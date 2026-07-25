@@ -33,14 +33,14 @@ if (!is_file($packageDir . '/vendor/autoload.php')) {
 require $packageDir . '/vendor/autoload.php';
 
 /**
- * This package's OWN module prefixes — deliberately NOT the whole shared `SprykerCommunity\` root.
- * search-ranking (a REAL `require`, not suggested) lives under that identical namespace root
- * (`SprykerCommunity\Client\SearchRanking\`, `SprykerCommunity\Zed\SearchRanking\`, ...), so a broad
- * `SprykerCommunity\` "own code, skip" prefix would silently skip verifying search-ranking's own symbols
- * too — exactly the undeclared-dependency bug this script exists to catch, just hidden by an overly
- * generous prefix. List this package's own module names explicitly here as they're added, so anything
- * under `SprykerCommunity\*\SearchRanking\` (a different module) falls through to the normal
- * class_exists() check below instead of being waved through.
+ * This package's OWN module prefixes — deliberately NOT the whole shared `SprykerCommunity\` root. Once
+ * `spryker-community/search-ranking` is declared as a real `require` (it isn't yet — no code references it
+ * yet either), it will live under that identical namespace root (`SprykerCommunity\Client\SearchRanking\`,
+ * `SprykerCommunity\Zed\SearchRanking\`, ...), so a broad `SprykerCommunity\` "own code, skip" prefix would
+ * silently skip verifying search-ranking's own symbols too — exactly the undeclared-dependency bug this
+ * script exists to catch, just hidden by an overly generous prefix. List this package's own module names
+ * explicitly here as they're added, so anything under `SprykerCommunity\*\SearchRanking\` (a different
+ * module) falls through to the normal class_exists() check below instead of being waved through.
  *
  * @var array<string>
  */

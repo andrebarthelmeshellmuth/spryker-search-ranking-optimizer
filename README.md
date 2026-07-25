@@ -14,9 +14,12 @@ actively designed, where search-ranking's own mechanism is stable, tested, v1.0)
 
 ## Relationship to search-ranking
 
-A real, one-directional dependency: this package requires `spryker-community/search-ranking` and writes
-into its tables (metric weights, settings) via its facade — search-ranking has no knowledge of this
-package and works completely standalone without it.
+Intended to be a real, one-directional dependency: this package will require
+`spryker-community/search-ranking` and write into its tables (metric weights, settings) via its facade —
+search-ranking has no knowledge of this package and works completely standalone without it. Not yet
+declared in `composer.json`, since no code here references it yet (nothing built) and search-ranking's own
+repo is currently private — will be added in the same change that first needs it, once search-ranking is
+public or CI has a way to authenticate against it.
 
 ## Planned scope
 
