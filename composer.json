@@ -1,0 +1,69 @@
+{
+    "name": "spryker-community/search-ranking-optimizer",
+    "type": "library",
+    "description": "Tuning layer for spryker-community/search-ranking: SRP weight-slider live preview, a tier-2/tier-3 propose-review-apply workflow with named checkpoints, offline relevance evaluation (rank_eval judgment capture + scoring), and a monthly auto-tune job - deciding what the ranking weights should be, on top of the mechanism that applies them.",
+    "license": "MIT",
+    "keywords": [
+        "spryker",
+        "elasticsearch",
+        "search",
+        "ranking",
+        "tuning",
+        "optimization"
+    ],
+    "require": {
+        "php": ">=8.3",
+        "spryker/kernel": "^3.30.0",
+        "spryker-community/search-ranking": "dev-main"
+    },
+    "require-dev": {
+        "codeception/codeception": "^5.0.0",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0.0",
+        "phpmd/phpmd": "^2.15.0",
+        "phpunit/phpunit": "^10.0.0 || ^11.0.0",
+        "spryker/code-sniffer": "^0.17.30"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking"
+        }
+    ],
+    "scripts": {
+        "check-floors": [
+            "@composer update --prefer-lowest --prefer-stable --no-dev --no-interaction",
+            "php tools/floor-check.php"
+        ]
+    },
+    "scripts-descriptions": {
+        "check-floors": "Verifies the declared dependency floors are real: resolves every constraint to its oldest allowed version (production deps only) and asserts each vendor symbol used in src/ actually exists there."
+    },
+    "autoload": {
+        "psr-4": {
+            "SprykerCommunity\\": "src/SprykerCommunity/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SprykerCommunityTest\\": "tests/SprykerCommunityTest/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "minimum-stability": "stable",
+    "homepage": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer",
+    "authors": [
+        {
+            "name": "Andre Barthelmes",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer/issues",
+        "source": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer"
+    }
+}

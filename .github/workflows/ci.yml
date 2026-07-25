@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    name: composer validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - run: composer validate --no-check-publish
+
+  style:
+    name: phpcs (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - run: vendor/bin/phpcs
+
+  floors:
+    # The check that matters most for this package. Its dependency floors are claims about which
+    # versions of search-ranking (and Spryker itself) an adopter may install; a shop leaner than the
+    # development shop is exactly where an undeclared dependency surfaces, and that cannot be observed
+    # while developing inside a full demo shop. This resolves every constraint to its oldest allowed
+    # version and asserts each vendor symbol used in src/ actually exists there.
+    name: dependency floors (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: composer check-floors
+
+  complexity:
+    # Two SEPARATE phpmd runs, not one combined ruleset: PHPMD merges every loaded ruleset's
+    # exclude-pattern into one global file-ignore list for a single invocation, so keeping
+    # TooManyPublicMethods' Facade/Factory exemption in its own ruleset (run on its own) is the only
+    # way to exempt just that one rule without also hiding Facades/Factories from the rules below.
+    name: phpmd (codesize)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - run: vendor/bin/phpmd src github phpmd.xml
+      - name: Public method count (Facades/Factories exempt)
+        run: vendor/bin/phpmd src github phpmd-public-methods.xml
