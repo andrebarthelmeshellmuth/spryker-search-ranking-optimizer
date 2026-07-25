@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <search-ranking-optimizer-gui>
+        <label>Search Ranking Optimizer</label>
+        <title>Search Ranking Optimizer</title>
+        <icon>tune</icon>
+        <bundle>search-ranking-optimizer</bundle>
+        <controller>calibration</controller>
+        <action>index</action>
+        <pages>
+            <search-ranking-optimizer-calibration>
+                <label>Calibration</label>
+                <title>Calibration</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>calibration</controller>
+                <action>index</action>
+            </search-ranking-optimizer-calibration>
+            <search-ranking-optimizer-calibration-apply>
+                <label>Apply Calibration</label>
+                <title>Apply Calibration</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>calibration-apply</controller>
+                <action>index</action>
+                <visible>0</visible>
+            </search-ranking-optimizer-calibration-apply>
+        </pages>
+    </search-ranking-optimizer-gui>
+</config>

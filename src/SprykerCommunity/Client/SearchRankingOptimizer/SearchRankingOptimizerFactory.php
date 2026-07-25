@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * This file is part of the spryker-community/search-ranking-optimizer package.
+ * For full license information, please view the LICENSE file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace SprykerCommunity\Client\SearchRankingOptimizer;
+
+use Elastica\Client;
+use Spryker\Client\Kernel\AbstractFactory;
+use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
+use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
+use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
+use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
+
+class SearchRankingOptimizerFactory extends AbstractFactory
+{
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface
+     */
+    public function createCalibrationSearcher(): CalibrationSearcherInterface
+    {
+        return new CalibrationSearcher(
+            $this->getElasticaClient(),
+            $this->createIndexNameResolver(),
+            $this->createRawRelevanceScoreExtractor(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface
+     */
+    public function createRawRelevanceScoreExtractor(): RawRelevanceScoreExtractorInterface
+    {
+        return new RawRelevanceScoreExtractor();
+    }
+
+    /**
+     * COMPOSITION over the core SearchElasticsearch module, deliberately — the same pattern (and the same
+     * reasoning) as the base spryker-community/search-ranking package's own Client factory, and as
+     * `SprykerCommunity\Client\SearchDebug\SearchDebugFactory::getElasticaClient()`.
+     *
+     * @return \Elastica\Client
+     */
+    public function getElasticaClient(): Client
+    {
+        return $this->createElasticaClientFactory()->createClient(
+            $this->createSearchElasticsearchConfig()->getClientConfig(),
+        );
+    }
+
+    /**
+     * @return \Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory
+     */
+    public function createElasticaClientFactory(): ElasticaClientFactory
+    {
+        return new ElasticaClientFactory();
+    }
+
+    /**
+     * @return \Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig
+     */
+    public function createSearchElasticsearchConfig(): SearchElasticsearchConfig
+    {
+        return new SearchElasticsearchConfig();
+    }
+
+    /**
+     * @return \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface
+     */
+    public function createIndexNameResolver(): IndexNameResolverInterface
+    {
+        return new IndexNameResolver(
+            $this->createNeverInvokedStoreClient(),
+            $this->createSearchElasticsearchConfig(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient
+     */
+    public function createNeverInvokedStoreClient(): NeverInvokedStoreClient
+    {
+        return new NeverInvokedStoreClient();
+    }
+}

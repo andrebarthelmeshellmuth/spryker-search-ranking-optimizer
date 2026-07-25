@@ -1,0 +1,76 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Search Ranking Calibration' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k)' } %}
+        {% block widget_content %}
+            <p>Live value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
+
+            {% if latestCalibration %}
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>Last calculated</th>
+                            <td>{{ latestCalibration.calculatedAt }}</td>
+                        </tr>
+                        <tr>
+                            <th>Relevant products per search (X)</th>
+                            <td>{{ latestCalibration.relevantProductCount }}</td>
+                        </tr>
+                        <tr>
+                            <th>Store / Locale</th>
+                            <td>{{ latestCalibration.storeName }} / {{ latestCalibration.localeName }}</td>
+                        </tr>
+                        <tr>
+                            <th>Sampled scores</th>
+                            <td>{{ latestCalibration.sampleCount }}</td>
+                        </tr>
+                        <tr>
+                            <th>Computed k (mean)</th>
+                            <td><strong>{{ latestCalibration.computedK }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th>Min / p25 / median / p75 / Max</th>
+                            <td>
+                                {{ latestCalibration.scoreMin }} /
+                                {{ latestCalibration.scoreP25 }} /
+                                {{ latestCalibration.scoreMedian }} /
+                                {{ latestCalibration.scoreP75 }} /
+                                {{ latestCalibration.scoreMax }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {{ form_start(applyForm, { action: url('/search-ranking-optimizer/calibration-apply') }) }}
+                {{ form_widget(applyForm) }}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">{{ 'Apply' | trans }}</button>
+                </div>
+                {{ form_end(applyForm) }}
+            {% else %}
+                <p>No calibration run has finished yet — upload one below.</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Upload New Calibration Run' } %}
+        {% block widget_content %}
+            <p>
+                Upload a single-column CSV of "relevant" search terms (one per line, gathered from real
+                search logs). The next <code>search-ranking-optimizer:calibrate</code> cron tick fires the
+                live catalog search-string query for each term, samples the raw text-relevance score of the
+                top-ranked products (up to X per term), and pools all of them into a suggested k value for
+                spryker-community/search-ranking's ranking formula.
+            </p>
+            {{ form_start(uploadForm, { action: url('/search-ranking-optimizer/calibration') }) }}
+            {{ form_widget(uploadForm) }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Upload' | trans }}</button>
+            </div>
+            {{ form_end(uploadForm) }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}
