@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<database xmlns="spryker:schema-01" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="zed" namespace="Orm\Zed\SearchRankingOptimizer\Persistence" package="src.Orm.Zed.SearchRankingOptimizer.Persistence" xsi:schemaLocation="spryker:schema-01 https://static.spryker.com/schema-01.xsd">
+
+    <table name="spy_search_ranking_calibration" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_calibration" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="relevant_product_count" type="INTEGER" required="true" description="X: number of top-ranked products per search term assumed relevant, e.g. 6."/>
+        <column name="store_name" type="VARCHAR" size="64" required="true" description="Store the calibration query runs against, e.g. DE — picked by the admin at upload time, since Zed has no implicit current store."/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true" description="Locale the calibration query runs against, e.g. de_DE — picked by the admin at upload time."/>
+        <column name="status" type="VARCHAR" size="32" required="true" defaultValue="uploaded" description="uploaded, skipped, calculating, calculated or failed."/>
+        <column name="computed_k" type="DOUBLE" required="false" description="Pooled mean text-relevance score across all sampled products; the calculated relevanceSaturationPoint suggestion."/>
+        <column name="score_min" type="DOUBLE" required="false"/>
+        <column name="score_max" type="DOUBLE" required="false"/>
+        <column name="score_mean" type="DOUBLE" required="false"/>
+        <column name="score_median" type="DOUBLE" required="false"/>
+        <column name="score_p25" type="DOUBLE" required="false"/>
+        <column name="score_p75" type="DOUBLE" required="false"/>
+        <column name="sample_count" type="INTEGER" required="false" description="Total number of pooled product scores the stats were computed from."/>
+        <column name="calculated_at" type="TIMESTAMP" required="false"/>
+        <column name="error_message" type="VARCHAR" size="1024" required="false"/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_calibration_pk_seq"/>
+
+        <index name="index-spy_src-status">
+            <index-column name="status"/>
+        </index>
+    </table>
+
+    <table name="spy_search_ranking_calibration_search_term" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_calibration_search_term" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="fk_search_ranking_calibration" type="INTEGER" required="true"/>
+        <column name="search_term" type="VARCHAR" size="255" required="true"/>
+        <column name="products_found" type="INTEGER" required="false" description="Null until calculated; may be less than the run's relevant_product_count."/>
+        <column name="scores" type="LONGVARCHAR" required="false" description="Comma-separated raw text-relevance scores, one per found product, null until calculated."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_calibration_search_term_pk_seq"/>
+
+        <foreign-key name="spy_src_search_term-fk_calibration" foreignTable="spy_search_ranking_calibration" phpName="SearchRankingCalibration" refPhpName="SearchRankingCalibrationSearchTerm" onDelete="CASCADE">
+            <reference local="fk_search_ranking_calibration" foreign="id_search_ranking_calibration"/>
+        </foreign-key>
+
+        <index name="index-spy_src_search_term-fk_calibration">
+            <index-column name="fk_search_ranking_calibration"/>
+        </index>
+    </table>
+
+</database>

@@ -1,0 +1,171 @@
+<?php
+
+/**
+ * This file is part of the spryker-community/search-ranking-optimizer package.
+ * For full license information, please view the LICENSE file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace SprykerCommunity\Zed\SearchRankingOptimizer;
+
+use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
+use Spryker\Zed\Kernel\Container;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeBridge;
+
+/**
+ * @method \SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerConfig getConfig()
+ */
+class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyProvider
+{
+    /**
+     * @var string
+     */
+    public const CLIENT_SEARCH_RANKING_OPTIMIZER = 'CLIENT_SEARCH_RANKING_OPTIMIZER';
+
+    /**
+     * The base spryker-community/search-ranking facade — this package writes the calibration's suggested
+     * `relevanceSaturationPoint` (k) back into that package's own setting via `saveRelevanceSaturationPoint()`
+     * when an admin applies a calibration. One-directional: this package depends on search-ranking, never
+     * the reverse.
+     *
+     * @var string
+     */
+    public const FACADE_SEARCH_RANKING = 'FACADE_SEARCH_RANKING';
+
+    /**
+     * The base package's storage facade — used to republish the ranking configuration after the applied
+     * `k` was persisted, so the live storefront query picks it up.
+     *
+     * @var string
+     */
+    public const FACADE_SEARCH_RANKING_STORAGE = 'FACADE_SEARCH_RANKING_STORAGE';
+
+    /**
+     * @var string
+     */
+    public const FACADE_STORE = 'FACADE_STORE';
+
+    /**
+     * @var string
+     */
+    public const FACADE_LOCALE = 'FACADE_LOCALE';
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    public function provideBusinessLayerDependencies(Container $container): Container
+    {
+        $container = parent::provideBusinessLayerDependencies($container);
+        $container = $this->addSearchRankingClient($container);
+
+        return $container;
+    }
+
+    /**
+     * The base-package facade bridges are Communication-layer dependencies only (the Gui apply
+     * controller), kept out of the Business layer so the calibration business logic itself has no
+     * dependency on the base package.
+     *
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    public function provideCommunicationLayerDependencies(Container $container): Container
+    {
+        $container = parent::provideCommunicationLayerDependencies($container);
+        $container = $this->addSearchRankingClient($container);
+        $container = $this->addSearchRankingFacade($container);
+        $container = $this->addSearchRankingStorageFacade($container);
+        $container = $this->addStoreFacade($container);
+        $container = $this->addLocaleFacade($container);
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addSearchRankingClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, function (Container $container) {
+            return new SearchRankingOptimizerToSearchRankingClientBridge(
+                $container->getLocator()->searchRankingOptimizer()->client(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addSearchRankingFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_SEARCH_RANKING, function (Container $container) {
+            return new SearchRankingOptimizerToSearchRankingFacadeBridge(
+                $container->getLocator()->searchRanking()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addSearchRankingStorageFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_SEARCH_RANKING_STORAGE, function (Container $container) {
+            return new SearchRankingOptimizerToSearchRankingStorageFacadeBridge(
+                $container->getLocator()->searchRankingStorage()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addStoreFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_STORE, function (Container $container) {
+            return new SearchRankingOptimizerToStoreFacadeBridge(
+                $container->getLocator()->store()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addLocaleFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_LOCALE, function (Container $container) {
+            return new SearchRankingOptimizerToLocaleFacadeBridge(
+                $container->getLocator()->locale()->facade(),
+            );
+        });
+
+        return $container;
+    }
+}

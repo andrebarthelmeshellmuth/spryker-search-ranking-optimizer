@@ -1,7 +1,7 @@
 {
     "name": "spryker-community/search-ranking-optimizer",
     "type": "library",
-    "description": "Tuning layer for spryker-community/search-ranking: SRP weight-slider live preview, a tier-2/tier-3 propose-review-apply workflow with named checkpoints, offline relevance evaluation (rank_eval judgment capture + scoring), and a monthly auto-tune job - deciding what the ranking weights should be, on top of the mechanism that applies them.",
+    "description": "Tuning layer for spryker-community/search-ranking: relevance-saturation-point (k) calibration (sample top-X search terms / top-Y results to compute the ranking formula's normalization constant), plus the planned SRP weight-slider preview, propose-review-apply workflow, rank_eval evaluation, and auto-tune job - deciding what the ranking parameters should be, on top of the mechanism that applies them.",
     "license": "MIT",
     "keywords": [
         "spryker",
@@ -13,7 +13,18 @@
     ],
     "require": {
         "php": ">=8.3",
-        "spryker/kernel": "^3.30.0"
+        "spryker/catalog": "^5.7.0",
+        "spryker/gui": "^3.30.0 || ^5.0.0",
+        "spryker/kernel": "^3.30.0",
+        "spryker/locale": "^4.0.0",
+        "spryker/propel-orm": "^1.24.0",
+        "spryker/search-elasticsearch": "^1.10.0",
+        "spryker/store": "^1.0.0",
+        "spryker/transfer": "^3.25.0",
+        "symfony/console": "^6.0.0 || ^7.0.0",
+        "symfony/form": "^6.0.0 || ^7.0.0",
+        "symfony/http-foundation": "^6.0.0 || ^7.0.0",
+        "symfony/validator": "^6.0.0 || ^7.0.0"
     },
     "require-dev": {
         "codeception/codeception": "^5.0.0",
@@ -21,6 +32,9 @@
         "phpmd/phpmd": "^2.15.0",
         "phpunit/phpunit": "^10.0.0 || ^11.0.0",
         "spryker/code-sniffer": "^0.17.30"
+    },
+    "suggest": {
+        "spryker-community/search-ranking": "REQUIRED AT RUNTIME. This package reads and writes the ranking formula's relevanceSaturationPoint (k) via search-ranking's own facade when a calibration is applied. Listed under suggest rather than require only because search-ranking's repository is currently private; it becomes a hard require once search-ranking is public."
     },
     "scripts": {
         "check-floors": [
