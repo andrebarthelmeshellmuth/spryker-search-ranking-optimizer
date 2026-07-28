@@ -15,6 +15,11 @@ installs and runs completely standalone without it (see [Relationship to search-
 propose/review/apply workflow, offline `rank_eval` evaluation, a monthly auto-tune job, automated weight
 search) is designed and on the [Roadmap](#roadmap) but not built yet.
 
+Verified: dependency floors resolved and checked at their oldest allowed versions (`composer
+check-floors`), 44 tests / 113 assertions (real database and real live-engine integration tests where a
+mocked collaborator couldn't actually prove the thing worth proving — see [Testing and CI](#testing-and-ci)),
+phpcs, phpmd, and phpstan level 8 all clean.
+
 ## What it does today
 
 ### Calibration — empirically sampling `relevanceSaturationPoint` (k)
@@ -72,8 +77,8 @@ here as the `Client\SearchRankingOptimizer\Search` component.
 - Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch — see `composer.json` for
   floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
-- **`spryker-community/search-ranking` installed and wired** — this is the runtime `suggest` dependency;
-  the Apply step writes into its `relevanceSaturationPoint` setting
+- **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.0`); the Apply step
+  writes into its `relevanceSaturationPoint` setting via its facade
 
 ## Installation
 
@@ -82,11 +87,21 @@ shares its `SprykerCommunity` core namespace and its `spryker-community/*` trans
 
 ### 1. Install the package
 
-```bash
-composer require spryker-community/search-ranking-optimizer
+Not yet published on Packagist — install from a path repository:
+
+```json
+"repositories": [
+    {
+        "type": "path",
+        "url": "packages/spryker-community/search-ranking-optimizer",
+        "options": { "symlink": true }
+    }
+]
 ```
 
-(During local development it is a `path` repository symlinked into the shop, exactly like its siblings.)
+```bash
+composer require spryker-community/search-ranking-optimizer:@dev
+```
 
 ### 2. Register the core namespace
 
@@ -182,6 +197,8 @@ Calibration is the first piece of a larger tuning layer. Designed, not yet built
 
 ## Testing and CI
 
+### Automated checks
+
 `.github/workflows/ci.yml` runs on every push and pull request, the same set of checks as its siblings:
 
 | check | what it protects |
@@ -202,13 +219,54 @@ composer check-floors
 
 ### Test suite
 
-Codeception suites live under `tests/` — the CSV search-term parser, the score calibrator, the statistics
-calculator, the raw-relevance-score extractor, and the persistence mapper. From a shop that has the
-package installed:
+**44 tests, 113 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+`Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash
 vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizer
 vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizer
+```
+
+The CSV search-term parser, the score calibrator (skip-older-uploads, failing-term-treated-as-zero,
+fail-when-nothing-scored, the vanished-row race), the statistics calculator, and the persistence mapper
+are covered as pure unit tests — no database needed.
+
+`SearchRankingOptimizerEntityManagerTest` and `SearchRankingOptimizerRepositoryTest` are **real database**
+integration tests, not mocked: every method here is a thin Propel read-modify-write, so the one thing
+actually worth protecting is that a value round-trips correctly (right FK linkage, right column mapping,
+a safe no-op instead of a crash on an id that no longer exists) — a mocked query builder could confirm the
+right methods were called but never that. One case (`findLatestCalculatedCalibration` returning `null`
+when nothing is calculated yet) is exempted from this shop's own suite: this demoshop always has at least
+one real calculated calibration already, so the "nothing calculated yet" branch can't be reached without
+deleting real data — covered by inspection instead (a two-line early-return, same shape as the four
+sibling not-found guards that *are* exercised).
+
+The `Client/SearchRankingOptimizer` suite lives at `tests/SprykerCommunityTest/Client/SearchRankingOptimizer`.
+`CalibrationSearcherTest` is a real integration test, not a unit test: it builds the exact query
+`SearchRankingOptimizerFactory::createCalibrationSearcher()` builds in production and fires it at this
+shop's own real product-page index (a throwaway fixture index would prove nothing here — this class exists
+specifically to sample real relevance scores from the real catalog), asserting a known search term returns
+real positive scores and an unmatched term returns none. `RawRelevanceScoreExtractorTest` covers the
+explanation-parsing logic itself as a pure unit test against all four known `_explanation` shapes
+(function-score-wrapped, unwrapped, nested, the zero-value guard) — `CalibrationSearcher` never wraps its
+query in `function_score` (unlike search-ranking's live serving path), so the unwrapped-fallback shape
+those unit tests assume is the same shape confirmed live against this shop's real OpenSearch 1.3.4.
+`NeverInvokedStoreClient` is the one class with no test: a `LogicException`-throwing stub that structurally
+satisfies an interface but is documented, by construction, to never actually be called — the same
+exemption this project's own audit convention already grants exception/boilerplate classes.
+
+Coverage (Codeception + pcov): 100% of methods/lines on every class except the two documented exemptions
+above (`NeverInvokedStoreClient`, and the one unreachable-in-this-shop branch in
+`SearchRankingOptimizerRepository`).
+
+Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 45
+files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
+generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
+`transfer:generate`:
+
+```bash
+vendor/bin/phpstan clear-result-cache -c vendor/spryker-community/search-ranking-optimizer/phpstan.neon
+vendor/bin/phpstan analyse -c vendor/spryker-community/search-ranking-optimizer/phpstan.neon vendor/spryker-community/search-ranking-optimizer/src
 ```
 
 ## License
