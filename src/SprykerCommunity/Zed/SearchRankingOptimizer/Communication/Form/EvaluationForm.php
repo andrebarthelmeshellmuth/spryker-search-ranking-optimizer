@@ -77,6 +77,7 @@ class EvaluationForm extends AbstractType
         $resolver->setDefaults([
             static::OPTION_STORE_CHOICES => [],
             static::OPTION_LOCALE_CHOICES => [],
+            'method' => 'GET',
         ]);
     }
 
