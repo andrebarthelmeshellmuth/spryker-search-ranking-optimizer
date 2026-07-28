@@ -92,4 +92,60 @@
         <property name="errorMessage" type="string"/>
     </transfer>
 
+    <!-- One rated (query, product) judgment feeding a rank_eval evaluation: the query's own id/searchTerm
+         plus the per-product mean gain across every admin who rated that (query, product) pair (see
+         SearchRankingEvaluationRequest for how "mean" is computed and why). -->
+    <transfer name="SearchRankingEvaluationProductGain" strict="true">
+        <property name="idProductAbstract" type="int"/>
+        <property name="gain" type="float"/>
+    </transfer>
+
+    <!-- One query's worth of rank_eval input: its canonical searchTerm (fired as the live catalog query)
+         plus every rated product's gain for it. -->
+    <transfer name="SearchRankingEvaluationQuery" strict="true">
+        <property name="idSearchRankingQuery" type="int"/>
+        <property name="searchTerm" type="string"/>
+        <property name="importanceWeight" type="float"/>
+        <property name="productGains" type="SearchRankingEvaluationProductGain[]" singular="productGain"/>
+    </transfer>
+
+    <!-- Zed business layer -> Client bridge request: fire one _rank_eval call covering every rated query
+         for a single (storeName, localeName) — mirrors Calibration's own store/locale scoping. cutoff is
+         the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). -->
+    <transfer name="SearchRankingEvaluationRequest" strict="true">
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="cutoff" type="int"/>
+        <property name="queries" type="SearchRankingEvaluationQuery[]" singular="query"/>
+    </transfer>
+
+    <!-- One query's own nDCG@cutoff, read out of _rank_eval's response `details` map (NOT the response's
+         own top-level metric_score, which is a plain unweighted mean across queries — the
+         query-importance-weighted aggregate is computed in PHP from these per-query values instead; see
+         RankEvaluationRunner). -->
+    <transfer name="SearchRankingEvaluationQueryScore" strict="true">
+        <property name="idSearchRankingQuery" type="int"/>
+        <property name="metricScore" type="float"/>
+    </transfer>
+
+    <!-- Client bridge -> Zed business layer response: one score per query that was actually included in
+         the request. -->
+    <transfer name="SearchRankingEvaluationResponse" strict="true">
+        <property name="queryScores" type="SearchRankingEvaluationQueryScore[]" singular="queryScore"/>
+    </transfer>
+
+    <!-- One persisted evaluation run: the query-importance-weighted nDCG aggregate across every rated
+         query for a (storeName, localeName) at a point in time, computed in PHP from the individual
+         SearchRankingEvaluationQueryScore values (see SearchRankingEvaluationResponse) weighted by each
+         query's own importanceWeight. queryCount is how many queries actually had ratings to contribute -
+         a run over a store/locale with zero rated queries is never persisted (nothing to evaluate). -->
+    <transfer name="SearchRankingEvaluation" strict="true">
+        <property name="idSearchRankingEvaluation" type="int"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="metricScore" type="float"/>
+        <property name="queryCount" type="int"/>
+        <property name="createdAt" type="string"/>
+    </transfer>
+
 </transfers>

@@ -12,10 +12,12 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager;
 
@@ -42,12 +44,21 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     protected array $calibrationEntities = [];
 
     /**
+     * @var array<int>
+     */
+    protected array $evaluationIds = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
     {
         foreach ($this->calibrationEntities as $calibrationEntity) {
             $calibrationEntity->delete();
+        }
+
+        foreach ($this->evaluationIds as $idSearchRankingEvaluation) {
+            SpySearchRankingEvaluationQuery::create()->findOneByIdSearchRankingEvaluation($idSearchRankingEvaluation)?->delete();
         }
 
         parent::_after();
@@ -245,6 +256,31 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->markCalibrationFailed(-1, 'irrelevant');
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateEvaluationPersistsTheEvaluation(): void
+    {
+        // Arrange
+        $evaluationTransfer = (new SearchRankingEvaluationTransfer())
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setMetricScore(0.7123)
+            ->setQueryCount(5);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createEvaluation($evaluationTransfer);
+        $this->evaluationIds[] = $resultTransfer->getIdSearchRankingEvaluationOrFail();
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingEvaluation());
+        $this->assertSame('DE', $resultTransfer->getStoreName());
+        $this->assertSame('en_US', $resultTransfer->getLocaleName());
+        $this->assertSame(0.7123, $resultTransfer->getMetricScore());
+        $this->assertSame(5, $resultTransfer->getQueryCount());
+        $this->assertNotNull($resultTransfer->getCreatedAt());
     }
 
     /**

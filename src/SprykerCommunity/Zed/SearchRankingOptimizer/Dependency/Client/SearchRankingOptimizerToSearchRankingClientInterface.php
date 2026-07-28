@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client;
 
+use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+
 interface SearchRankingOptimizerToSearchRankingClientInterface
 {
     /**
@@ -20,4 +23,11 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
      * @return array<float>
      */
     public function getCalibrationScores(string $searchTerm, string $storeName, string $localeName, int $limit): array;
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
+     */
+    public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
 }

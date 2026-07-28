@@ -12,7 +12,9 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 use Codeception\Test\Unit;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
 
@@ -43,6 +45,16 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     protected array $queryEntities = [];
 
     /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating>
+     */
+    protected array $ratingEntities = [];
+
+    /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation>
+     */
+    protected array $evaluationEntities = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
@@ -51,8 +63,16 @@ class SearchRankingOptimizerRepositoryTest extends Unit
             $calibrationEntity->delete();
         }
 
+        foreach ($this->ratingEntities as $ratingEntity) {
+            $ratingEntity->delete();
+        }
+
         foreach ($this->queryEntities as $queryEntity) {
             $queryEntity->delete();
+        }
+
+        foreach ($this->evaluationEntities as $evaluationEntity) {
+            $evaluationEntity->delete();
         }
 
         parent::_after();
@@ -209,6 +229,106 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testFindQueriesByStoreLocaleReturnsOnlyQueriesForThatStoreLocale(): void
+    {
+        // Arrange
+        $storeName = 'DE-TEST-FIND-QUERIES';
+        $matching = $this->createTestQuery('chair', $storeName, 'en_US');
+        $this->createTestQuery('desk', $storeName, 'de_DE');
+        $this->createTestQuery('lamp', 'DE-TEST-OTHER-STORE', 'en_US');
+
+        // Act
+        $queryTransfers = (new SearchRankingOptimizerRepository())->findQueriesByStoreLocale($storeName, 'en_US');
+
+        // Assert
+        $this->assertCount(1, $queryTransfers);
+        $this->assertSame($matching->getIdSearchRankingQuery(), $queryTransfers[0]->getIdSearchRankingQuery());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindRatingsByStoreLocaleReturnsRatingsJoinedThroughTheQuery(): void
+    {
+        // Arrange — id 9 is a real seeded product abstract (M1006811), needed to satisfy the rating
+        // table's real FK constraint to spy_product_abstract.
+        $storeName = 'DE-TEST-FIND-RATINGS';
+        $queryEntity = $this->createTestQuery('chair', $storeName, 'en_US');
+        $otherStoreQueryEntity = $this->createTestQuery('chair', 'DE-TEST-OTHER-STORE', 'en_US');
+
+        $matchingRating = $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-1', 9, 'heart');
+        $this->createTestRating($otherStoreQueryEntity->getIdSearchRankingQuery(), 'CUST-1', 9, 'heart');
+
+        // Act
+        $ratingTransfers = (new SearchRankingOptimizerRepository())->findRatingsByStoreLocale($storeName, 'en_US');
+
+        // Assert
+        $this->assertCount(1, $ratingTransfers);
+        $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindLatestEvaluationReturnsTheMostRecentRow(): void
+    {
+        // Arrange
+        $storeName = 'DE-TEST-LATEST-EVAL';
+        $older = $this->createTestEvaluation($storeName, 'en_US', 0.5, 3);
+        $older->setCreatedAt('2026-01-01 00:00:00');
+        $older->save();
+
+        $newer = $this->createTestEvaluation($storeName, 'en_US', 0.7, 5);
+        $newer->setCreatedAt('2099-01-01 00:00:00');
+        $newer->save();
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestEvaluation($storeName, 'en_US');
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($newer->getIdSearchRankingEvaluation(), $resultTransfer->getIdSearchRankingEvaluation());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindLatestEvaluationReturnsNullWhenNoneExists(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestEvaluation('DE-TEST-NO-EVAL-EXISTS', 'en_US');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindEvaluationHistoryByStoreLocaleReturnsNewestFirst(): void
+    {
+        // Arrange
+        $storeName = 'DE-TEST-EVAL-HISTORY';
+        $older = $this->createTestEvaluation($storeName, 'en_US', 0.5, 3);
+        $older->setCreatedAt('2026-01-01 00:00:00');
+        $older->save();
+
+        $newer = $this->createTestEvaluation($storeName, 'en_US', 0.7, 5);
+        $newer->setCreatedAt('2099-01-01 00:00:00');
+        $newer->save();
+
+        // Act
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistoryByStoreLocale($storeName, 'en_US');
+
+        // Assert
+        $this->assertCount(2, $historyTransfers);
+        $this->assertSame($newer->getIdSearchRankingEvaluation(), $historyTransfers[0]->getIdSearchRankingEvaluation());
+        $this->assertSame($older->getIdSearchRankingEvaluation(), $historyTransfers[1]->getIdSearchRankingEvaluation());
+    }
+
+    /**
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
@@ -245,5 +365,53 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->calibrationEntities[] = $calibrationEntity;
 
         return $calibrationEntity;
+    }
+
+    /**
+     * @param int $fkSearchRankingQuery
+     * @param string $customerReference
+     * @param int $fkProductAbstract
+     * @param string $ratingType
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating
+     */
+    protected function createTestRating(
+        int $fkSearchRankingQuery,
+        string $customerReference,
+        int $fkProductAbstract,
+        string $ratingType,
+    ): SpySearchRankingQueryRating {
+        $ratingEntity = new SpySearchRankingQueryRating();
+        $ratingEntity->setFkSearchRankingQuery($fkSearchRankingQuery);
+        $ratingEntity->setCustomerReference($customerReference);
+        $ratingEntity->setFkProductAbstract($fkProductAbstract);
+        $ratingEntity->setRatingType($ratingType);
+        $ratingEntity->save();
+
+        $this->ratingEntities[] = $ratingEntity;
+
+        return $ratingEntity;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $metricScore
+     * @param int $queryCount
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation
+     */
+    protected function createTestEvaluation(string $storeName, string $localeName, float $metricScore, int $queryCount): SpySearchRankingEvaluation
+    {
+        $evaluationEntity = new SpySearchRankingEvaluation();
+        $evaluationEntity->setStoreName($storeName);
+        $evaluationEntity->setLocaleName($localeName);
+        $evaluationEntity->setMetricScore($metricScore);
+        $evaluationEntity->setQueryCount($queryCount);
+        $evaluationEntity->save();
+
+        $this->evaluationEntities[] = $evaluationEntity;
+
+        return $evaluationEntity;
     }
 }

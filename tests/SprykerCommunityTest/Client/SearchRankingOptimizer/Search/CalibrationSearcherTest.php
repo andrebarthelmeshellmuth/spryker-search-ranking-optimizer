@@ -14,6 +14,7 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 
@@ -82,6 +83,6 @@ class CalibrationSearcherTest extends Unit
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        return new CalibrationSearcher($elasticaClient, $indexNameResolver, new RawRelevanceScoreExtractor());
+        return new CalibrationSearcher($elasticaClient, $indexNameResolver, new RawRelevanceScoreExtractor(), new LiveCatalogSearchQueryBuilder());
     }
 }

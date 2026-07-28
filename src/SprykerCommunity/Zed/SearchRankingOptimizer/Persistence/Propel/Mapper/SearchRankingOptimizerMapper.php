@@ -11,10 +11,12 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 
@@ -131,5 +133,24 @@ class SearchRankingOptimizerMapper
             ->setRatingType($ratingEntity->getRatingType())
             ->setCreatedAt($ratingEntity->getCreatedAt()?->format(DATE_ATOM))
             ->setUpdatedAt($ratingEntity->getUpdatedAt()?->format(DATE_ATOM));
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation $evaluationEntity
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
+     */
+    public function mapEvaluationEntityToTransfer(
+        SpySearchRankingEvaluation $evaluationEntity,
+        SearchRankingEvaluationTransfer $evaluationTransfer,
+    ): SearchRankingEvaluationTransfer {
+        return $evaluationTransfer
+            ->setIdSearchRankingEvaluation($evaluationEntity->getIdSearchRankingEvaluation())
+            ->setStoreName($evaluationEntity->getStoreName())
+            ->setLocaleName($evaluationEntity->getLocaleName())
+            ->setMetricScore($evaluationEntity->getMetricScore())
+            ->setQueryCount($evaluationEntity->getQueryCount())
+            ->setCreatedAt($evaluationEntity->getCreatedAt()?->format(DATE_ATOM));
     }
 }

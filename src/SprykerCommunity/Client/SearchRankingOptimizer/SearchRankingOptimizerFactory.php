@@ -18,7 +18,11 @@ use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStub;
@@ -35,6 +39,7 @@ class SearchRankingOptimizerFactory extends AbstractFactory
             $this->getElasticaClient(),
             $this->createIndexNameResolver(),
             $this->createRawRelevanceScoreExtractor(),
+            $this->createLiveCatalogSearchQueryBuilder(),
         );
     }
 
@@ -44,6 +49,26 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function createRawRelevanceScoreExtractor(): RawRelevanceScoreExtractorInterface
     {
         return new RawRelevanceScoreExtractor();
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface
+     */
+    public function createLiveCatalogSearchQueryBuilder(): LiveCatalogSearchQueryBuilderInterface
+    {
+        return new LiveCatalogSearchQueryBuilder();
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface
+     */
+    public function createRankEvalRunner(): RankEvalRunnerInterface
+    {
+        return new RankEvalRunner(
+            $this->getElasticaClient(),
+            $this->createIndexNameResolver(),
+            $this->createLiveCatalogSearchQueryBuilder(),
+        );
     }
 
     /**

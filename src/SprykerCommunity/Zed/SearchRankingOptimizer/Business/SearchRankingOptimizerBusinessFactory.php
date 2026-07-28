@@ -18,6 +18,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibr
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculator;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdater;
@@ -109,5 +113,26 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function createQueryImportanceWeightUpdater(): QueryImportanceWeightUpdaterInterface
     {
         return new QueryImportanceWeightUpdater($this->getEntityManager());
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface
+     */
+    public function createRelevanceJudgmentGainMapper(): RelevanceJudgmentGainMapperInterface
+    {
+        return new RelevanceJudgmentGainMapper();
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface
+     */
+    public function createRankEvaluationRunner(): RankEvaluationRunnerInterface
+    {
+        return new RankEvaluationRunner(
+            $this->getRepository(),
+            $this->getEntityManager(),
+            $this->getSearchRankingClient(),
+            $this->createRelevanceJudgmentGainMapper(),
+        );
     }
 }

@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
+use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 use Spryker\Client\Kernel\AbstractClient;
@@ -69,5 +71,21 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
         return $this->getFactory()
             ->createProductRelevanceJudgmentStub()
             ->clearProductRelevanceJudgment($requestTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
+     */
+    public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
+    {
+        return $this->getFactory()
+            ->createRankEvalRunner()
+            ->evaluate($requestTransfer);
     }
 }
