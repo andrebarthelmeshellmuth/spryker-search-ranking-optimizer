@@ -10,9 +10,11 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
@@ -49,6 +51,11 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     protected array $evaluationIds = [];
 
     /**
+     * @var array<int>
+     */
+    protected array $autoTuneMetricConfigIds = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
@@ -59,6 +66,10 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         foreach ($this->evaluationIds as $idSearchRankingEvaluation) {
             SpySearchRankingEvaluationQuery::create()->findOneByIdSearchRankingEvaluation($idSearchRankingEvaluation)?->delete();
+        }
+
+        foreach ($this->autoTuneMetricConfigIds as $idSearchRankingAutoTuneMetricConfig) {
+            SpySearchRankingAutoTuneMetricConfigQuery::create()->findOneByIdSearchRankingAutoTuneMetricConfig($idSearchRankingAutoTuneMetricConfig)?->delete();
         }
 
         parent::_after();
@@ -281,6 +292,67 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(0.7123, $resultTransfer->getMetricScore());
         $this->assertSame(5, $resultTransfer->getQueryCount());
         $this->assertNotNull($resultTransfer->getCreatedAt());
+    }
+
+    /**
+     * @return void
+     */
+    public function testSaveAutoTuneMetricConfigCreatesANewRowWhenNoneExistsYetForTheMetric(): void
+    {
+        // Arrange
+        $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
+            ->setIdSearchRankingMetric(90001)
+            ->setAutoTuneThreshold(0.8)
+            ->setIsAutoUpdateEnabled(true)
+            ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
+            ->setIsNotifyEnabled(true);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig($autoTuneMetricConfigTransfer);
+        $this->autoTuneMetricConfigIds[] = $resultTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingAutoTuneMetricConfig());
+        $this->assertSame(90001, $resultTransfer->getIdSearchRankingMetric());
+        $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
+        $this->assertTrue($resultTransfer->getIsAutoUpdateEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $resultTransfer->getAutoUpdateScope());
+        $this->assertTrue($resultTransfer->getIsNotifyEnabled());
+    }
+
+    /**
+     * @return void
+     */
+    public function testSaveAutoTuneMetricConfigUpdatesTheExistingRowForThatMetricInsteadOfCreatingASecondOne(): void
+    {
+        // Arrange
+        $firstSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
+            (new SearchRankingAutoTuneMetricConfigTransfer())
+                ->setIdSearchRankingMetric(90002)
+                ->setAutoTuneThreshold(0.8)
+                ->setIsAutoUpdateEnabled(false)
+                ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
+                ->setIsNotifyEnabled(false),
+        );
+        $this->autoTuneMetricConfigIds[] = $firstSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
+
+        // Act
+        $secondSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
+            (new SearchRankingAutoTuneMetricConfigTransfer())
+                ->setIdSearchRankingMetric(90002)
+                ->setAutoTuneThreshold(0.6)
+                ->setIsAutoUpdateEnabled(true)
+                ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
+                ->setIsNotifyEnabled(true),
+        );
+
+        // Assert
+        $this->assertSame($firstSaveTransfer->getIdSearchRankingAutoTuneMetricConfig(), $secondSaveTransfer->getIdSearchRankingAutoTuneMetricConfig());
+        $this->assertSame(0.6, $secondSaveTransfer->getAutoTuneThreshold());
+        $this->assertTrue($secondSaveTransfer->getIsAutoUpdateEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $secondSaveTransfer->getAutoUpdateScope());
+        $this->assertTrue($secondSaveTransfer->getIsNotifyEnabled());
+        $this->assertSame(1, SpySearchRankingAutoTuneMetricConfigQuery::create()->filterByFkSearchRankingMetric(90002)->count());
     }
 
     /**

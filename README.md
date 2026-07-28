@@ -12,9 +12,9 @@ installs and runs completely standalone without it (see [Relationship to search-
 ## Status
 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
-evaluation, and weight checkpoint/rollback are all built, tested, and shipping.** The rest of the
-tuning layer (weight-slider preview, a propose/review/apply workflow, a monthly auto-tune job, automated
-weight search) is designed and on the [Roadmap](#roadmap) but not built yet.
+evaluation, weight checkpoint/rollback, and the monthly auto-tune job are all built, tested, and
+shipping.** The rest of the tuning layer (weight-slider preview, a propose/review/apply workflow,
+automated weight search) is designed and on the [Roadmap](#roadmap) but not built yet.
 
 Verified live end-to-end in a real browser (not just the automated test suite — see
 [Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
@@ -163,6 +163,49 @@ written back by a restore — it is a pure code-level project flag (`Pyz\Shared\
 in a host shop), with no corresponding save method on `search-ranking`'s facade, deliberately out of scope
 for anything database-driven.
 
+### Auto-tune — a monthly fit-quality check per metric
+
+Weight checkpoints above cover `relevanceWeight`/metric weights/entropy knobs — but a metric's own
+normalization **formula** (does `pdp_impressions` still fit an `atan` curve, or has the underlying data
+drifted enough that a different shape now fits better?) is a completely separate axis, with its own
+audit trail already built into `search-ranking` itself (`spy_search_ranking_metric_history`, see that
+package's own README). Auto-tune is the monthly job that watches that axis and, per metric, proposes or
+applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the entropy
+knobs, so it has no reason to write a weight checkpoint of its own.
+
+From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page, per active metric:
+
+- **Auto-tune threshold (R²)** — left blank by default, meaning the metric is opted OUT of auto-tune
+  entirely. Setting a value opts it in: the monthly job compares the metric's CURRENT fit (evaluated
+  fresh every run, no side effect) against this floor.
+- **Auto-update** (on/off) and **notify by email** (on/off) are independent toggles — all four
+  combinations are meaningful: neither (log only, via an `isChange=false` row in `search-ranking`'s own
+  history table), auto-update only (silent refit — a bit of a leap of faith, but supported), notify only
+  (a proposal email, formula left untouched until a human applies it via `search-ranking`'s own Edit
+  page), or both (refit applied AND a summary email sent).
+- **Auto-update scope**, once auto-update is on: **"Keep current shape (parameters only)"** re-fits only
+  the metric's own current curve family's parameter (e.g. keep `atan`, just recompute its `k`); **"Program's
+  choice (may switch shape)"** takes the overall best-fitting candidate across every shape
+  `search-ranking`'s own curve fitter offers, even if that means switching families entirely. A metric
+  with no known `shape` yet (a freeform/custom formula) always gets program's-choice behavior regardless
+  of this setting — there's no "current shape" to stay within.
+
+Running `vendor/bin/console search-ranking-optimizer:auto-tune` (intended for the monthly cron, see
+[Installation](#installation)):
+
+```
+pdp_impressions: fit still adequate (R² = 0.9883), no change.
+random: fit dropped to R² = -1.2734 (below threshold) — applied x / (x + 3) (R² = 0.91).
+Notified 2 admin(s) by email.
+```
+
+Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
+every metric that crossed its threshold with notify on, to every admin holding an ACL role named
+`search-score-admin` (every member of every ACL group holding that role; see [Requirements](#requirements)).
+A run that needs to notify but finds no admin holding that role yet simply sends to nobody
+(`notifiedEmailCount = 0`), logged rather than treated as an error — the same posture the weight-checkpoint
+restore path takes toward a metric deleted since a checkpoint was taken.
+
 ## Relationship to search-ranking
 
 - **One-directional dependency.** This package depends on `search-ranking`; `search-ranking` never depends
@@ -180,14 +223,20 @@ for anything database-driven.
 ## Requirements
 
 - PHP >= 8.3
-- Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/company-user — see
-  `composer.json` for floors, verified by `composer check-floors`)
+- Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/permission-extension/
+  company-user/acl/symfony-mailer — see `composer.json` for floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
 - **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.0`); the Apply step
-  writes into its `relevanceSaturationPoint` setting via its facade
+  writes into its `relevanceSaturationPoint` setting via its facade, and the auto-tune job writes into its
+  metric formulas the same way
 - **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
   active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
   shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
+- **A working `spryker/mail`/`spryker/symfony-mailer` SMTP setup** — only needed if you actually enable a
+  metric's "notify by email" auto-tune toggle; everything else in this package works without it.
+- **An ACL role named `search-score-admin`** — only needed for the same reason, to resolve who receives
+  the auto-tune notification email (every member of every ACL group holding that role). Create it via the
+  Zed ACL Gui or your own `data:import acl-role`-style fixture; nothing here creates it for you.
 
 ## Installation
 
@@ -222,9 +271,11 @@ In `config/Shared/config_default.php`, ensure `SprykerCommunity` is in `KernelCo
 In `Pyz\Zed\Console\ConsoleDependencyProvider::getConsoleCommands()`:
 
 ```php
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerAutoTuneConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCalibrateConsole;
 
 new SearchRankingOptimizerCalibrateConsole(),
+new SearchRankingOptimizerAutoTuneConsole(),
 ```
 
 ### 3a. Register the permission plugins (required for the SRP rating widget)
@@ -346,7 +397,7 @@ controller will 404 with "No route found" until this runs too:
 vendor/bin/console router:cache:warm-up:backend-gateway
 ```
 
-### 7. Schedule the calibration cron
+### 7. Schedule the calibration and auto-tune crons
 
 E.g. in `Pyz\Zed\SymfonyScheduler\SymfonySchedulerConfig::getCronJobs()`:
 
@@ -355,31 +406,35 @@ E.g. in `Pyz\Zed\SymfonyScheduler\SymfonySchedulerConfig::getCronJobs()`:
     'command' => '$PHP_BIN vendor/bin/console search-ranking-optimizer:calibrate',
     'schedule' => '*/5 * * * *',
 ],
+'search-ranking-optimizer-auto-tune' => [
+    'command' => '$PHP_BIN vendor/bin/console search-ranking-optimizer:auto-tune',
+    'schedule' => '0 6 1 * *',
+],
 ```
 
-The command is a safe no-op when there is no `uploaded` run, so it is fine to leave scheduled. (You can
-also just run it by hand after each upload.)
+Both commands are safe no-ops when there's nothing to do (no `uploaded` calibration run; no metric with an
+auto-tune threshold set), so it's fine to leave them scheduled. `0 6 1 * *` is once a month, the 1st at
+06:00 — auto-tune is a drift-detection job, not something that needs finer granularity.
 
 ## Modules
 
-- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, and weight
-  checkpoint/rollback business logic, persistence, console command, Zed GUI (Calibration + Apply, Queries
-  listing/edit-importance, Evaluation, and Weight Checkpoints controllers), the raw-Elastica search
-  components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model, and
-  the Zed Gateway endpoint that persists a rating.
+- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, weight
+  checkpoint/rollback, and monthly auto-tune business logic, persistence, console commands, Zed GUI
+  (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight Checkpoints, and Auto-Tune
+  Settings controllers), the raw-Elastica search components (shared query builder, calibration searcher,
+  rank_eval runner), the rated-query data model, and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
-Calibration, judgment capture (rating collection + curation), rank_eval evaluation, and weight checkpoint/
-rollback are the first four pieces of a larger tuning layer. Designed, not yet built:
+Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
+rollback, and the monthly auto-tune job are the first five pieces of a larger tuning layer. Designed, not
+yet built:
 
 - **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
   metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
   and a "fetch with these settings" button for a real, verified re-rank.
-- **Monthly auto-tune job** — per metric, check whether its live formula still fits the data; on a drop
-  below a configurable threshold, propose (or, if enabled, apply) a refit and notify the configured admins.
 - **Automated weight search** — search the blend weight plus per-metric weights against the judgment set
   algorithmically (e.g. Bayesian optimization) rather than only via human proposals, using rank_eval's
   score as the objective function.
@@ -408,7 +463,7 @@ composer check-floors
 
 ### Test suite
 
-**91 tests, 247 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**110 tests, 315 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash
@@ -421,8 +476,13 @@ fail-when-nothing-scored, the vanished-row race), the statistics calculator, the
 search-term canonicalizer, `ProductRelevanceJudgmentWriter` (canonicalization-before-lookup, creating a
 query on first rating, rejecting an unknown rating type before touching persistence), and
 `RelevanceJudgmentAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
-the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission)
-are covered as pure unit tests — no database needed.
+the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission),
+`AutoTuneNotificationRecipientResolver` (no role yet vs. de-duplicating usernames across multiple ACL
+groups), and `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
+threshold check-only path, proposing vs. applying a refit, parameters-only staying within the current
+shape vs. falling back to program's-choice for an unknown shape, and the notify batching — exactly one
+combined email covering every metric that both crossed its threshold and has notify on) are covered as
+pure unit tests — no database needed.
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
 real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button
@@ -438,7 +498,9 @@ built yet.
 integration tests, not mocked: every method here is a thin Propel read-modify-write, so the one thing
 actually worth protecting is that a value round-trips correctly (right FK linkage, right column mapping,
 a safe no-op instead of a crash on an id that no longer exists) — a mocked query builder could confirm the
-right methods were called but never that. One case (`findLatestCalculatedCalibration` returning `null`
+right methods were called but never that. This includes the per-metric auto-tune config's own upsert (a
+second save updates the existing row rather than creating a duplicate) and its threshold-set filtering.
+One case (`findLatestCalculatedCalibration` returning `null`
 when nothing is calculated yet) is exempted from this shop's own suite: this demoshop always has at least
 one real calculated calibration already, so the "nothing calculated yet" branch can't be reached without
 deleting real data — covered by inspection instead (a two-line early-return, same shape as the four

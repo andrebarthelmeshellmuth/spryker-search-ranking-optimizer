@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
@@ -232,4 +234,54 @@ interface SearchRankingOptimizerFacadeInterface
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
     public function findWeightCheckpointHistory(): array;
+
+    /**
+     * Specification:
+     * - Returns null when the metric has no auto-tune config yet (has never had a threshold set) — a
+     *   safe, expected state for most metrics, not an error.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
+     */
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
+
+    /**
+     * Specification:
+     * - Only configs with a real threshold set — a metric with no config row, or an explicit NULL
+     *   threshold, has opted out of auto-tune entirely and is simply absent here.
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
+     */
+    public function findAutoTuneMetricConfigsWithThresholdSet(): array;
+
+    /**
+     * Specification:
+     * - Upserts by `idSearchRankingMetric` — at most one config row per metric.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
+     */
+    public function saveAutoTuneMetricConfig(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+    ): SearchRankingAutoTuneMetricConfigTransfer;
+
+    /**
+     * Specification:
+     * - Runs the monthly auto-tune check across every metric with an auto-tune threshold set — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface::run()}
+     *   for the full specification.
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
+     */
+    public function runAutoTune(): SearchRankingAutoTuneResultTransfer;
 }

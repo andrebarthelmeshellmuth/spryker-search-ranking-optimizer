@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 
 use Codeception\Test\Unit;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
@@ -55,6 +56,11 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     protected array $evaluationEntities = [];
 
     /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig>
+     */
+    protected array $autoTuneMetricConfigEntities = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
@@ -73,6 +79,10 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         foreach ($this->evaluationEntities as $evaluationEntity) {
             $evaluationEntity->delete();
+        }
+
+        foreach ($this->autoTuneMetricConfigEntities as $autoTuneMetricConfigEntity) {
+            $autoTuneMetricConfigEntity->delete();
         }
 
         parent::_after();
@@ -326,6 +336,85 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertCount(2, $historyTransfers);
         $this->assertSame($newer->getIdSearchRankingEvaluation(), $historyTransfers[0]->getIdSearchRankingEvaluation());
         $this->assertSame($older->getIdSearchRankingEvaluation(), $historyTransfers[1]->getIdSearchRankingEvaluation());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101);
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame(90101, $resultTransfer->getIdSearchRankingMetric());
+        $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
+        $this->assertFalse($resultTransfer->getIsAutoUpdateEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, $resultTransfer->getAutoUpdateScope());
+        $this->assertTrue($resultTransfer->getIsNotifyEnabled());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindAutoTuneMetricConfigByMetricIdReturnsNullWhenTheMetricHasNoConfigYet(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102);
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindAutoTuneMetricConfigsWithThresholdSetExcludesConfigsWithNoThreshold(): void
+    {
+        // Arrange
+        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
+        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
+
+        // Act
+        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet();
+        $returnedMetricIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingMetric(), $resultTransfers);
+
+        // Assert
+        $this->assertContains($withThreshold->getFkSearchRankingMetric(), $returnedMetricIds);
+        $this->assertNotContains($withoutThreshold->getFkSearchRankingMetric(), $returnedMetricIds);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param float|null $autoTuneThreshold
+     * @param bool $isAutoUpdateEnabled
+     * @param string $autoUpdateScope
+     * @param bool $isNotifyEnabled
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
+     */
+    protected function createTestAutoTuneMetricConfig(
+        int $idSearchRankingMetric,
+        ?float $autoTuneThreshold,
+        bool $isAutoUpdateEnabled,
+        string $autoUpdateScope,
+        bool $isNotifyEnabled,
+    ): SpySearchRankingAutoTuneMetricConfig {
+        $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
+        $autoTuneMetricConfigEntity->setFkSearchRankingMetric($idSearchRankingMetric);
+        $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneThreshold);
+        $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($isAutoUpdateEnabled);
+        $autoTuneMetricConfigEntity->setAutoUpdateScope($autoUpdateScope);
+        $autoTuneMetricConfigEntity->setIsNotifyEnabled($isNotifyEnabled);
+        $autoTuneMetricConfigEntity->save();
+
+        $this->autoTuneMetricConfigEntities[] = $autoTuneMetricConfigEntity;
+
+        return $autoTuneMetricConfigEntity;
     }
 
     /**

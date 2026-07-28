@@ -41,13 +41,14 @@ class SearchRankingOptimizerCalibrateConsole extends Console
         parent::configure();
     }
 
+    // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
+
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      *
      * @return int
      */
-    // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter

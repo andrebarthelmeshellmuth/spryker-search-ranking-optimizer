@@ -158,4 +158,123 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
 
         return true;
     }
+
+    /**
+     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     */
+    public function getActiveMetrics(): array
+    {
+        $metrics = [];
+
+        foreach ($this->searchRankingFacade->getActiveMetricCollection()->getMetrics() as $metricTransfer) {
+            $metrics[] = [
+                'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
+                'name' => $metricTransfer->getNameOrFail(),
+            ];
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     *
+     * @return float|null
+     */
+    public function evaluateCurrentMetricFit(int $idSearchRankingMetric): ?float
+    {
+        return $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     *
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     */
+    public function findMetricDetail(int $idSearchRankingMetric): ?array
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+
+        if ($metricTransfer === null) {
+            return null;
+        }
+
+        return [
+            'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
+            'name' => $metricTransfer->getNameOrFail(),
+            'formula' => $metricTransfer->getFormulaOrFail(),
+            'isHigherBetter' => $metricTransfer->getIsHigherBetter() ?? true,
+            'shape' => $metricTransfer->getShape(),
+        ];
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     *
+     * @return array<int, array{shape: string, formula: string, rSquared: float, isWinner: bool}>
+     */
+    public function getFitCandidates(int $idSearchRankingMetric): array
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+
+        if ($metricTransfer === null) {
+            return [];
+        }
+
+        $previewTransfer = $this->searchRankingFacade->previewFormula(
+            $idSearchRankingMetric,
+            $metricTransfer->getFormulaOrFail(),
+            $metricTransfer->getIsHigherBetter() ?? true,
+        );
+
+        $candidates = [];
+
+        foreach ($previewTransfer->getCandidates() as $candidateTransfer) {
+            $candidates[] = [
+                'shape' => $candidateTransfer->getShapeOrFail(),
+                'formula' => $candidateTransfer->getFormulaOrFail(),
+                'rSquared' => $candidateTransfer->getRSquaredOrFail(),
+                'isWinner' => $candidateTransfer->getIsWinner() ?? false,
+            ];
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $formula
+     *
+     * @return bool
+     */
+    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+
+        if ($metricTransfer === null) {
+            return false;
+        }
+
+        $this->searchRankingFacade->saveMetric($metricTransfer->setFormula($formula));
+
+        return true;
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     *
+     * @return bool
+     */
+    public function recordMetricCheckOnly(int $idSearchRankingMetric): bool
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+
+        if ($metricTransfer === null) {
+            return false;
+        }
+
+        $this->searchRankingFacade->recordCheckOnly($metricTransfer);
+
+        return true;
+    }
 }

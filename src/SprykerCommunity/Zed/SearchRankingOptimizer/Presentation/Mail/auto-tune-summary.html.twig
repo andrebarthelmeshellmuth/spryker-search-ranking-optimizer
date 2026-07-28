@@ -1,0 +1,29 @@
+<p>
+    The monthly search-ranking auto-tune check found {{ mail.autoTuneMetricResults | length }} metric(s) whose
+    live formula no longer fits its data well enough:
+</p>
+<table cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th>Metric</th>
+            <th>Before</th>
+            <th>After{{ mail.autoTuneAnyApplied ? ' (applied)' : ' (proposed only)' }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for metricResult in mail.autoTuneMetricResults %}
+            <tr>
+                <td>{{ metricResult.metricName }}</td>
+                <td>
+                    {{ metricResult.beforeFormula }}<br />
+                    R² = {{ metricResult.beforeFitRSquared }}
+                </td>
+                <td>
+                    {{ metricResult.afterFormula }}<br />
+                    R² = {{ metricResult.afterFitRSquared }}
+                    {{ metricResult.wasApplied ? ' — applied' : ' — proposed, not applied' }}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

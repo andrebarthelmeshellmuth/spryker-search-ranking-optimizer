@@ -10,12 +10,15 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
 /**
@@ -210,5 +213,86 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame('en_US', $evaluationTransfer->getLocaleName());
         $this->assertSame(0.7123, $evaluationTransfer->getMetricScore());
         $this->assertSame(12, $evaluationTransfer->getQueryCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapsAutoTuneMetricConfigEntityFieldsOntoTheTransfer(): void
+    {
+        // Arrange
+        $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
+        $autoTuneMetricConfigEntity->setIdSearchRankingAutoTuneMetricConfig(3);
+        $autoTuneMetricConfigEntity->setFkSearchRankingMetric(7);
+        $autoTuneMetricConfigEntity->setAutoTuneThreshold(0.8);
+        $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled(true);
+        $autoTuneMetricConfigEntity->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY);
+        $autoTuneMetricConfigEntity->setIsNotifyEnabled(false);
+
+        // Act
+        $autoTuneMetricConfigTransfer = (new SearchRankingOptimizerMapper())->mapAutoTuneMetricConfigEntityToTransfer(
+            $autoTuneMetricConfigEntity,
+            new SearchRankingAutoTuneMetricConfigTransfer(),
+        );
+
+        // Assert
+        $this->assertSame(3, $autoTuneMetricConfigTransfer->getIdSearchRankingAutoTuneMetricConfig());
+        $this->assertSame(7, $autoTuneMetricConfigTransfer->getIdSearchRankingMetric());
+        $this->assertSame(0.8, $autoTuneMetricConfigTransfer->getAutoTuneThreshold());
+        $this->assertTrue($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigTransfer->getAutoUpdateScope());
+        $this->assertFalse($autoTuneMetricConfigTransfer->getIsNotifyEnabled());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapsAutoTuneMetricConfigTransferFieldsOntoTheEntity(): void
+    {
+        // Arrange
+        $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
+            ->setIdSearchRankingMetric(7)
+            ->setAutoTuneThreshold(0.8)
+            ->setIsAutoUpdateEnabled(true)
+            ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
+            ->setIsNotifyEnabled(false);
+
+        // Act
+        $autoTuneMetricConfigEntity = (new SearchRankingOptimizerMapper())->mapAutoTuneMetricConfigTransferToEntity(
+            $autoTuneMetricConfigTransfer,
+            new SpySearchRankingAutoTuneMetricConfig(),
+        );
+
+        // Assert
+        $this->assertSame(7, $autoTuneMetricConfigEntity->getFkSearchRankingMetric());
+        $this->assertSame(0.8, $autoTuneMetricConfigEntity->getAutoTuneThreshold());
+        $this->assertTrue($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigEntity->getAutoUpdateScope());
+        $this->assertFalse($autoTuneMetricConfigEntity->getIsNotifyEnabled());
+    }
+
+    /**
+     * A NULL threshold (opted-out metric) must map through as NULL, not silently coerced to 0.0.
+     *
+     * @return void
+     */
+    public function testMapsANullAutoTuneThresholdAsNullNotZero(): void
+    {
+        // Arrange
+        $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
+            ->setIdSearchRankingMetric(7)
+            ->setAutoTuneThreshold(null)
+            ->setIsAutoUpdateEnabled(false)
+            ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
+            ->setIsNotifyEnabled(false);
+
+        // Act
+        $autoTuneMetricConfigEntity = (new SearchRankingOptimizerMapper())->mapAutoTuneMetricConfigTransferToEntity(
+            $autoTuneMetricConfigTransfer,
+            new SpySearchRankingAutoTuneMetricConfig(),
+        );
+
+        // Assert
+        $this->assertNull($autoTuneMetricConfigEntity->getAutoTuneThreshold());
     }
 }

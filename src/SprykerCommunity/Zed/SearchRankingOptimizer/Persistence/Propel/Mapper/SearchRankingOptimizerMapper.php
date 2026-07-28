@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
@@ -16,6 +17,7 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
@@ -222,5 +224,43 @@ class SearchRankingOptimizerMapper
         }
 
         return $metricWeightTransfers;
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
+     */
+    public function mapAutoTuneMetricConfigEntityToTransfer(
+        SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+    ): SearchRankingAutoTuneMetricConfigTransfer {
+        return $autoTuneMetricConfigTransfer
+            ->setIdSearchRankingAutoTuneMetricConfig($autoTuneMetricConfigEntity->getIdSearchRankingAutoTuneMetricConfig())
+            ->setIdSearchRankingMetric($autoTuneMetricConfigEntity->getFkSearchRankingMetric())
+            ->setAutoTuneThreshold($autoTuneMetricConfigEntity->getAutoTuneThreshold())
+            ->setIsAutoUpdateEnabled($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled())
+            ->setAutoUpdateScope($autoTuneMetricConfigEntity->getAutoUpdateScope())
+            ->setIsNotifyEnabled($autoTuneMetricConfigEntity->getIsNotifyEnabled());
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
+     */
+    public function mapAutoTuneMetricConfigTransferToEntity(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
+    ): SpySearchRankingAutoTuneMetricConfig {
+        $autoTuneMetricConfigEntity->setFkSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail());
+        $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneMetricConfigTransfer->getAutoTuneThreshold());
+        $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled() ?? false);
+        $autoTuneMetricConfigEntity->setAutoUpdateScope($autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail());
+        $autoTuneMetricConfigEntity->setIsNotifyEnabled($autoTuneMetricConfigTransfer->getIsNotifyEnabled() ?? false);
+
+        return $autoTuneMetricConfigEntity;
     }
 }
