@@ -24,3 +24,4 @@ suites:
                     projectNamespaces: ['Pyz']
                     coreNamespaces: ['SprykerShop', 'Spryker', 'SprykerEco', 'SprykerSdk', 'SprykerFeature', 'SprykerCommunity']
                 - \SprykerTest\Shared\Testify\Helper\DependencyHelper
+                - \SprykerTest\Shared\Propel\Helper\TransactionHelper
