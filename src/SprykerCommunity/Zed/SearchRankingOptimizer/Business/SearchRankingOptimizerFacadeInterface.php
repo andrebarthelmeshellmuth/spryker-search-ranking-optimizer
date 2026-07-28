@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 
 interface SearchRankingOptimizerFacadeInterface
 {
@@ -53,4 +55,23 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
+
+    /**
+     * Specification:
+     * - Canonicalizes the request's raw search term, finds-or-creates the matching query row, then
+     *   upserts the rater's judgment for that (query, product) pair — the same rater re-submitting for
+     *   the same pair updates their existing row in place; a different rater on the same pair always gets
+     *   their own row (disagreement is a signal, never overwritten).
+     * - Caller (the Gateway Controller) is responsible for authorization — this method does not itself
+     *   check the RateSearchRelevancePermissionPlugin permission.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
+     */
+    public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer;
 }

@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
 /**
@@ -57,5 +59,21 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer
     {
         return $this->getRepository()->findLatestCalculatedCalibration();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
+     */
+    public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer
+    {
+        return $this->getFactory()->createProductRelevanceJudgmentWriter()->submitJudgment($requestTransfer);
     }
 }

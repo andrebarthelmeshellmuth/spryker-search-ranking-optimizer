@@ -79,4 +79,34 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const PAGE_SOURCE_IDENTIFIER = 'page';
+
+    /**
+     * Specification:
+     * - A Relevance Rater's positive-relevance judgment for a (query, product) pair.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const RATING_TYPE_HEART = 'heart';
+
+    /**
+     * Specification:
+     * - A Relevance Rater's neutral/acceptable-relevance judgment for a (query, product) pair.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const RATING_TYPE_CHECK = 'check';
+
+    /**
+     * Specification:
+     * - A Relevance Rater's negative-relevance judgment for a (query, product) pair.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const RATING_TYPE_X = 'x';
 }

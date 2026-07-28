@@ -11,6 +11,8 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Spryker\Zed\Kernel\Persistence\AbstractPersistenceFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
@@ -30,6 +32,22 @@ class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactor
     public function createSearchRankingCalibrationSearchTermQuery(): SpySearchRankingCalibrationSearchTermQuery
     {
         return SpySearchRankingCalibrationSearchTermQuery::create();
+    }
+
+    /**
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery
+     */
+    public function createSearchRankingQueryQuery(): SpySearchRankingQueryQuery
+    {
+        return SpySearchRankingQueryQuery::create();
+    }
+
+    /**
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery
+     */
+    public function createSearchRankingQueryRatingQuery(): SpySearchRankingQueryRatingQuery
+    {
+        return SpySearchRankingQueryRatingQuery::create();
     }
 
     /**

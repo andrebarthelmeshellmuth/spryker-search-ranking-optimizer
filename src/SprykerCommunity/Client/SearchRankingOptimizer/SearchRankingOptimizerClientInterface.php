@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
+
 interface SearchRankingOptimizerClientInterface
 {
     /**
@@ -29,4 +32,21 @@ interface SearchRankingOptimizerClientInterface
      * @return array<float>
      */
     public function getCalibrationScores(string $searchTerm, string $storeName, string $localeName, int $limit): array;
+
+    /**
+     * Specification:
+     * - Submits a Relevance Rater's heart/checkmark/X judgment for a (query, product) pair via a
+     *   synchronous Zed gateway call. Zed independently re-authorizes the caller — this method does not
+     *   itself check the RateSearchRelevancePermissionPlugin permission, that only gates whether the
+     *   widget renders/is interactive on Yves.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function submitProductRelevanceJudgment(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer;
 }

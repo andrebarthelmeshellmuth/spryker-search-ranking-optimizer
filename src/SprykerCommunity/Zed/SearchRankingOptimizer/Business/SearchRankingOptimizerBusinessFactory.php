@@ -18,6 +18,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibr
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculator;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 
@@ -74,5 +78,25 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function getSearchRankingClient(): SearchRankingOptimizerToSearchRankingClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_OPTIMIZER);
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface
+     */
+    public function createSearchTermCanonicalizer(): SearchTermCanonicalizerInterface
+    {
+        return new SearchTermCanonicalizer();
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface
+     */
+    public function createProductRelevanceJudgmentWriter(): ProductRelevanceJudgmentWriterInterface
+    {
+        return new ProductRelevanceJudgmentWriter(
+            $this->createSearchTermCanonicalizer(),
+            $this->getRepository(),
+            $this->getEntityManager(),
+        );
     }
 }

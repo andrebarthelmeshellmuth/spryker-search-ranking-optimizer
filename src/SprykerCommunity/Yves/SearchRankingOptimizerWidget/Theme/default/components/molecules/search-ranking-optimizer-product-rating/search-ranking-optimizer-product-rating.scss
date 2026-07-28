@@ -1,0 +1,60 @@
+// Sits in normal document flow (unlike search-debug's absolutely-positioned hover overlay), directly below
+// wherever search-debug's own product-wrapper/overlay is on the same tile when both are active — appended
+// after it in page-layout-catalog.twig, so it simply adds real height to the card rather than overlapping
+// anything, per the package's design spec ("tile height grows to fit").
+.search-ranking-optimizer-product-rating {
+    display: flex;
+    justify-content: center;
+    gap: rem(8);
+    margin-top: rem(8);
+}
+
+// Reuses the shop's own existing red ($setting-color-alt, already used for e.g. "SALE %" labels) for
+// heart/x rather than introducing a new red — a genuinely new accent color is only justified for the one
+// tone this shop has no equivalent of at all (green, below).
+$search-ranking-optimizer-rating-red: $setting-color-alt;
+
+// No existing shop-wide "success green" token to reuse (unlike red) — a small local constant, scoped to
+// this component only, same reasoning search-debug's own $search-debug-trigger-color local accent used.
+$search-ranking-optimizer-rating-green: #2e7d32;
+
+.search-ranking-optimizer-product-rating__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: rem(32);
+    height: rem(32);
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    // Default grey, per the package's design spec — every button starts identical and unrated-looking
+    // until a click colorizes exactly one of them (see the &--heart/&--check/&--x[aria-pressed] rules
+    // below).
+    background-color: transparent;
+    color: $setting-color-gray-2;
+    cursor: pointer;
+    transition: color 150ms ease-in-out, background-color 150ms ease-in-out;
+
+    svg {
+        width: rem(20);
+        height: rem(20);
+    }
+
+    &:hover,
+    &:focus {
+        background-color: $setting-color-gray-7;
+    }
+
+    // Heart and X share the same red-family accent (both a "not neutral" relevance judgment, one positive
+    // one negative) — only the icon glyph itself tells them apart once colorized, matching the spec's
+    // "heart/X red-family, checkmark green" grouping.
+    &--heart[aria-pressed='true'],
+    &--x[aria-pressed='true'] {
+        color: $search-ranking-optimizer-rating-red;
+    }
+
+    &--check[aria-pressed='true'] {
+        color: $search-ranking-optimizer-rating-green;
+    }
+}

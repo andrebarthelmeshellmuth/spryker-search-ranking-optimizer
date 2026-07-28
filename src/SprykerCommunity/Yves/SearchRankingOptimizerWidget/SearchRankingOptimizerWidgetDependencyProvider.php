@@ -1,0 +1,97 @@
+<?php
+
+/**
+ * This file is part of the spryker-community/search-ranking-optimizer package.
+ * For full license information, please view the LICENSE file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace SprykerCommunity\Yves\SearchRankingOptimizerWidget;
+
+use Spryker\Yves\Kernel\AbstractBundleDependencyProvider;
+use Spryker\Yves\Kernel\Container;
+use SprykerCommunity\Yves\SearchRankingOptimizerWidget\Dependency\Client\SearchRankingOptimizerWidgetToCustomerClientBridge;
+use SprykerCommunity\Yves\SearchRankingOptimizerWidget\Dependency\Client\SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge;
+use SprykerCommunity\Yves\SearchRankingOptimizerWidget\Dependency\Client\SearchRankingOptimizerWidgetToStoreClientBridge;
+
+class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDependencyProvider
+{
+    /**
+     * @var string
+     */
+    public const CLIENT_SEARCH_RANKING_OPTIMIZER = 'CLIENT_SEARCH_RANKING_OPTIMIZER';
+
+    /**
+     * @var string
+     */
+    public const CLIENT_CUSTOMER = 'CLIENT_CUSTOMER';
+
+    /**
+     * @var string
+     */
+    public const CLIENT_STORE = 'CLIENT_STORE';
+
+    /**
+     * @param \Spryker\Yves\Kernel\Container $container
+     *
+     * @return \Spryker\Yves\Kernel\Container
+     */
+    public function provideDependencies(Container $container): Container
+    {
+        $container = parent::provideDependencies($container);
+        $container = $this->addSearchRankingOptimizerClient($container);
+        $container = $this->addCustomerClient($container);
+        $container = $this->addStoreClient($container);
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Yves\Kernel\Container $container
+     *
+     * @return \Spryker\Yves\Kernel\Container
+     */
+    protected function addSearchRankingOptimizerClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, function (Container $container) {
+            return new SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge(
+                $container->getLocator()->searchRankingOptimizer()->client(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Yves\Kernel\Container $container
+     *
+     * @return \Spryker\Yves\Kernel\Container
+     */
+    protected function addCustomerClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_CUSTOMER, function (Container $container) {
+            return new SearchRankingOptimizerWidgetToCustomerClientBridge(
+                $container->getLocator()->customer()->client(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Yves\Kernel\Container $container
+     *
+     * @return \Spryker\Yves\Kernel\Container
+     */
+    protected function addStoreClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_STORE, function (Container $container) {
+            return new SearchRankingOptimizerWidgetToStoreClientBridge(
+                $container->getLocator()->store()->client(),
+            );
+        });
+
+        return $container;
+    }
+}

@@ -11,6 +11,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Propel\Runtime\ActiveQuery\Criteria;
 use Spryker\Zed\Kernel\Persistence\AbstractRepository;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -92,5 +93,50 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         return $this->getFactory()
             ->createSearchRankingOptimizerMapper()
             ->mapCalibrationEntityToTransfer($calibrationEntity, new SearchRankingCalibrationTransfer());
+    }
+
+    /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryByTermStoreLocale(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryTransfer
+    {
+        $queryEntity = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->filterBySearchTerm($searchTerm)
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->findOne();
+
+        if ($queryEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapQueryEntityToTransfer($queryEntity, new SearchRankingQueryTransfer());
+    }
+
+    /**
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function findAllQueriesOrderedByUpdatedAt(): array
+    {
+        $queryEntities = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->orderByUpdatedAt(Criteria::DESC)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $queryTransfers = [];
+
+        foreach ($queryEntities as $queryEntity) {
+            $queryTransfers[] = $mapper->mapQueryEntityToTransfer($queryEntity, new SearchRankingQueryTransfer());
+        }
+
+        return $queryTransfers;
     }
 }

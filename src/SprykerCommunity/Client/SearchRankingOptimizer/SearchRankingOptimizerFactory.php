@@ -15,11 +15,14 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStub;
+use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStubInterface;
 
 class SearchRankingOptimizerFactory extends AbstractFactory
 {
@@ -90,5 +93,21 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function createNeverInvokedStoreClient(): NeverInvokedStoreClient
     {
         return new NeverInvokedStoreClient();
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStubInterface
+     */
+    public function createProductRelevanceJudgmentStub(): ProductRelevanceJudgmentStubInterface
+    {
+        return new ProductRelevanceJudgmentStub($this->getZedRequestClient());
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface
+     */
+    public function getZedRequestClient(): SearchRankingOptimizerToZedRequestInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_ZED_REQUEST);
     }
 }

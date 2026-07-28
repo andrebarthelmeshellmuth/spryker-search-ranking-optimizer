@@ -1,0 +1,7 @@
+key,translation,locale
+search_ranking_optimizer.rate.heart,Rate this product as highly relevant,en_US
+search_ranking_optimizer.rate.heart,Als sehr relevant bewerten,de_DE
+search_ranking_optimizer.rate.check,Rate this product as acceptably relevant,en_US
+search_ranking_optimizer.rate.check,Als akzeptabel relevant bewerten,de_DE
+search_ranking_optimizer.rate.x,Rate this product as not relevant,en_US
+search_ranking_optimizer.rate.x,Als nicht relevant bewerten,de_DE

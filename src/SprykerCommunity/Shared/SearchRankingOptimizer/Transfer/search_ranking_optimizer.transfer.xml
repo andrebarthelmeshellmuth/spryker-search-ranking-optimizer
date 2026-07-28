@@ -40,4 +40,54 @@
         <property name="scores" type="float[]" singular="score"/>
     </transfer>
 
+    <!-- A canonical search query (trim/lowercase/collapse-whitespace, NOT tokenized) that has accumulated
+         at least one relevance rating. importanceWeight is Query Curator-editable, flat-defaults to 1. -->
+    <transfer name="SearchRankingQuery" strict="true">
+        <property name="idSearchRankingQuery" type="int"/>
+        <property name="searchTerm" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="importanceWeight" type="float"/>
+        <property name="createdAt" type="string"/>
+        <property name="updatedAt" type="string"/>
+    </transfer>
+
+    <!-- One Relevance Rater's judgment for a (query, product) pair. Unique per (fkSearchRankingQuery,
+         customerReference, fkProductAbstract) — the same rater re-clicking the same pair upserts in place;
+         different raters on the same pair each keep their own row (disagreement is a signal, never
+         overwritten — see README). ratingType is one of SearchRankingOptimizerConfig::RATING_TYPE_*. -->
+    <transfer name="SearchRankingQueryRating" strict="true">
+        <property name="idSearchRankingQueryRating" type="int"/>
+        <property name="fkSearchRankingQuery" type="int"/>
+        <property name="customerReference" type="string"/>
+        <property name="fkProductAbstract" type="int"/>
+        <property name="ratingType" type="string"/>
+        <property name="createdAt" type="string"/>
+        <property name="updatedAt" type="string"/>
+    </transfer>
+
+    <!-- Yves -> Zed gateway request: submits one Relevance Rater judgment. searchTerm arrives
+         UN-canonicalized (raw, as typed by the shopper who ran this search) — the Zed side canonicalizes
+         it before finding-or-creating the SearchRankingQuery row, so the same logical query submitted with
+         different casing/whitespace always resolves to the same row. customerReference is set server-side
+         by the Yves controller from the authenticated session, never trusted from client input. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentRequest" strict="true">
+        <property name="searchTerm" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="idProductAbstract" type="int"/>
+        <property name="ratingType" type="string"/>
+        <property name="customerReference" type="string"/>
+    </transfer>
+
+    <!-- Zed -> Yves gateway response. isSuccess=false covers both an unauthorized caller (isAuthorized
+         check failed) and a rejected write (e.g. InvalidRatingTypeException) — errorMessage explains
+         which; the Yves side never needs to distinguish them, it just leaves the widget ungrayed/unchanged
+         either way. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="rating" type="SearchRankingQueryRating"/>
+        <property name="errorMessage" type="string"/>
+    </transfer>
+
 </transfers>

@@ -12,7 +12,9 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer;
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeBridge;
@@ -56,6 +58,23 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     public const FACADE_LOCALE = 'FACADE_LOCALE';
 
     /**
+     * Resolves the incoming Gateway Controller request's customer reference to its active company user(s)
+     * — never trust an idCompanyUser passed in the request transfer itself, always re-derive it server-side.
+     *
+     * @var string
+     */
+    public const FACADE_COMPANY_USER = 'FACADE_COMPANY_USER';
+
+    /**
+     * Re-checks RateSearchRelevancePermissionPlugin / SetSearchQueryImportancePermissionPlugin server-side
+     * in the Gateway Controller, independently of whatever the Yves side already gated — the single gate
+     * for these writes, same posture as search-debug's own SearchDebugAccessChecker.
+     *
+     * @var string
+     */
+    public const FACADE_PERMISSION = 'FACADE_PERMISSION';
+
+    /**
      * @param \Spryker\Zed\Kernel\Container $container
      *
      * @return \Spryker\Zed\Kernel\Container
@@ -85,6 +104,8 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = $this->addSearchRankingStorageFacade($container);
         $container = $this->addStoreFacade($container);
         $container = $this->addLocaleFacade($container);
+        $container = $this->addCompanyUserFacade($container);
+        $container = $this->addPermissionFacade($container);
 
         return $container;
     }
@@ -163,6 +184,38 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container->set(static::FACADE_LOCALE, function (Container $container) {
             return new SearchRankingOptimizerToLocaleFacadeBridge(
                 $container->getLocator()->locale()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addCompanyUserFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_COMPANY_USER, function (Container $container) {
+            return new SearchRankingOptimizerToCompanyUserFacadeBridge(
+                $container->getLocator()->companyUser()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addPermissionFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_PERMISSION, function (Container $container) {
+            return new SearchRankingOptimizerToPermissionFacadeBridge(
+                $container->getLocator()->permission()->facade(),
             );
         });
 
