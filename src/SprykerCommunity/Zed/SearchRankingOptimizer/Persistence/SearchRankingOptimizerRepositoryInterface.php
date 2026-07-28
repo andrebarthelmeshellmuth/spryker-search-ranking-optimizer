@@ -70,4 +70,16 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
+
+    /**
+     * The distinct, already-canonical search terms organically collected via the SRP rating widget for a
+     * given store/locale — the default calibration term source once real ratings exist (see
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface::createCalibration()}).
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function findDistinctSearchTermsByStoreLocale(string $storeName, string $localeName): array;
 }

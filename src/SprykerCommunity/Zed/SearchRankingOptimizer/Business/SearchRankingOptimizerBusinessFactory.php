@@ -57,6 +57,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     {
         return new CalibrationUploadHandler(
             $this->createCsvSearchTermParser(),
+            $this->getRepository(),
             $this->getEntityManager(),
         );
     }

@@ -183,4 +183,22 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
         return $queryTransfers;
     }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function findDistinctSearchTermsByStoreLocale(string $storeName, string $localeName): array
+    {
+        return $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->select('SearchTerm')
+            ->distinct()
+            ->find()
+            ->getArrayCopy();
+    }
 }

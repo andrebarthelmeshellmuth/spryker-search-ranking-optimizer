@@ -74,19 +74,26 @@
         {% endblock %}
     {% endembed %}
 
-    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Upload New Calibration Run' } %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Start New Calibration Run' } %}
         {% block widget_content %}
             <p>
-                Upload a single-column CSV of "relevant" search terms (one per line, gathered from real
-                search logs). The next <code>search-ranking-optimizer:calibrate</code> cron tick fires the
-                live catalog search-string query for each term, samples the raw text-relevance score of the
-                top-ranked products (up to X per term), and pools all of them into a suggested k value for
+                By default, sources search terms from the distinct queries already organically rated via
+                the SRP relevance-rating widget for the chosen store/locale — no upload needed. The next
+                <code>search-ranking-optimizer:calibrate</code> cron tick fires the live catalog
+                search-string query for each term, samples the raw text-relevance score of the top-ranked
+                products (up to X per term), and pools all of them into a suggested k value for
                 spryker-community/search-ranking's ranking formula.
             </p>
             {{ form_start(uploadForm, { action: url('/search-ranking-optimizer/calibration') }) }}
-            {{ form_widget(uploadForm) }}
+            {{ form_row(uploadForm.relevantProductCount) }}
+            {{ form_row(uploadForm.storeName) }}
+            {{ form_row(uploadForm.localeName) }}
+            {{ form_row(uploadForm.useCsvUpload) }}
+            <div id="search-ranking-optimizer-calibration-csv-file-row" data-role="csv-file-row" hidden>
+                {{ form_row(uploadForm.file) }}
+            </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">{{ 'Upload' | trans }}</button>
+                <button type="submit" class="btn btn-primary">{{ 'Start' | trans }}</button>
             </div>
             {{ form_end(uploadForm) }}
         {% endblock %}
@@ -95,6 +102,28 @@
 
 {% block footer_js %}
     {{ parent() }}
+    <script>
+        (function () {
+            'use strict';
+
+            // Progressive enhancement only: the checkbox/file-row pairing is still fully valid without
+            // JS (the form-level validation still requires a file when the checkbox is checked either
+            // way) — this just avoids showing the file input before it's relevant.
+            var checkbox = document.getElementById('search_ranking_calibration_upload_useCsvUpload');
+            var fileRow = document.getElementById('search-ranking-optimizer-calibration-csv-file-row');
+
+            if (!checkbox || !fileRow) {
+                return;
+            }
+
+            function sync() {
+                fileRow.hidden = !checkbox.checked;
+            }
+
+            checkbox.addEventListener('change', sync);
+            sync();
+        }());
+    </script>
     {% if inProgressCalibration %}
         <script>
             (function () {

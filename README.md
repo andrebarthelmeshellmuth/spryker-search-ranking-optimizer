@@ -37,9 +37,12 @@ does that sampling.
 
 The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page:
 
-1. **Upload a run.** Provide a list of representative search terms (CSV, one per line), the store and
-   locale to run them against (Zed has no implicit current store, so both are picked explicitly), and the
-   number of top results per term to sample (X). The run is persisted in status `uploaded`.
+1. **Start a run.** Pick the store and locale to run against (Zed has no implicit current store, so both
+   are picked explicitly) and the number of top results per term to sample (X). By default, search terms
+   come from the distinct queries already organically rated via the SRP widget below for that store/locale
+   — no upload needed. Check **"Bootstrap from CSV upload instead"** to bypass those and provide a CSV
+   (one term per line) instead — useful to bootstrap calibration before real ratings exist, or for testing.
+   Either way, the run is persisted in status `uploaded`.
 2. **Calculate.** The `search-ranking-optimizer:calibrate` console command (run on a cron, or by hand)
    picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, fires the **live catalog
    search-string query** for each term against the real search index, pools the top-X raw text-relevance
@@ -95,9 +98,10 @@ gets built, one click at a time, directly on the storefront search results page 
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
   persisting anything.
 
-This is the data-capture half of what [GAP-2 evaluation and beyond](#roadmap) will eventually score against
-— nothing consumes these ratings yet (see Roadmap), but they accumulate from real traffic starting the
-moment this is installed.
+This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
+the next calibration run with no export/import step. [GAP-2 evaluation and beyond](#roadmap) will eventually
+score against these ratings directly too; that consumer doesn't exist yet, but the ratings themselves
+accumulate from real traffic starting the moment this is installed.
 
 ## Relationship to search-ranking
 

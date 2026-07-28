@@ -38,14 +38,15 @@ class CalibrationController extends AbstractController
         if ($uploadForm->isSubmitted() && $uploadForm->isValid()) {
             $uploadData = $uploadForm->getData();
 
-            /** @var \Symfony\Component\HttpFoundation\File\UploadedFile $uploadedFile */
+            /** @var \Symfony\Component\HttpFoundation\File\UploadedFile|null $uploadedFile */
             $uploadedFile = $uploadForm->get(CalibrationUploadForm::FIELD_FILE)->getData();
+            $useCsvUpload = (bool)$uploadData[CalibrationUploadForm::FIELD_USE_CSV_UPLOAD];
 
             $this->getFacade()->createCalibration(
                 (int)$uploadData[CalibrationUploadForm::FIELD_RELEVANT_PRODUCT_COUNT],
                 (string)$uploadData[CalibrationUploadForm::FIELD_STORE_NAME],
                 (string)$uploadData[CalibrationUploadForm::FIELD_LOCALE_NAME],
-                $this->readUploadedFileContent($uploadedFile),
+                $useCsvUpload && $uploadedFile !== null ? $this->readUploadedFileContent($uploadedFile) : null,
             );
 
             $this->addSuccessMessage(

@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 use Codeception\Test\Unit;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
 
@@ -37,12 +38,21 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     protected array $calibrationEntities = [];
 
     /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery>
+     */
+    protected array $queryEntities = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
     {
         foreach ($this->calibrationEntities as $calibrationEntity) {
             $calibrationEntity->delete();
+        }
+
+        foreach ($this->queryEntities as $queryEntity) {
+            $queryEntity->delete();
         }
 
         parent::_after();
@@ -175,6 +185,47 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         // Assert
         $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindDistinctSearchTermsByStoreLocaleReturnsEachTermOnceForTheGivenStoreLocale(): void
+    {
+        // Arrange — an isolated store name so this never collides with real organic ratings in the shared
+        // demo database.
+        $storeName = 'DE-TEST-DISTINCT-TERMS';
+
+        $this->createTestQuery('chair', $storeName, 'en_US');
+        $this->createTestQuery('desk', $storeName, 'en_US');
+        $this->createTestQuery('chair', $storeName, 'de_DE');
+        $this->createTestQuery('lamp', 'DE-TEST-OTHER-STORE', 'en_US');
+
+        // Act
+        $searchTerms = (new SearchRankingOptimizerRepository())->findDistinctSearchTermsByStoreLocale($storeName, 'en_US');
+
+        // Assert
+        $this->assertEqualsCanonicalizing(['chair', 'desk'], $searchTerms);
+    }
+
+    /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery
+     */
+    protected function createTestQuery(string $searchTerm, string $storeName, string $localeName): SpySearchRankingQuery
+    {
+        $queryEntity = new SpySearchRankingQuery();
+        $queryEntity->setSearchTerm($searchTerm);
+        $queryEntity->setStoreName($storeName);
+        $queryEntity->setLocaleName($localeName);
+        $queryEntity->save();
+
+        $this->queryEntities[] = $queryEntity;
+
+        return $queryEntity;
     }
 
     /**
