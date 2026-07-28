@@ -44,4 +44,21 @@ class ProductRelevanceJudgmentStub implements ProductRelevanceJudgmentStubInterf
 
         return $responseTransfer;
     }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function clearProductRelevanceJudgment(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer {
+        /** @var \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer $responseTransfer */
+        $responseTransfer = $this->zedRequestClient->call(
+            '/search-ranking-optimizer/gateway/clear-product-relevance-judgment',
+            $requestTransfer,
+        );
+
+        return $responseTransfer;
+    }
 }

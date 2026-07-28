@@ -117,6 +117,56 @@ class ProductRelevanceJudgmentWriterTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testClearJudgmentDeletesTheRatingWhenTheQueryExists(): void
+    {
+        // Arrange
+        $requestTransfer = $this->createRequestTransfer('desk', SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+
+        $canonicalizerMock = $this->createMock(SearchTermCanonicalizerInterface::class);
+        $canonicalizerMock->method('canonicalize')->willReturn('desk');
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueryByTermStoreLocale')
+            ->with('desk', 'DE', 'en_US')
+            ->willReturn((new SearchRankingQueryTransfer())->setIdSearchRankingQuery(9));
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->once())
+            ->method('deleteRating')
+            ->with(9, 'CUST-1', 123);
+
+        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+
+        // Act
+        $writer->clearJudgment($requestTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testClearJudgmentIsASafeNoOpWhenNoQueryExistsForThatTerm(): void
+    {
+        // Arrange
+        $requestTransfer = $this->createRequestTransfer('never rated', SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+
+        $canonicalizerMock = $this->createMock(SearchTermCanonicalizerInterface::class);
+        $canonicalizerMock->method('canonicalize')->willReturn('never rated');
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueryByTermStoreLocale')->willReturn(null);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('deleteRating');
+
+        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+
+        // Act
+        $writer->clearJudgment($requestTransfer);
+    }
+
+    /**
      * @param string $searchTerm
      * @param string $ratingType
      *

@@ -20,6 +20,11 @@ class SearchRankingOptimizerWidgetRouteProviderPlugin extends AbstractRouteProvi
     public const ROUTE_NAME_SUBMIT_RELEVANCE_JUDGMENT = 'search-ranking-optimizer-widget/submit-relevance-judgment';
 
     /**
+     * @var string
+     */
+    public const ROUTE_NAME_CLEAR_RELEVANCE_JUDGMENT = 'search-ranking-optimizer-widget/clear-relevance-judgment';
+
+    /**
      * @param \Spryker\Yves\Router\Route\RouteCollection $routeCollection
      *
      * @return \Spryker\Yves\Router\Route\RouteCollection
@@ -29,6 +34,10 @@ class SearchRankingOptimizerWidgetRouteProviderPlugin extends AbstractRouteProvi
         $route = $this->buildRoute('/search-ranking-optimizer-widget/submit-relevance-judgment', 'SearchRankingOptimizerWidget', 'SubmitRelevanceJudgment', 'submitAction')
             ->setMethods(['POST']);
         $routeCollection->add(static::ROUTE_NAME_SUBMIT_RELEVANCE_JUDGMENT, $route);
+
+        $clearRoute = $this->buildRoute('/search-ranking-optimizer-widget/clear-relevance-judgment', 'SearchRankingOptimizerWidget', 'SubmitRelevanceJudgment', 'clearAction')
+            ->setMethods(['POST']);
+        $routeCollection->add(static::ROUTE_NAME_CLEAR_RELEVANCE_JUDGMENT, $clearRoute);
 
         return $routeCollection;
     }

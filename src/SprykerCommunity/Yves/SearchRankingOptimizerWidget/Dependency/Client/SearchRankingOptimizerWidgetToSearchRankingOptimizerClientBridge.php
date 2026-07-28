@@ -37,4 +37,15 @@ class SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge implement
     ): SearchRankingProductRelevanceJudgmentResponseTransfer {
         return $this->searchRankingOptimizerClient->submitProductRelevanceJudgment($requestTransfer);
     }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function clearProductRelevanceJudgment(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer {
+        return $this->searchRankingOptimizerClient->clearProductRelevanceJudgment($requestTransfer);
+    }
 }

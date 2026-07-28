@@ -26,4 +26,15 @@ interface ProductRelevanceJudgmentWriterInterface
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer;
+
+    /**
+     * Canonicalizes the request's raw search term, looks up the matching query row (never creates one —
+     * clearing a judgment that was never submitted is a safe no-op, not a reason to create a query), and
+     * deletes the rater's row for that (query, product) pair, if any.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return void
+     */
+    public function clearJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void;
 }

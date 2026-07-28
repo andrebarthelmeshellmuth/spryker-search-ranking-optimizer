@@ -78,6 +78,22 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
+     * - Canonicalizes the request's raw search term, looks up the matching query row (never creates one),
+     *   and deletes the rater's judgment for that (query, product) pair, if any. A safe no-op if there was
+     *   nothing to clear.
+     * - Caller (the Gateway Controller) is responsible for authorization, same as
+     *   {@see submitProductRelevanceJudgment()}.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return void
+     */
+    public function clearProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void;
+
+    /**
+     * Specification:
      * - Returns every rated query, newest-activity-first (`updated_at` DESC, bumped on every new rating —
      *   not just an importance-weight edit).
      *

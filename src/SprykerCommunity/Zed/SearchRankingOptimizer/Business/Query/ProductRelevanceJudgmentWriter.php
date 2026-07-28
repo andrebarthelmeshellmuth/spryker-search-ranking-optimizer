@@ -102,4 +102,30 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
 
         return $this->entityManager->upsertRating($ratingTransfer);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return void
+     */
+    public function clearJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void
+    {
+        $canonicalSearchTerm = $this->searchTermCanonicalizer->canonicalize($requestTransfer->getSearchTermOrFail());
+        $storeName = $requestTransfer->getStoreNameOrFail();
+        $localeName = $requestTransfer->getLocaleNameOrFail();
+
+        $queryTransfer = $this->repository->findQueryByTermStoreLocale($canonicalSearchTerm, $storeName, $localeName);
+
+        if ($queryTransfer === null) {
+            return;
+        }
+
+        $this->entityManager->deleteRating(
+            $queryTransfer->getIdSearchRankingQueryOrFail(),
+            $requestTransfer->getCustomerReferenceOrFail(),
+            $requestTransfer->getIdProductAbstractOrFail(),
+        );
+    }
 }

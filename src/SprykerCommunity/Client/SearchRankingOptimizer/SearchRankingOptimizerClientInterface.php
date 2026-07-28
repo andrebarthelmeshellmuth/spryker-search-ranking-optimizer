@@ -49,4 +49,21 @@ interface SearchRankingOptimizerClientInterface
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer;
+
+    /**
+     * Specification:
+     * - Clears a Relevance Rater's previously submitted judgment for a (query, product) pair via a
+     *   synchronous Zed gateway call — backs the widget's "click an already-pressed button to unselect"
+     *   affordance. Zed independently re-authorizes the caller, same as
+     *   {@see submitProductRelevanceJudgment()}.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function clearProductRelevanceJudgment(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer;
 }

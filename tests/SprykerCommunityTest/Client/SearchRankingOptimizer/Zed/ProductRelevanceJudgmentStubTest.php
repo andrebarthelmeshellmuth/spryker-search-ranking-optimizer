@@ -57,4 +57,34 @@ class ProductRelevanceJudgmentStubTest extends Unit
         // Assert
         $this->assertSame($responseTransfer, $result);
     }
+
+    /**
+     * @return void
+     */
+    public function testClearProductRelevanceJudgmentCallsTheExpectedGatewayUrlWithTheRequestTransfer(): void
+    {
+        // Arrange
+        $requestTransfer = (new SearchRankingProductRelevanceJudgmentRequestTransfer())
+            ->setSearchTerm('chair')
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setIdProductAbstract(1)
+            ->setCustomerReference('CUST-1');
+
+        $responseTransfer = (new SearchRankingProductRelevanceJudgmentResponseTransfer())->setIsSuccess(true);
+
+        $zedRequestClientMock = $this->createMock(SearchRankingOptimizerToZedRequestInterface::class);
+        $zedRequestClientMock->expects($this->once())
+            ->method('call')
+            ->with('/search-ranking-optimizer/gateway/clear-product-relevance-judgment', $requestTransfer)
+            ->willReturn($responseTransfer);
+
+        $stub = new ProductRelevanceJudgmentStub($zedRequestClientMock);
+
+        // Act
+        $result = $stub->clearProductRelevanceJudgment($requestTransfer);
+
+        // Assert
+        $this->assertSame($responseTransfer, $result);
+    }
 }

@@ -56,4 +56,31 @@ class GatewayController extends AbstractGatewayController
                 ->setErrorMessage($invalidRatingTypeException->getMessage());
         }
     }
+
+    /**
+     * Backs the widget's "click an already-pressed button to unselect" affordance. Same authorization
+     * posture as {@see submitProductRelevanceJudgmentAction()} — clearing your own judgment needs the
+     * same permission submitting one does, re-checked here rather than trusted from Yves.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function clearProductRelevanceJudgmentAction(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer {
+        $isAuthorized = $this->getFactory()
+            ->createRelevanceJudgmentAuthorizer()
+            ->isAuthorized($requestTransfer->getCustomerReferenceOrFail(), RateSearchRelevancePermissionPlugin::KEY);
+
+        if (!$isAuthorized) {
+            return (new SearchRankingProductRelevanceJudgmentResponseTransfer())
+                ->setIsSuccess(false)
+                ->setErrorMessage('Not authorized to rate search relevance.');
+        }
+
+        $this->getFacade()->clearProductRelevanceJudgment($requestTransfer);
+
+        return (new SearchRankingProductRelevanceJudgmentResponseTransfer())->setIsSuccess(true);
+    }
 }

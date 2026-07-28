@@ -53,4 +53,21 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
             ->createProductRelevanceJudgmentStub()
             ->submitProductRelevanceJudgment($requestTransfer);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     */
+    public function clearProductRelevanceJudgment(
+        SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentResponseTransfer {
+        return $this->getFactory()
+            ->createProductRelevanceJudgmentStub()
+            ->clearProductRelevanceJudgment($requestTransfer);
+    }
 }

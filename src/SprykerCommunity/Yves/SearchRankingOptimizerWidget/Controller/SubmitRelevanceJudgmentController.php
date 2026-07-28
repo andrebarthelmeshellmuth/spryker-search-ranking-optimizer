@@ -77,4 +77,39 @@ class SubmitRelevanceJudgmentController extends AbstractController
             'ratingType' => $responseTransfer->getRating()?->getRatingType(),
         ]);
     }
+
+    /**
+     * Backs the widget's "click an already-pressed button to unselect" affordance. Same permission gate
+     * as {@see submitAction()} — clearing your own judgment needs the same permission submitting one does.
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
+     * @return \Symfony\Component\HttpFoundation\JsonResponse
+     */
+    public function clearAction(Request $request): JsonResponse
+    {
+        if (!$this->can(RateSearchRelevancePermissionPlugin::KEY)) {
+            return $this->jsonResponse(['isSuccess' => false, 'errorMessage' => 'Not authorized.'], 403);
+        }
+
+        $customerTransfer = $this->getFactory()->getCustomerClient()->getCustomer();
+
+        if ($customerTransfer === null || $customerTransfer->getCustomerReference() === null) {
+            return $this->jsonResponse(['isSuccess' => false, 'errorMessage' => 'Not logged in.'], 403);
+        }
+
+        $requestTransfer = (new SearchRankingProductRelevanceJudgmentRequestTransfer())
+            ->setSearchTerm((string)$request->request->get(static::PARAM_SEARCH_TERM, ''))
+            ->setStoreName($this->getFactory()->getStoreClient()->getCurrentStore()->getNameOrFail())
+            ->setLocaleName($this->getLocale())
+            ->setIdProductAbstract((int)$request->request->get(static::PARAM_ID_PRODUCT_ABSTRACT, 0))
+            ->setCustomerReference($customerTransfer->getCustomerReference());
+
+        $responseTransfer = $this->getFactory()->getSearchRankingOptimizerClient()->clearProductRelevanceJudgment($requestTransfer);
+
+        return $this->jsonResponse([
+            'isSuccess' => $responseTransfer->getIsSuccess(),
+            'errorMessage' => $responseTransfer->getErrorMessage(),
+        ]);
+    }
 }

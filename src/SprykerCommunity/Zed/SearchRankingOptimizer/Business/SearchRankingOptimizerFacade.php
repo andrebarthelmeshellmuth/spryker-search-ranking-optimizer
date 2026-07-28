@@ -83,6 +83,20 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     *
+     * @return void
+     */
+    public function clearProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void
+    {
+        $this->getFactory()->createProductRelevanceJudgmentWriter()->clearJudgment($requestTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
      * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
      */
     public function getQueries(): array

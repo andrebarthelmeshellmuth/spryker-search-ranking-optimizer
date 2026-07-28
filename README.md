@@ -72,8 +72,8 @@ gets built, one click at a time, directly on the storefront search results page 
   **Relevance Rater** permission (`RateSearchRelevancePermissionPlugin`) — heart = highly relevant, check =
   acceptably relevant, X = not relevant. Default grey, colorized on click (heart/X share a red-family
   accent, check is green); only one button is ever pressed per (customer, product) pair on a given SRP.
-  Clicking an already-pressed button re-submits the same judgment (idempotent) rather than clearing it —
-  there is no separate "unrate" affordance by design.
+  Clicking the already-pressed button unselects it, deleting the underlying rating row — the one case
+  where a click means "remove my judgment" rather than "set it."
 - **One row per (query, customer, product).** The canonical search term (trimmed, lowercased,
   whitespace-collapsed — deliberately *not* tokenized, so two genuinely different queries never get merged)
   is stored once in `spy_search_ranking_query`; each rating is its own row in
@@ -346,7 +346,7 @@ composer check-floors
 
 ### Test suite
 
-**59 tests, 148 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**62 tests, 160 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash

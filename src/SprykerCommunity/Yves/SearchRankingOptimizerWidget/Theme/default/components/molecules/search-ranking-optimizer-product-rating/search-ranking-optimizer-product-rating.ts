@@ -1,6 +1,7 @@
 import Component from 'ShopUi/models/component';
 
 const SUBMIT_URL = '/search-ranking-optimizer-widget/submit-relevance-judgment';
+const CLEAR_URL = '/search-ranking-optimizer-widget/clear-relevance-judgment';
 
 export default class SearchRankingOptimizerProductRating extends Component {
     /**
@@ -38,15 +39,22 @@ export default class SearchRankingOptimizerProductRating extends Component {
     /**
      * Single-select: clicking a button that is not yet pressed selects it and deselects the other two
      * (visual state only, before the network round-trip — see the scss for how `aria-pressed` drives the
-     * heart/x red-family vs. check green colorization). Clicking the ALREADY-pressed button is still sent
-     * (idempotent re-submission of the same judgment, matching the backend's own upsert-in-place
-     * semantics), rather than treated as a "clear my rating" action — there is no unrated state to return
-     * to once a button reads pressed, by design (an admin who wants to change their mind clicks a
-     * different button, they do not need a fourth "clear" affordance for that).
+     * heart/x red-family vs. check green colorization). Clicking the ALREADY-pressed button unselects it
+     * (clears the judgment entirely) rather than re-submitting it — the one case where a click means
+     * "delete my rating" instead of "set my rating".
      *
      * @param button - the button that was clicked.
      */
     protected handleClick(button: HTMLButtonElement): void {
+        const wasPressed = button.getAttribute('aria-pressed') === 'true';
+
+        if (wasPressed) {
+            this.setPressed(undefined);
+            this.clearJudgment(button);
+
+            return;
+        }
+
         const ratingType = button.dataset.ratingType ?? '';
         const previouslyPressed = this.buttons.find((candidate) => candidate.getAttribute('aria-pressed') === 'true');
 
@@ -56,8 +64,9 @@ export default class SearchRankingOptimizerProductRating extends Component {
 
     /**
      * @param pressedButton - the button to mark pressed; every other button in this widget is cleared.
+     * Pass `undefined` to clear all three (nothing pressed).
      */
-    protected setPressed(pressedButton: HTMLButtonElement): void {
+    protected setPressed(pressedButton: HTMLButtonElement | undefined): void {
         this.buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === pressedButton)));
     }
 
@@ -89,17 +98,35 @@ export default class SearchRankingOptimizerProductRating extends Component {
             .then((response) => response.json())
             .then((responseData: { isSuccess: boolean }) => {
                 if (!responseData.isSuccess) {
-                    this.revertPressed(previouslyPressedButton);
+                    this.setPressed(previouslyPressedButton);
                 }
             })
-            .catch(() => this.revertPressed(previouslyPressedButton));
+            .catch(() => this.setPressed(previouslyPressedButton));
     }
 
     /**
-     * @param previouslyPressedButton - the button to restore as pressed, or none if nothing was pressed
-     * before this click.
+     * On a failed or unauthorized clear, re-presses the button the customer had just unselected — a
+     * customer should never see a button go grey for a judgment that is still actually persisted.
+     *
+     * @param clickedButton - the (previously pressed) button that was clicked to unselect it.
      */
-    protected revertPressed(previouslyPressedButton: HTMLButtonElement | undefined): void {
-        this.buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === previouslyPressedButton)));
+    protected clearJudgment(clickedButton: HTMLButtonElement): void {
+        const body = new URLSearchParams({
+            searchTerm: this.searchTerm,
+            idProductAbstract: this.idProductAbstract,
+        });
+
+        fetch(CLEAR_URL, {
+            method: 'POST',
+            body,
+            credentials: 'same-origin',
+        })
+            .then((response) => response.json())
+            .then((responseData: { isSuccess: boolean }) => {
+                if (!responseData.isSuccess) {
+                    this.setPressed(clickedButton);
+                }
+            })
+            .catch(() => this.setPressed(clickedButton));
     }
 }

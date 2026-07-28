@@ -104,4 +104,17 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function upsertRating(SearchRankingQueryRatingTransfer $ratingTransfer): SearchRankingQueryRatingTransfer;
+
+    /**
+     * Backs the widget's "click an already-pressed button to unselect" affordance — the same identifying
+     * triple {@see upsertRating()} matches an existing row against. A safe no-op when there is nothing to
+     * delete.
+     *
+     * @param int $fkSearchRankingQuery
+     * @param string $customerReference
+     * @param int $fkProductAbstract
+     *
+     * @return void
+     */
+    public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void;
 }
