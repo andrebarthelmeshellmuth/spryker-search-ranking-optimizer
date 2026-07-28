@@ -59,6 +59,17 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
+     * - Returns the run currently in status=calculating, if any — at most one at a time by design. Backs
+     *   the Calibration page's live progress counter.
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
+
+    /**
+     * Specification:
      * - Canonicalizes the request's raw search term, finds-or-creates the matching query row, then
      *   upserts the rater's judgment for that (query, product) pair — the same rater re-submitting for
      *   the same pair updates their existing row in place; a different rater on the same pair always gets

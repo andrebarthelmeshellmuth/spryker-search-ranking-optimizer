@@ -46,7 +46,9 @@ class SearchRankingOptimizerMapper
             ->setSampleCount($calibrationEntity->getSampleCount())
             ->setCalculatedAt($calibrationEntity->getCalculatedAt()?->format(DATE_ATOM))
             ->setErrorMessage($calibrationEntity->getErrorMessage())
-            ->setCreatedAt($calibrationEntity->getCreatedAt()?->format(DATE_ATOM));
+            ->setCreatedAt($calibrationEntity->getCreatedAt()?->format(DATE_ATOM))
+            ->setTotalCount($calibrationEntity->getTotalCount())
+            ->setProcessedCount($calibrationEntity->getProcessedCount());
     }
 
     /**

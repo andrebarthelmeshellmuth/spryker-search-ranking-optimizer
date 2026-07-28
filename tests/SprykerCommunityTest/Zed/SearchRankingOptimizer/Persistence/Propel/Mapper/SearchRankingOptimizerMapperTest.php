@@ -52,6 +52,8 @@ class SearchRankingOptimizerMapperTest extends Unit
         $calibrationEntity->setSampleCount(20);
         $calibrationEntity->setCalculatedAt('2026-01-15 10:00:00');
         $calibrationEntity->setCreatedAt('2026-01-15 09:00:00');
+        $calibrationEntity->setTotalCount(12);
+        $calibrationEntity->setProcessedCount(7);
 
         // Act
         $calibrationTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationEntityToTransfer(
@@ -73,6 +75,8 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(7.0, $calibrationTransfer->getScoreP75());
         $this->assertSame(20, $calibrationTransfer->getSampleCount());
         $this->assertStringStartsWith('2026-01-15T10:00:00', (string)$calibrationTransfer->getCalculatedAt());
+        $this->assertSame(12, $calibrationTransfer->getTotalCount());
+        $this->assertSame(7, $calibrationTransfer->getProcessedCount());
     }
 
     /**

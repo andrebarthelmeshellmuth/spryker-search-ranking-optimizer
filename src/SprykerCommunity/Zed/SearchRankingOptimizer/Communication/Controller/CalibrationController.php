@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -64,8 +65,33 @@ class CalibrationController extends AbstractController
         return $this->viewResponse([
             'currentRelevanceSaturationPoint' => $currentRelevanceSaturationPoint,
             'latestCalibration' => $latestCalibrationTransfer,
+            'inProgressCalibration' => $this->getFacade()->findCalibrationInProgress(),
             'uploadForm' => $uploadForm->createView(),
             'applyForm' => $applyForm,
+        ]);
+    }
+
+    /**
+     * Polled by the Calibration page's own JS while a run is in status=calculating — deliberately tiny
+     * (id/status/counts only, no search terms) since this fires roughly once a second for however long
+     * the run takes.
+     *
+     * @return \Symfony\Component\HttpFoundation\JsonResponse
+     */
+    public function progressAction(): JsonResponse
+    {
+        $inProgressCalibrationTransfer = $this->getFacade()->findCalibrationInProgress();
+
+        if ($inProgressCalibrationTransfer === null) {
+            return $this->jsonResponse([
+                'status' => null,
+            ]);
+        }
+
+        return $this->jsonResponse([
+            'status' => $inProgressCalibrationTransfer->getStatus(),
+            'processedCount' => $inProgressCalibrationTransfer->getProcessedCount(),
+            'totalCount' => $inProgressCalibrationTransfer->getTotalCount(),
         ]);
     }
 

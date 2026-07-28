@@ -43,6 +43,17 @@ interface SearchRankingOptimizerEntityManagerInterface
     public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $scores): void;
 
     /**
+     * Adds 1 to the calibration's `processedCount` — called once per search term as the calculation loop
+     * works through them, the numerator half of the live progress counter. A safe no-op if the id no
+     * longer exists.
+     *
+     * @param int $idSearchRankingCalibration
+     *
+     * @return void
+     */
+    public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void;
+
+    /**
      * Persists the pooled statistics onto the calibration row and sets status=calculated.
      *
      * @param int $idSearchRankingCalibration

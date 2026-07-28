@@ -17,6 +17,8 @@
         <column name="sample_count" type="INTEGER" required="false" description="Total number of pooled product scores the stats were computed from."/>
         <column name="calculated_at" type="TIMESTAMP" required="false"/>
         <column name="error_message" type="VARCHAR" size="1024" required="false"/>
+        <column name="total_count" type="INTEGER" required="true" defaultValue="0" description="Search term count, set once at upload time — the denominator for the live progress counter shown while status=calculating."/>
+        <column name="processed_count" type="INTEGER" required="true" defaultValue="0" description="Search terms fired so far in the current/last run — incremented one at a time inside ScoreCalibrator::calculate()'s own per-term loop, the numerator for the live progress counter."/>
 
         <behavior name="timestampable"/>
         <id-method-parameter value="spy_search_ranking_calibration_pk_seq"/>

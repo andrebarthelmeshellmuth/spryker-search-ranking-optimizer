@@ -44,7 +44,10 @@ The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page
    picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, fires the **live catalog
    search-string query** for each term against the real search index, pools the top-X raw text-relevance
    `_score` values across all terms, and computes a suggested `k` from that pool. The run moves to
-   `calculated` (or `failed`, with a stored error message).
+   `calculated` (or `failed`, with a stored error message). While it's running, the Calibration page shows
+   a live "X / Y search terms processed" counter (a small `progressAction()` JSON endpoint the page polls
+   once a second) — no fake/indeterminate spinner, since the console command's own per-term loop is a
+   genuinely trackable count.
 3. **Apply.** Back on the Calibration page, review the suggested `k` against the current live value and
    click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` setting — through
    `search-ranking`'s own facade, which republishes the ranking configuration exactly as a manual edit on
@@ -346,7 +349,7 @@ composer check-floors
 
 ### Test suite
 
-**62 tests, 160 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**67 tests, 172 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash

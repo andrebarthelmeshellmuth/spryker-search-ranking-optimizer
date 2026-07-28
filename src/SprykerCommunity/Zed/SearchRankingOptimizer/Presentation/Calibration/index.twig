@@ -4,6 +4,24 @@
 {% block section_title %}{{ widget_title | trans }}{% endblock %}
 
 {% block content %}
+    {% if inProgressCalibration %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Calibration In Progress' } %}
+            {% block widget_content %}
+                {# Polled by the script at the bottom of this page — the counts printed here are only the
+                   first paint; every update after that comes from progressAction()'s JSON, not a page
+                   reload. #}
+                <div class="search-ranking-optimizer-calibration-progress" data-role="calibration-progress">
+                    <p>
+                        <span data-role="processed">{{ inProgressCalibration.processedCount }}</span> /
+                        <span data-role="total">{{ inProgressCalibration.totalCount }}</span>
+                        {{ 'search terms processed' | trans }}
+                    </p>
+                    <progress data-role="progress-bar" value="{{ inProgressCalibration.processedCount }}" max="{{ inProgressCalibration.totalCount|default(1) }}" style="width: 100%;"></progress>
+                </div>
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+
     {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k)' } %}
         {% block widget_content %}
             <p>Live value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
@@ -73,4 +91,49 @@
             {{ form_end(uploadForm) }}
         {% endblock %}
     {% endembed %}
+{% endblock %}
+
+{% block footer_js %}
+    {{ parent() }}
+    {% if inProgressCalibration %}
+        <script>
+            (function () {
+                'use strict';
+
+                // Polls until status stops being "calculating" (finished, failed, or — extremely
+                // unlikely mid-poll — picked up as a fresh "uploaded" run again), then reloads once to
+                // show the finished widgets (Apply form, or the error) instead of trying to fade this
+                // progress panel out client-side.
+                var processedElement = document.querySelector('[data-role="calibration-progress"] [data-role="processed"]');
+                var totalElement = document.querySelector('[data-role="calibration-progress"] [data-role="total"]');
+                var progressBarElement = document.querySelector('[data-role="calibration-progress"] [data-role="progress-bar"]');
+
+                function poll() {
+                    fetch('/search-ranking-optimizer/calibration/progress', { headers: { Accept: 'application/json' } })
+                        .then(function (response) { return response.json(); })
+                        .then(function (progress) {
+                            if (progress.status !== 'calculating') {
+                                window.location.reload();
+
+                                return;
+                            }
+
+                            processedElement.textContent = progress.processedCount;
+                            totalElement.textContent = progress.totalCount;
+                            progressBarElement.setAttribute('value', progress.processedCount);
+                            progressBarElement.setAttribute('max', progress.totalCount || 1);
+
+                            window.setTimeout(poll, 1000);
+                        })
+                        .catch(function () {
+                            // A transient failure (e.g. one dropped request) shouldn't stop polling —
+                            // just try again on the same cadence.
+                            window.setTimeout(poll, 1000);
+                        });
+                }
+
+                window.setTimeout(poll, 1000);
+            }());
+        </script>
+    {% endif %}
 {% endblock %}

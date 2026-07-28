@@ -141,6 +141,43 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testFindCalibrationInProgressReturnsTheCalculatingRowWithItsProgressCounts(): void
+    {
+        // Arrange
+        $inProgress = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING);
+        $inProgress->setTotalCount(8);
+        $inProgress->setProcessedCount(3);
+        $inProgress->save();
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($inProgress->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame(8, $resultTransfer->getTotalCount());
+        $this->assertSame(3, $resultTransfer->getProcessedCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindCalibrationInProgressReturnsNullWhenNothingIsCalculating(): void
+    {
+        // Arrange
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
      * @param string $status
      *
      * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration

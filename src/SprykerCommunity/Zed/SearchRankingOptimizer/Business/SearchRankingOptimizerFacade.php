@@ -67,6 +67,18 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
+    {
+        return $this->getRepository()->findCalibrationInProgress();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException

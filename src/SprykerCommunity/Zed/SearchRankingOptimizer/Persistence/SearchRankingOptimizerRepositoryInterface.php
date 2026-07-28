@@ -37,6 +37,14 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
 
     /**
+     * The run currently in status=calculating, if any — at most one at a time by design. Backs the
+     * Calibration page's live progress counter.
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
+
+    /**
      * Looks up a query by its exact canonical (searchTerm, storeName, localeName) key — the same key
      * {@see SearchRankingOptimizerEntityManagerInterface::findOrCreateQuery()} upserts against.
      *
