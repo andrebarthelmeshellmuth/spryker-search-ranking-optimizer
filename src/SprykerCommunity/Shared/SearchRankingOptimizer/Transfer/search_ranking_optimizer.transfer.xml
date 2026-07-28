@@ -148,4 +148,38 @@
         <property name="createdAt" type="string"/>
     </transfer>
 
+    <!-- One metric's weight at the moment a checkpoint was taken. idSearchRankingMetric is
+         search-ranking's own metric id, kept only as a best-effort restore key, since that metric could
+         be deleted before a restore attempt (see WeightCheckpointRestorer, a safe no-op in that case). -->
+    <transfer name="SearchRankingWeightCheckpointMetricWeight" strict="true">
+        <property name="idSearchRankingMetric" type="int"/>
+        <property name="name" type="string"/>
+        <property name="weight" type="float"/>
+    </transfer>
+
+    <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
+         reproduce: the relevanceWeight blend, every metric's own weight, and the 3 entropy-weighting
+         knobs (probe size/exponent/shift magnitude) — NOT relevanceSaturationPoint, which already has its
+         own versioning story via Calibration and stays out of checkpoint scope deliberately. The entropy
+         knobs ARE included: they directly shape the live ranking formula's behavior the same way
+         relevanceWeight/metric weights do, so a checkpoint that omitted them wouldn't actually reproduce
+         a past ranking behavior, only part of it. isEntropyWeightingEnabled is captured alongside them —
+         entropy weighting is a code-level, project-wide flag (search-ranking's
+         SearchRankingConfig::isEntropyWeightingEnabled()) independent of the 3 knob VALUES, so a
+         checkpoint honestly records whether those numbers were actually live at the time, rather than
+         silently implying they always were. source is 'manual' for now (a Query Curator-triggered "take
+         checkpoint now" or a restore); later phases will add 'auto-tune'/'algorithm' values as those
+         producers get built, per the "one harness, three producers" design. -->
+    <transfer name="SearchRankingWeightCheckpoint" strict="true">
+        <property name="idSearchRankingWeightCheckpoint" type="int"/>
+        <property name="source" type="string"/>
+        <property name="relevanceWeight" type="float"/>
+        <property name="entropyProbeResultSize" type="int"/>
+        <property name="entropyWeightExponent" type="float"/>
+        <property name="entropyWeightShiftMagnitude" type="float"/>
+        <property name="isEntropyWeightingEnabled" type="bool"/>
+        <property name="metricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="metricWeight"/>
+        <property name="createdAt" type="string"/>
+    </transfer>
+
 </transfers>

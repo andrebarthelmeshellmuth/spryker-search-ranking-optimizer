@@ -14,6 +14,7 @@ use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
 /**
@@ -193,5 +194,45 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function findEvaluationHistory(string $storeName, string $localeName): array
     {
         return $this->getRepository()->findEvaluationHistoryByStoreLocale($storeName, $localeName);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $source
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     */
+    public function recordWeightCheckpoint(string $source): SearchRankingWeightCheckpointTransfer
+    {
+        return $this->getFactory()->createWeightCheckpointRecorder()->record($source);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchRankingWeightCheckpoint
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
+     */
+    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
+    {
+        return $this->getFactory()->createWeightCheckpointRestorer()->restore($idSearchRankingWeightCheckpoint);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
+     */
+    public function findWeightCheckpointHistory(): array
+    {
+        return $this->getRepository()->findWeightCheckpointHistory();
     }
 }

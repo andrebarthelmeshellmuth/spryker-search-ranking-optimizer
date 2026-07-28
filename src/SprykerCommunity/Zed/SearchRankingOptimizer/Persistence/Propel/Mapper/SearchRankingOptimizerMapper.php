@@ -14,11 +14,14 @@ use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 
 class SearchRankingOptimizerMapper
 {
@@ -152,5 +155,72 @@ class SearchRankingOptimizerMapper
             ->setMetricScore($evaluationEntity->getMetricScore())
             ->setQueryCount($evaluationEntity->getQueryCount())
             ->setCreatedAt($evaluationEntity->getCreatedAt()?->format(DATE_ATOM));
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint $weightCheckpointEntity
+     * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     */
+    public function mapWeightCheckpointEntityToTransfer(
+        SpySearchRankingWeightCheckpoint $weightCheckpointEntity,
+        SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer,
+    ): SearchRankingWeightCheckpointTransfer {
+        $weightCheckpointTransfer
+            ->setIdSearchRankingWeightCheckpoint($weightCheckpointEntity->getIdSearchRankingWeightCheckpoint())
+            ->setSource($weightCheckpointEntity->getSource())
+            ->setRelevanceWeight($weightCheckpointEntity->getRelevanceWeight())
+            ->setEntropyProbeResultSize($weightCheckpointEntity->getEntropyProbeResultSize())
+            ->setEntropyWeightExponent($weightCheckpointEntity->getEntropyWeightExponent())
+            ->setEntropyWeightShiftMagnitude($weightCheckpointEntity->getEntropyWeightShiftMagnitude())
+            ->setIsEntropyWeightingEnabled($weightCheckpointEntity->getIsEntropyWeightingEnabled())
+            ->setCreatedAt($weightCheckpointEntity->getCreatedAt()?->format(DATE_ATOM));
+
+        foreach ($this->decodeMetricWeights($weightCheckpointEntity->getMetricWeights()) as $metricWeightTransfer) {
+            $weightCheckpointTransfer->addMetricWeight($metricWeightTransfer);
+        }
+
+        return $weightCheckpointTransfer;
+    }
+
+    /**
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $metricWeightTransfers
+     *
+     * @return string
+     */
+    public function encodeMetricWeights(array $metricWeightTransfers): string
+    {
+        $metricWeights = [];
+
+        foreach ($metricWeightTransfers as $metricWeightTransfer) {
+            $metricWeights[] = [
+                'idSearchRankingMetric' => $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
+                'name' => $metricWeightTransfer->getNameOrFail(),
+                'weight' => $metricWeightTransfer->getWeightOrFail(),
+            ];
+        }
+
+        return (string)json_encode($metricWeights);
+    }
+
+    /**
+     * @param string $metricWeightsJson
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer>
+     */
+    protected function decodeMetricWeights(string $metricWeightsJson): array
+    {
+        $decoded = json_decode($metricWeightsJson, true);
+        $metricWeightTransfers = [];
+
+        foreach ((is_array($decoded) ? $decoded : []) as $metricWeight) {
+            $metricWeightTransfers[] = (new SearchRankingWeightCheckpointMetricWeightTransfer())
+                ->setIdSearchRankingMetric((int)$metricWeight['idSearchRankingMetric'])
+                ->setName((string)$metricWeight['name'])
+                ->setWeight((float)$metricWeight['weight']);
+        }
+
+        return $metricWeightTransfers;
     }
 }

@@ -18,6 +18,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibr
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculator;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorder;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
@@ -29,6 +33,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWe
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 
 /**
@@ -134,5 +139,36 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingClient(),
             $this->createRelevanceJudgmentGainMapper(),
         );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
+     */
+    public function createWeightCheckpointRecorder(): WeightCheckpointRecorderInterface
+    {
+        return new WeightCheckpointRecorder(
+            $this->getSearchRankingFacade(),
+            $this->getEntityManager(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorerInterface
+     */
+    public function createWeightCheckpointRestorer(): WeightCheckpointRestorerInterface
+    {
+        return new WeightCheckpointRestorer(
+            $this->getRepository(),
+            $this->getSearchRankingFacade(),
+            $this->createWeightCheckpointRecorder(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
+     */
+    public function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
     }
 }

@@ -17,6 +17,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationAp
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\QueryImportanceWeightForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RecordWeightCheckpointForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RestoreWeightCheckpointForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
@@ -161,6 +163,26 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     {
         return $this->getFormFactory()->create(QueryImportanceWeightForm::class, [
             QueryImportanceWeightForm::FIELD_IMPORTANCE_WEIGHT => $importanceWeight,
+        ]);
+    }
+
+    /**
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createRecordWeightCheckpointForm(): FormInterface
+    {
+        return $this->getFormFactory()->create(RecordWeightCheckpointForm::class);
+    }
+
+    /**
+     * @param int $idSearchRankingWeightCheckpoint
+     *
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createRestoreWeightCheckpointForm(int $idSearchRankingWeightCheckpoint): FormInterface
+    {
+        return $this->getFormFactory()->create(RestoreWeightCheckpointForm::class, [
+            RestoreWeightCheckpointForm::FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT => $idSearchRankingWeightCheckpoint,
         ]);
     }
 }

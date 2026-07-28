@@ -14,6 +14,7 @@ use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
 interface SearchRankingOptimizerFacadeInterface
 {
@@ -189,4 +190,46 @@ interface SearchRankingOptimizerFacadeInterface
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
     public function findEvaluationHistory(string $storeName, string $localeName): array;
+
+    /**
+     * Specification:
+     * - Reads the CURRENT state directly from `search-ranking`'s own facade — relevanceWeight, every
+     *   metric's own weight, the 3 entropy-weighting knobs, and whether entropy weighting is currently
+     *   enabled at the code level — and persists it as one new weight checkpoint.
+     *
+     * @api
+     *
+     * @param string $source
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     */
+    public function recordWeightCheckpoint(string $source): SearchRankingWeightCheckpointTransfer;
+
+    /**
+     * Specification:
+     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 entropy knobs back through
+     *   `search-ranking`'s own facade, skipping any metric that no longer exists.
+     * - Never writes back `isEntropyWeightingEnabled` — it's a pure code-level project flag with no
+     *   corresponding save method.
+     * - Records a NEW checkpoint of the resulting state (source `manual`) and returns it — restoring IS
+     *   applying, so it gets its own checkpoint like any other applied change.
+     * - Returns null (writes nothing) when the given id doesn't exist.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingWeightCheckpoint
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
+     */
+    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
+
+    /**
+     * Specification:
+     * - Returns every persisted weight checkpoint, newest first.
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
+     */
+    public function findWeightCheckpointHistory(): array;
 }

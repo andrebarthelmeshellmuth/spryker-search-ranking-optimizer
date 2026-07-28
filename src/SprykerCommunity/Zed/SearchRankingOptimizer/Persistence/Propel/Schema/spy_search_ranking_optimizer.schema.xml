@@ -113,4 +113,22 @@
         </index>
     </table>
 
+    <table name="spy_search_ranking_weight_checkpoint" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_weight_checkpoint" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="source" type="VARCHAR" size="32" required="true" description="SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_* — 'manual' for now, later phases add further producers."/>
+        <column name="relevance_weight" type="DOUBLE" required="true" description="search-ranking's relevanceWeight blend at the moment this checkpoint was taken."/>
+        <column name="entropy_probe_result_size" type="INTEGER" required="true" description="search-ranking's entropyProbeResultSize at the moment this checkpoint was taken (meaningful only if entropy weighting is enabled at the code level, but always captured — cheap and keeps a checkpoint a complete snapshot regardless of that project-level flag)."/>
+        <column name="entropy_weight_exponent" type="DOUBLE" required="true" description="search-ranking's entropyWeightExponent at the moment this checkpoint was taken."/>
+        <column name="entropy_weight_shift_magnitude" type="DOUBLE" required="true" description="search-ranking's entropyWeightShiftMagnitude at the moment this checkpoint was taken."/>
+        <column name="is_entropy_weighting_enabled" type="BOOLEAN" required="true" description="Whether search-ranking's code-level entropy-weighting flag was on at the moment this checkpoint was taken — independent of the 3 knob values above, so a checkpoint honestly records whether those numbers were actually live, not just what they were set to."/>
+        <column name="metric_weights" type="LONGVARCHAR" required="true" description="JSON array of {idSearchRankingMetric, name, weight} — every metric's own weight at the moment this checkpoint was taken, active or not."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_weight_checkpoint_pk_seq"/>
+
+        <index name="index-spy_srwc-created_at">
+            <index-column name="created_at"/>
+        </index>
+    </table>
+
 </database>

@@ -1,0 +1,110 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Weight Checkpoints' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current State' } %}
+        {% block widget_content %}
+            <p>
+                What <code>search-ranking</code> is using for ranking right now — take a checkpoint before
+                changing anything by hand, so there's always a way back.
+            </p>
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>Relevance weight (text vs. business score)</th>
+                        <td><strong>{{ relevanceWeight }}</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Entropy weighting enabled?</th>
+                        <td>
+                            {% if isEntropyWeightingEnabled %}
+                                <span class="label label-success">Yes</span>
+                            {% else %}
+                                <span class="label label-default">No</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Entropy probe result size</th>
+                        <td>{{ entropyProbeResultSize }}</td>
+                    </tr>
+                    <tr>
+                        <th>Entropy weight exponent</th>
+                        <td>{{ entropyWeightExponent }}</td>
+                    </tr>
+                    <tr>
+                        <th>Entropy weight shift magnitude</th>
+                        <td>{{ entropyWeightShiftMagnitude }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {% if metricWeights %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for metricWeight in metricWeights %}
+                            <tr>
+                                <td>{{ metricWeight.name }}</td>
+                                <td>{{ metricWeight.weight }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No metrics configured yet.</p>
+            {% endif %}
+
+            {{ form_start(recordForm, { action: url('/search-ranking-optimizer/checkpoint/record'), method: 'POST' }) }}
+            {{ form_widget(recordForm) }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Take checkpoint now' | trans }}</button>
+            </div>
+            {{ form_end(recordForm) }}
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
+        {% block widget_content %}
+            {% if weightCheckpointHistory %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Recorded at</th>
+                            <th>Source</th>
+                            <th>Relevance weight</th>
+                            <th>Entropy enabled?</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for weightCheckpoint in weightCheckpointHistory %}
+                            <tr>
+                                <td>{{ weightCheckpoint.createdAt }}</td>
+                                <td>{{ weightCheckpoint.source }}</td>
+                                <td>{{ weightCheckpoint.relevanceWeight }}</td>
+                                <td>{{ weightCheckpoint.isEntropyWeightingEnabled ? 'Yes' : 'No' }}</td>
+                                <td>
+                                    {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
+                                    {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
+                                    {{ form_widget(restoreForm) }}
+                                    <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Restore' | trans }}</button>
+                                    {{ form_end(restoreForm) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No checkpoint has been recorded yet.</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

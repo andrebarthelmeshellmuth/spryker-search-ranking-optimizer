@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
 interface SearchRankingOptimizerRepositoryInterface
 {
@@ -130,4 +131,18 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
     public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array;
+
+    /**
+     * Every persisted weight checkpoint, newest first — backs the Zed Checkpoint page's history list.
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
+     */
+    public function findWeightCheckpointHistory(): array;
+
+    /**
+     * @param int $idSearchRankingWeightCheckpoint
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
+     */
+    public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
 }

@@ -83,14 +83,17 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     {
         $container = parent::provideBusinessLayerDependencies($container);
         $container = $this->addSearchRankingClient($container);
+        $container = $this->addSearchRankingFacade($container);
 
         return $container;
     }
 
     /**
-     * The base-package facade bridges are Communication-layer dependencies only (the Gui apply
-     * controller), kept out of the Business layer so the calibration business logic itself has no
-     * dependency on the base package.
+     * The base-package facade bridge is also needed in the Business layer as of the weight-checkpoint
+     * feature (`WeightCheckpointRecorder`/`WeightCheckpointRestorer` read and write `search-ranking`'s own
+     * live tuning values directly) — every other base-package bridge here stays Communication-layer only
+     * (the Gui apply controller), since calibration/scoring business logic still has no dependency on the
+     * base package beyond the Client it already used.
      *
      * @param \Spryker\Zed\Kernel\Container $container
      *
