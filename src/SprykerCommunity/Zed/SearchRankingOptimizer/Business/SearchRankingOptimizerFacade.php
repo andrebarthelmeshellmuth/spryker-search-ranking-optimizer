@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
 /**
@@ -75,5 +76,46 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer
     {
         return $this->getFactory()->createProductRelevanceJudgmentWriter()->submitJudgment($requestTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function getQueries(): array
+    {
+        return $this->getRepository()->findAllQueriesOrderedByUpdatedAt();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchRankingQuery
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer
+    {
+        return $this->getRepository()->findQueryById($idSearchRankingQuery);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchRankingQuery
+     * @param float $importanceWeight
+     *
+     * @return void
+     */
+    public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void
+    {
+        $this->getFactory()->createQueryImportanceWeightUpdater()->update($idSearchRankingQuery, $importanceWeight);
     }
 }

@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 
 interface SearchRankingOptimizerFacadeInterface
 {
@@ -74,4 +75,40 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer;
+
+    /**
+     * Specification:
+     * - Returns every rated query, newest-activity-first (`updated_at` DESC, bumped on every new rating —
+     *   not just an importance-weight edit).
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function getQueries(): array;
+
+    /**
+     * Specification:
+     * - Returns null if the id no longer exists.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingQuery
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
+
+    /**
+     * Specification:
+     * - Sets `importanceWeight` on the given query. A safe no-op if the id no longer exists.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingQuery
+     * @param float $importanceWeight
+     *
+     * @return void
+     */
+    public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void;
 }

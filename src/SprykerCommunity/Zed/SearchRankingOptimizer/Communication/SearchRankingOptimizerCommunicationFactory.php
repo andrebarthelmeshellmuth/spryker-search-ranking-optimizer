@@ -9,11 +9,14 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication;
 
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\QueryImportanceWeightForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
@@ -115,5 +118,25 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
             $this->getCompanyUserFacade(),
             $this->getPermissionFacade(),
         );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable
+     */
+    public function createQueryTable(): QueryTable
+    {
+        return new QueryTable(SpySearchRankingQueryQuery::create());
+    }
+
+    /**
+     * @param float $importanceWeight
+     *
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createQueryImportanceWeightForm(float $importanceWeight): FormInterface
+    {
+        return $this->getFormFactory()->create(QueryImportanceWeightForm::class, [
+            QueryImportanceWeightForm::FIELD_IMPORTANCE_WEIGHT => $importanceWeight,
+        ]);
     }
 }

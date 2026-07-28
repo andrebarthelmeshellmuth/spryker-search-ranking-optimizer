@@ -11,7 +11,8 @@ installs and runs completely standalone without it (see [Relationship to search-
 
 ## Status
 
-**Calibration and the SRP relevance-rating widget are both built, tested, and shipping.** The rest of the
+**Calibration, the SRP relevance-rating widget, and the Zed Queries curation page are all built, tested,
+and shipping.** The rest of the
 tuning layer (weight-slider preview, a propose/review/apply workflow, offline `rank_eval` evaluation, a
 monthly auto-tune job, automated weight search) is designed and on the [Roadmap](#roadmap) but not built
 yet.
@@ -83,6 +84,9 @@ gets built, one click at a time, directly on the storefront search results page 
 - **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a separate **Query Curator**
   permission (`SetSearchQueryImportancePermissionPlugin`) mark some queries as mattering more than others
   once they've accumulated ratings — a deliberately separate skill/permission from rating relevance itself.
+  Edited from the **Search Ranking Optimizer → Queries** Zed page: every rated query, newest-activity-first,
+  with an "Edit importance" action per row (a plain, paginated/sortable/searchable `Gui` table — the same
+  component `spryker-community/search-ranking`'s own Metrics page uses).
 - **Server-side authorization, not just a hidden button.** The Yves widget only *renders* for a permitted
   customer, but the write itself goes through a Zed `GatewayController` that independently re-checks the
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
@@ -292,20 +296,17 @@ also just run it by hand after each upload.)
 ## Modules
 
 - **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration business logic, persistence, console
-  command, Zed GUI (Calibration + Apply controllers), the raw-Elastica search component, the rated-query
-  data model, and the Zed Gateway endpoint that persists a rating.
+  command, Zed GUI (Calibration + Apply controllers, and the Queries listing/edit-importance controllers),
+  the raw-Elastica search component, the rated-query data model, and the Zed Gateway endpoint that persists
+  a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
-Calibration and judgment capture (rating collection) are the first two pieces of a larger tuning layer.
-Designed, not yet built:
+Calibration and judgment capture (rating collection + curation) are the first two pieces of a larger
+tuning layer. Designed, not yet built:
 
-- **A Zed queries page** — list `spy_search_ranking_query` rows sorted by most-recently-rated first, with
-  `importance_weight` inline-editable by the Query Curator permission. The data model and permission already
-  exist (see "SRP relevance rating" above); only the listing page
-  itself is still open.
 - **`_rank_eval` scoring** — turn the ratings this widget already collects into a numeric objective score
   (nDCG) via OpenSearch/Elasticsearch's `_rank_eval` API, so a tuning change can be measured against a real
   objective instead of judged by eye. Heart/check/X → numeric gain mapping stays configurable, not
@@ -345,7 +346,7 @@ composer check-floors
 
 ### Test suite
 
-**58 tests, 145 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**59 tests, 148 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash
@@ -403,7 +404,7 @@ the one further exemption, same class as those two: it is a thin pass-through to
 needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
 verification in [Status](#status) instead of a unit test.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 75
+Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 80
 files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
 generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
 `transfer:generate`. **Invoke it via the real `packages/` path, not the `vendor/` symlink** — running it

@@ -55,4 +55,11 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
      */
     public function findAllQueriesOrderedByUpdatedAt(): array;
+
+    /**
+     * @param int $idSearchRankingQuery
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
 }

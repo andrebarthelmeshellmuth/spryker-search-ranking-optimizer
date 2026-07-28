@@ -121,6 +121,26 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
+     * @param int $idSearchRankingQuery
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer
+    {
+        $queryEntity = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->findOneByIdSearchRankingQuery($idSearchRankingQuery);
+
+        if ($queryEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapQueryEntityToTransfer($queryEntity, new SearchRankingQueryTransfer());
+    }
+
+    /**
      * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
      */
     public function findAllQueriesOrderedByUpdatedAt(): array
