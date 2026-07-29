@@ -61,9 +61,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
             $resultTransfer->addMetricResult($metricResultTransfer);
 
-            if (!$metricResultTransfer->getWasThresholdMet() && $autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
-                $metricResultsToNotify[] = $metricResultTransfer;
+            if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
+                continue;
             }
+
+            $metricResultsToNotify[] = $metricResultTransfer;
         }
 
         $notifiedEmailCount = $metricResultsToNotify === [] ? 0 : $this->sendSummaryEmail($metricResultsToNotify);
@@ -205,9 +207,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $anyApplied = false;
 
         foreach ($metricResultTransfers as $metricResultTransfer) {
-            if ($metricResultTransfer->getWasApplied()) {
-                $anyApplied = true;
+            if (!$metricResultTransfer->getWasApplied()) {
+                continue;
             }
+
+            $anyApplied = true;
         }
 
         $mailTransfer = (new MailTransfer())

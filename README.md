@@ -18,6 +18,7 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [Rank evaluation — a real objective score, not averaged opinion](#rank-evaluation--a-real-objective-score-not-averaged-opinion)
   - [Weight checkpoints — a way back before changing anything by hand](#weight-checkpoints--a-way-back-before-changing-anything-by-hand)
   - [Auto-tune — a monthly fit-quality check per metric](#auto-tune--a-monthly-fit-quality-check-per-metric)
+  - [Automated weight optimization — searching relevanceWeight and metric weights algorithmically](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
 - [Relationship to search-ranking](#relationship-to-search-ranking)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -29,7 +30,7 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [4. Register the Zed navigation entry](#4-register-the-zed-navigation-entry)
   - [5. Translations](#5-translations)
   - [6. Build (transfers, Propel tables, caches)](#6-build-transfers-propel-tables-caches)
-  - [7. Schedule the calibration and auto-tune crons](#7-schedule-the-calibration-and-auto-tune-crons)
+  - [7. Schedule the calibration, auto-tune, and optimize crons](#7-schedule-the-calibration-auto-tune-and-optimize-crons)
 - [Modules](#modules)
 - [Roadmap](#roadmap)
 - [Testing and CI](#testing-and-ci)
@@ -41,9 +42,10 @@ installs and runs completely standalone without it (see [Relationship to search-
 ## Status
 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
-evaluation, weight checkpoint/rollback, and the monthly auto-tune job are all built, tested, and
-shipping.** The rest of the tuning layer (weight-slider preview, a propose/review/apply workflow,
-automated weight search) is designed and on the [Roadmap](#roadmap) but not built yet.
+evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
+(CMA-ES/differential evolution against the rank-evaluation score) are all built, tested, and shipping.**
+The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
+[Roadmap](#roadmap) but not built yet.
 
 Verified live end-to-end in a real browser (not just the automated test suite — see
 [Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
@@ -235,6 +237,50 @@ A run that needs to notify but finds no admin holding that role yet simply sends
 (`notifiedEmailCount = 0`), logged rather than treated as an error — the same posture the weight-checkpoint
 restore path takes toward a metric deleted since a checkpoint was taken.
 
+### Automated weight optimization — searching `relevanceWeight` and metric weights algorithmically
+
+Weight checkpoints let a human propose new weights and roll them back; auto-tune keeps a metric's own
+normalization formula honest. Neither one actually *searches* for a better `relevanceWeight`/metric-weight
+combination — that's what this piece does, using rank evaluation's nDCG-style score (see
+[Rank evaluation](#rank-evaluation--a-real-objective-score-not-averaged-opinion) above) as the objective
+function for a real black-box optimizer, rather than only via human proposals.
+
+The search space is `search-ranking`'s actual constraint shape: `relevanceWeight` clamped to a trust region
+around its current live value (`SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance()`,
+default `±0.15`, so a run can't wander off into an untested part of the space in one shot), and every
+active metric's weight constrained to a simplex (all metric weights `>= 0` and summing to `1`). The simplex
+is handled via a softmax reparametrization (`SimplexSoftmaxReparametrization`): the optimizer itself only
+ever sees an unconstrained real-valued vector (one free coordinate pinned to remove the redundant
+shift-invariant direction softmax would otherwise introduce), and `ParameterVectorMapper` converts it to and
+from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
+valid, real configuration by construction, with no rejection/repair step needed.
+
+Two black-box algorithms ship, selectable per run:
+
+- **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) — the default. Adapts both a step size and a
+  full covariance matrix from generation to generation, so it learns the search space's actual shape
+  (correlated weights, differing sensitivities) rather than searching each dimension independently.
+- **Differential evolution** — deliberately simpler (mutate-crossover-select against the current population,
+  no covariance adaptation at all), included as a baseline "the thing to beat" rather than because it's
+  expected to win.
+
+The workflow, from the **Search Ranking Optimizer → Automated Optimization** Zed page:
+
+1. **Run now.** Pick the store, locale, and algorithm. This queues a run and immediately processes it
+   in-request (small population/generation counts keep a run to a handful of seconds against this demoshop's
+   own judgment set); a real shop with a much larger judgment set would run this via
+   `vendor/bin/console search-ranking-optimizer:optimize` on a cron instead, one run at a time (FIFO —
+   oldest queued run first), and let the page's poll pick up the result once it lands.
+2. **Compare.** Once done, the page shows the baseline score (the live configuration's own rank-evaluation
+   score) against the winning candidate's score, plus the concrete `relevanceWeight` and per-metric weight
+   values that produced it — never applied automatically.
+3. **Apply**, only if the comparison looks like a real improvement. Applying writes the winning
+   `relevanceWeight` and metric weights through `search-ranking`'s own facade, records an optimizer-sourced
+   weight checkpoint first (so it's one click back to the prior state via the
+   [Weight checkpoints](#weight-checkpoints--a-way-back-before-changing-anything-by-hand) page), and
+   republishes the live storefront configuration — the same "write through facade, checkpoint first,
+   publish explicitly" shape every other apply action in this package follows.
+
 ## Relationship to search-ranking
 
 - **One-directional dependency.** This package depends on `search-ranking`; `search-ranking` never depends
@@ -302,9 +348,11 @@ In `Pyz\Zed\Console\ConsoleDependencyProvider::getConsoleCommands()`:
 ```php
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerAutoTuneConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCalibrateConsole;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerOptimizeConsole;
 
 new SearchRankingOptimizerCalibrateConsole(),
 new SearchRankingOptimizerAutoTuneConsole(),
+new SearchRankingOptimizerOptimizeConsole(),
 ```
 
 ### 3a. Register the permission plugins (required for the SRP rating widget)
@@ -408,13 +456,16 @@ vendor/bin/console data:import glossary
 
 ### 6. Build (transfers, Propel tables, caches)
 
-This package ships a Propel schema for **four** tables: `spy_search_ranking_calibration` +
-`spy_search_ranking_calibration_search_term` (Calibration), and `spy_search_ranking_query` +
-`spy_search_ranking_query_rating` (the SRP rating widget). Generate transfers and install the schema:
+This package ships a Propel schema for **eight** tables: `spy_search_ranking_calibration` +
+`spy_search_ranking_calibration_search_term` (Calibration), `spy_search_ranking_query` +
+`spy_search_ranking_query_rating` (the SRP rating widget), `spy_search_ranking_evaluation` (rank
+evaluation), `spy_search_ranking_weight_checkpoint` (weight checkpoints),
+`spy_search_ranking_auto_tune_metric_config` (auto-tune), and `spy_search_ranking_optimizer_run`
+(automated weight optimization). Generate transfers and install the schema:
 
 ```bash
 vendor/bin/console transfer:generate
-vendor/bin/console propel:install       # creates all four tables + builds ORM classes
+vendor/bin/console propel:install       # creates all eight tables + builds ORM classes
 vendor/bin/console router:cache:warm-up:backoffice
 ```
 
@@ -426,7 +477,7 @@ controller will 404 with "No route found" until this runs too:
 vendor/bin/console router:cache:warm-up:backend-gateway
 ```
 
-### 7. Schedule the calibration and auto-tune crons
+### 7. Schedule the calibration, auto-tune, and optimize crons
 
 E.g. in `Pyz\Zed\SymfonyScheduler\SymfonySchedulerConfig::getCronJobs()`:
 
@@ -439,34 +490,41 @@ E.g. in `Pyz\Zed\SymfonyScheduler\SymfonySchedulerConfig::getCronJobs()`:
     'command' => '$PHP_BIN vendor/bin/console search-ranking-optimizer:auto-tune',
     'schedule' => '0 6 1 * *',
 ],
+'search-ranking-optimizer-optimize' => [
+    'command' => '$PHP_BIN vendor/bin/console search-ranking-optimizer:optimize',
+    'schedule' => '*/5 * * * *',
+],
 ```
 
-Both commands are safe no-ops when there's nothing to do (no `uploaded` calibration run; no metric with an
-auto-tune threshold set), so it's fine to leave them scheduled. `0 6 1 * *` is once a month, the 1st at
-06:00 — auto-tune is a drift-detection job, not something that needs finer granularity.
+All three commands are safe no-ops when there's nothing to do (no `uploaded` calibration run; no metric
+with an auto-tune threshold set; no queued optimization run), so it's fine to leave them scheduled. `0 6
+1 * *` is once a month, the 1st at 06:00 — auto-tune is a drift-detection job, not something that needs
+finer granularity. `search-ranking-optimizer:optimize` processes at most one queued run per tick (the
+oldest queued run, FIFO); the [Zed page](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+already processes a run in-request when you click "Run now", so the cron only matters for runs queued some
+other way.
 
 ## Modules
 
 - **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, weight
-  checkpoint/rollback, and monthly auto-tune business logic, persistence, console commands, Zed GUI
-  (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight Checkpoints, and Auto-Tune
-  Settings controllers), the raw-Elastica search components (shared query builder, calibration searcher,
-  rank_eval runner), the rated-query data model, and the Zed Gateway endpoint that persists a rating.
+  checkpoint/rollback, monthly auto-tune, and automated weight optimization business logic, persistence,
+  console commands, Zed GUI (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight
+  Checkpoints, Auto-Tune Settings, and Automated Optimization + Apply controllers), the raw-Elastica search
+  components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model,
+  the generic (Spryker-agnostic) CMA-ES/differential-evolution optimizer algorithms and simplex softmax
+  reparametrization, and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
 Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
-rollback, and the monthly auto-tune job are the first five pieces of a larger tuning layer. Designed, not
-yet built:
+rollback, the monthly auto-tune job, and automated weight optimization are the tuning layer built so far.
+Designed, not yet built:
 
 - **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
   metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
   and a "fetch with these settings" button for a real, verified re-rank.
-- **Automated weight search** — search the blend weight plus per-metric weights against the judgment set
-  algorithmically (e.g. Bayesian optimization) rather than only via human proposals, using rank_eval's
-  score as the objective function.
 
 ## Testing and CI
 
@@ -492,7 +550,7 @@ composer check-floors
 
 ### Test suite
 
-**110 tests, 315 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**173 tests, 542 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash
@@ -507,11 +565,20 @@ query on first rating, rejecting an unknown rating type before touching persiste
 `RelevanceJudgmentAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
 the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission),
 `AutoTuneNotificationRecipientResolver` (no role yet vs. de-duplicating usernames across multiple ACL
-groups), and `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
+groups), `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
 threshold check-only path, proposing vs. applying a refit, parameters-only staying within the current
 shape vs. falling back to program's-choice for an unknown shape, and the notify batching — exactly one
-combined email covering every metric that both crossed its threshold and has notify on) are covered as
-pure unit tests — no database needed.
+combined email covering every metric that both crossed its threshold and has notify on), `CmaEsAlgorithm`
+and `DifferentialEvolutionAlgorithm` (each verified against standard benchmark functions — sphere,
+Rosenbrock — converging to the known minimum from a random start, not just "doesn't crash"),
+`SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
+softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
+(the trust-region bound around the run's starting `relevanceWeight`, round-tripping a configuration through
+`mapConfigurationToVector`/`mapVectorToConfiguration`), `OptimizationRunner` (queues and processes a run,
+population/generation-count sizing, the objective function's sign flip since the algorithms minimize but a
+higher rank-evaluation score is better, always propose-only), and `OptimizationApplier` (null when the run
+doesn't exist or isn't done yet, writing the winning candidate through the facade, recording an
+optimizer-sourced checkpoint, marking the run applied) are covered as pure unit tests — no database needed.
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
 real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button
