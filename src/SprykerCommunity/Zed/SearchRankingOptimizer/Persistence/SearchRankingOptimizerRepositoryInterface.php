@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
@@ -164,4 +165,40 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
      */
     public function findAutoTuneMetricConfigsWithThresholdSet(): array;
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * The oldest still-queued run, if any — FIFO processing, one run per
+     * `search-ranking-optimizer:optimize` invocation, same "at most one at a time" discipline as
+     * Calibration (though Calibration instead always picks the NEWEST upload, since there only the latest
+     * search-term list matters; here every queued run is a distinct, equally-valid request).
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOldestQueuedOptimizerRun(): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * The run currently being worked, if any — backs the Zed page's live progress counter. Deliberately
+     * cheap (a single indexed lookup by status), safe to poll.
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * The most recently created run for a given store/locale, regardless of status — backs the Zed page's
+     * "last run" display (a queued/running/done/failed run all matter equally for this purpose).
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
 }

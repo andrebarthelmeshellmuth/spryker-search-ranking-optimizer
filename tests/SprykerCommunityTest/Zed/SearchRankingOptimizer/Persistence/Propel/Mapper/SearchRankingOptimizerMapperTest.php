@@ -14,10 +14,12 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
@@ -294,5 +296,71 @@ class SearchRankingOptimizerMapperTest extends Unit
 
         // Assert
         $this->assertNull($autoTuneMetricConfigEntity->getAutoTuneThreshold());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapsOptimizerRunEntityFieldsOntoTheTransferIncludingDecodedBestMetricWeights(): void
+    {
+        // Arrange
+        $optimizerRunEntity = new SpySearchRankingOptimizerRun();
+        $optimizerRunEntity->setIdSearchRankingOptimizerRun(3);
+        $optimizerRunEntity->setStoreName('DE');
+        $optimizerRunEntity->setLocaleName('en_US');
+        $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
+        $optimizerRunEntity->setTotalCount(400);
+        $optimizerRunEntity->setProcessedCount(400);
+        $optimizerRunEntity->setBaselineScore(0.65);
+        $optimizerRunEntity->setBestRelevanceWeight(0.8);
+        $optimizerRunEntity->setBestMetricWeights('[{"idSearchRankingMetric":1,"name":"top_seller","weight":0.6}]');
+        $optimizerRunEntity->setBestScore(0.91);
+
+        // Act
+        $optimizerRunTransfer = (new SearchRankingOptimizerMapper())->mapOptimizerRunEntityToTransfer(
+            $optimizerRunEntity,
+            new SearchRankingOptimizerRunTransfer(),
+        );
+
+        // Assert
+        $this->assertSame(3, $optimizerRunTransfer->getIdSearchRankingOptimizerRun());
+        $this->assertSame('DE', $optimizerRunTransfer->getStoreName());
+        $this->assertSame('en_US', $optimizerRunTransfer->getLocaleName());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, $optimizerRunTransfer->getAlgorithm());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $optimizerRunTransfer->getStatus());
+        $this->assertSame(400, $optimizerRunTransfer->getTotalCount());
+        $this->assertSame(400, $optimizerRunTransfer->getProcessedCount());
+        $this->assertSame(0.65, $optimizerRunTransfer->getBaselineScore());
+        $this->assertSame(0.8, $optimizerRunTransfer->getBestRelevanceWeight());
+        $this->assertSame(0.91, $optimizerRunTransfer->getBestScore());
+
+        $bestMetricWeights = iterator_to_array($optimizerRunTransfer->getBestMetricWeights());
+        $this->assertCount(1, $bestMetricWeights);
+        $this->assertSame('top_seller', $bestMetricWeights[0]->getName());
+        $this->assertSame(0.6, $bestMetricWeights[0]->getWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapsAnOptimizerRunWithNoBestMetricWeightsYetToAnEmptyCollection(): void
+    {
+        // Arrange
+        $optimizerRunEntity = new SpySearchRankingOptimizerRun();
+        $optimizerRunEntity->setIdSearchRankingOptimizerRun(4);
+        $optimizerRunEntity->setStoreName('DE');
+        $optimizerRunEntity->setLocaleName('en_US');
+        $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION);
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+
+        // Act
+        $optimizerRunTransfer = (new SearchRankingOptimizerMapper())->mapOptimizerRunEntityToTransfer(
+            $optimizerRunEntity,
+            new SearchRankingOptimizerRunTransfer(),
+        );
+
+        // Assert
+        $this->assertCount(0, iterator_to_array($optimizerRunTransfer->getBestMetricWeights()));
     }
 }

@@ -147,4 +147,27 @@
         </unique>
     </table>
 
+    <table name="spy_search_ranking_optimizer_run" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_optimizer_run" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="store_name" type="VARCHAR" size="64" required="true"/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true"/>
+        <column name="algorithm" type="VARCHAR" size="32" required="true" description="SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_* — which algorithm this run uses."/>
+        <column name="status" type="VARCHAR" size="32" required="true" defaultValue="queued" description="SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_* — queued, running, done or failed."/>
+        <column name="total_count" type="INTEGER" required="true" defaultValue="0" description="Total planned candidate evaluations (population size * generations), set once the run actually starts — the denominator for the live progress counter shown while status=running."/>
+        <column name="processed_count" type="INTEGER" required="true" defaultValue="0" description="Candidate evaluations completed so far in the current/last run — the numerator for the live progress counter."/>
+        <column name="baseline_score" type="DOUBLE" required="false" description="The live configuration's own weighted nDCG score at the moment this run started, for comparison against the winning candidate — null until the run starts."/>
+        <column name="best_relevance_weight" type="DOUBLE" required="false" description="The winning candidate's relevanceWeight. Null until status=done."/>
+        <column name="best_metric_weights" type="LONGVARCHAR" required="false" description="JSON array of {idSearchRankingMetric, name, weight} for the winning candidate — same shape/encoding as spy_search_ranking_weight_checkpoint.metric_weights. Null until status=done."/>
+        <column name="best_score" type="DOUBLE" required="false" description="The winning candidate's own weighted nDCG score. Null until status=done."/>
+        <column name="completed_at" type="TIMESTAMP" required="false"/>
+        <column name="error_message" type="VARCHAR" size="1024" required="false"/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_optimizer_run_pk_seq"/>
+
+        <index name="index-spy_sror-status">
+            <index-column name="status"/>
+        </index>
+    </table>
+
 </database>

@@ -13,6 +13,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricCon
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
@@ -75,6 +76,14 @@ class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactor
     public function createSearchRankingAutoTuneMetricConfigQuery(): SpySearchRankingAutoTuneMetricConfigQuery
     {
         return SpySearchRankingAutoTuneMetricConfigQuery::create();
+    }
+
+    /**
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery
+     */
+    public function createSearchRankingOptimizerRunQuery(): SpySearchRankingOptimizerRunQuery
+    {
+        return SpySearchRankingOptimizerRunQuery::create();
     }
 
     /**

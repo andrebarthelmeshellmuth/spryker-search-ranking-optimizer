@@ -217,4 +217,68 @@ class SearchRankingOptimizerConfig
     {
         return 0.15;
     }
+
+    /**
+     * Specification:
+     * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
+     *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
+     *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_QUEUED = 'queued';
+
+    /**
+     * Specification:
+     * - The console command has picked this run up and is actively working through it — evolving
+     *   generations, evaluating candidates. Backs the Zed page's live progress counter.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_RUNNING = 'running';
+
+    /**
+     * Specification:
+     * - The run finished successfully — a winning candidate (best_relevance_weight/best_metric_weights/
+     *   best_score) is available for a human to review and, if they choose, Apply.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_DONE = 'done';
+
+    /**
+     * Specification:
+     * - The run stopped before producing a result — see the row's own error_message.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_FAILED = 'failed';
+
+    /**
+     * Specification:
+     * - {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\CmaEsAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_CMA_ES = 'cma_es';
+
+    /**
+     * Specification:
+     * - {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\DifferentialEvolutionAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION = 'differential_evolution';
 }

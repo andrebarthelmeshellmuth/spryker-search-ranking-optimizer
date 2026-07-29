@@ -12,6 +12,7 @@ namespace SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm;
 use InvalidArgumentException;
 use Random\Randomizer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\Internal\SymmetricEigenDecomposition;
+use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\Internal\VectorMath;
 
 /**
  * (μ/μ_w, λ)-CMA-ES — a faithful port of the standard algorithm as described in Hansen's own simplified
@@ -67,13 +68,23 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
     protected SymmetricEigenDecomposition $eigenDecomposition;
 
     /**
+     * @var \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\Internal\VectorMath
+     */
+    protected VectorMath $vectorMath;
+
+    /**
      * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\Internal\SymmetricEigenDecomposition|null $eigenDecomposition
      * @param \Random\Randomizer|null $randomizer
+     * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\Internal\VectorMath|null $vectorMath
      */
-    public function __construct(?SymmetricEigenDecomposition $eigenDecomposition = null, ?Randomizer $randomizer = null)
-    {
+    public function __construct(
+        ?SymmetricEigenDecomposition $eigenDecomposition = null,
+        ?Randomizer $randomizer = null,
+        ?VectorMath $vectorMath = null,
+    ) {
         parent::__construct($randomizer);
         $this->eigenDecomposition = $eigenDecomposition ?? new SymmetricEigenDecomposition();
+        $this->vectorMath = $vectorMath ?? new VectorMath();
     }
 
     /**
@@ -156,7 +167,7 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
 
             $newMean = $this->weightedRecombination($samples, $rankedIndexes, $strategy['weights'], $n);
             $samplingSigma = $sigma;
-            $yMean = $this->scaleVector($this->subtractVectors($newMean, $mean), 1.0 / $samplingSigma);
+            $yMean = $this->vectorMath->scaleVector($this->vectorMath->subtractVectors($newMean, $mean), 1.0 / $samplingSigma);
 
             $pathSigma = $this->updatePathSigma($pathSigma, $yMean, $eigenvectors, $eigenvalues, $strategy);
             $sigma = $this->updateStepSize($sigma, $pathSigma, $strategy);
@@ -314,8 +325,8 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
             // y = B * (D .* z) -- scale the isotropic sample by the eigenvalues' square roots, THEN
             // rotate into the covariance's own basis. No transformByTranspose here: z is already
             // isotropic (N(0,I)), so there is nothing to project out of eigenspace first.
-            $y = $this->matrixVectorMultiply($eigenvectors, $this->applyDiagonal($sqrtEigenvalues, $z));
-            $x = $this->clamp($this->addVectors($mean, $this->scaleVector($y, $sigma)), $lowerBounds, $upperBounds);
+            $y = $this->vectorMath->matrixVectorMultiply($eigenvectors, $this->vectorMath->applyDiagonal($sqrtEigenvalues, $z));
+            $x = $this->clamp($this->vectorMath->addVectors($mean, $this->vectorMath->scaleVector($y, $sigma)), $lowerBounds, $upperBounds);
 
             $samples[$k] = ['z' => $z, 'y' => $y, 'x' => $x];
         }
@@ -374,10 +385,10 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
         $inverseSqrtTransformed = $this->applyInverseSqrtCovariance($yMean, $eigenvectors, $sqrtEigenvalues);
         $factor = sqrt($strategy['cSigma'] * (2 - $strategy['cSigma']) * $strategy['muEff']);
 
-        $decayed = $this->scaleVector($pathSigma, 1 - $strategy['cSigma']);
-        $boosted = $this->scaleVector($inverseSqrtTransformed, $factor);
+        $decayed = $this->vectorMath->scaleVector($pathSigma, 1 - $strategy['cSigma']);
+        $boosted = $this->vectorMath->scaleVector($inverseSqrtTransformed, $factor);
 
-        return $this->addVectors($decayed, $boosted);
+        return $this->vectorMath->addVectors($decayed, $boosted);
     }
 
     /**
@@ -391,13 +402,13 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
      */
     protected function applyInverseSqrtCovariance(array $vector, array $eigenvectors, array $sqrtEigenvalues): array
     {
-        $transformed = $this->transformByTranspose($eigenvectors, $vector);
+        $transformed = $this->vectorMath->transformByTranspose($eigenvectors, $vector);
 
         foreach ($transformed as $index => $value) {
             $transformed[$index] = $value / max($sqrtEigenvalues[$index], PHP_FLOAT_EPSILON);
         }
 
-        return $this->matrixVectorMultiply($eigenvectors, $transformed);
+        return $this->vectorMath->matrixVectorMultiply($eigenvectors, $transformed);
     }
 
     /**
@@ -409,7 +420,7 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
      */
     protected function updateStepSize(float $sigma, array $pathSigma, array $strategy): float
     {
-        $pathNorm = $this->vectorNorm($pathSigma);
+        $pathNorm = $this->vectorMath->vectorNorm($pathSigma);
 
         return $sigma * exp(($strategy['cSigma'] / $strategy['dSigma']) * ($pathNorm / $strategy['chiN'] - 1));
     }
@@ -425,7 +436,7 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
      */
     protected function computeHeaviside(array $pathSigma, array $strategy, int $n, int $generation): float
     {
-        $pathNorm = $this->vectorNorm($pathSigma);
+        $pathNorm = $this->vectorMath->vectorNorm($pathSigma);
         $expectedNorm = sqrt(1 - (1 - $strategy['cSigma']) ** (2 * $generation)) * $strategy['chiN'];
         $threshold = (1.4 + 2 / ($n + 1)) * $strategy['chiN'];
 
@@ -444,10 +455,10 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
     {
         $factor = $hSigma * sqrt($strategy['cc'] * (2 - $strategy['cc']) * $strategy['muEff']);
 
-        $decayed = $this->scaleVector($pathC, 1 - $strategy['cc']);
-        $boosted = $this->scaleVector($yMean, $factor);
+        $decayed = $this->vectorMath->scaleVector($pathC, 1 - $strategy['cc']);
+        $boosted = $this->vectorMath->scaleVector($yMean, $factor);
 
-        return $this->addVectors($decayed, $boosted);
+        return $this->vectorMath->addVectors($decayed, $boosted);
     }
 
     /**
@@ -490,7 +501,7 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
         foreach ($strategy['weights'] as $rank => $weight) {
             $sampleIndex = $rankedIndexes[$rank];
             $x = $samples[$sampleIndex]['x'];
-            $y = $this->scaleVector($this->subtractVectors($x, $mean), 1.0 / $sigma);
+            $y = $this->vectorMath->scaleVector($this->vectorMath->subtractVectors($x, $mean), 1.0 / $sigma);
 
             for ($i = 0; $i < $n; $i++) {
                 for ($j = 0; $j < $n; $j++) {
@@ -500,130 +511,5 @@ class CmaEsAlgorithm extends AbstractOptimizerAlgorithm
         }
 
         return $updated;
-    }
-
-    /**
-     * @param array<int, array<int, float>> $matrix
-     * @param array<int, float> $vector
-     *
-     * @return array<int, float>
-     */
-    protected function matrixVectorMultiply(array $matrix, array $vector): array
-    {
-        $result = [];
-
-        foreach ($matrix as $i => $row) {
-            $sum = 0.0;
-
-            foreach ($row as $j => $value) {
-                $sum += $value * $vector[$j];
-            }
-
-            $result[$i] = $sum;
-        }
-
-        return $result;
-    }
-
-    /**
-     * matrix^T * vector -- since {@see SymmetricEigenDecomposition} returns eigenvectors as columns of
-     * $matrix, this is what's needed to project a vector INTO eigenspace (matrixVectorMultiply projects
-     * back OUT of it).
-     *
-     * @param array<int, array<int, float>> $matrix
-     * @param array<int, float> $vector
-     *
-     * @return array<int, float>
-     */
-    protected function transformByTranspose(array $matrix, array $vector): array
-    {
-        $n = count($vector);
-        $result = array_fill(0, $n, 0.0);
-
-        for ($i = 0; $i < $n; $i++) {
-            for ($j = 0; $j < $n; $j++) {
-                $result[$j] += $matrix[$i][$j] * $vector[$i];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<int, float> $diagonal
-     * @param array<int, float> $vector
-     *
-     * @return array<int, float>
-     */
-    protected function applyDiagonal(array $diagonal, array $vector): array
-    {
-        $result = [];
-
-        foreach ($vector as $index => $value) {
-            $result[$index] = $diagonal[$index] * $value;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<int, float> $vector
-     * @param float $scalar
-     *
-     * @return array<int, float>
-     */
-    protected function scaleVector(array $vector, float $scalar): array
-    {
-        return array_map(static fn (float $value): float => $value * $scalar, $vector);
-    }
-
-    /**
-     * @param array<int, float> $a
-     * @param array<int, float> $b
-     *
-     * @return array<int, float>
-     */
-    protected function addVectors(array $a, array $b): array
-    {
-        $result = [];
-
-        foreach ($a as $index => $value) {
-            $result[$index] = $value + $b[$index];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<int, float> $a
-     * @param array<int, float> $b
-     *
-     * @return array<int, float>
-     */
-    protected function subtractVectors(array $a, array $b): array
-    {
-        $result = [];
-
-        foreach ($a as $index => $value) {
-            $result[$index] = $value - $b[$index];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<int, float> $vector
-     *
-     * @return float
-     */
-    protected function vectorNorm(array $vector): float
-    {
-        $sumOfSquares = 0.0;
-
-        foreach ($vector as $value) {
-            $sumOfSquares += $value ** 2;
-        }
-
-        return sqrt($sumOfSquares);
     }
 }
