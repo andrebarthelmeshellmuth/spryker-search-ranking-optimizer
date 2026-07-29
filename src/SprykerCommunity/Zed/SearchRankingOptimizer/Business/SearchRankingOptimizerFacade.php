@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -290,5 +291,65 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer
     {
         return $this->getFactory()->createAutoTuneRunner()->run();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $algorithm
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     */
+    public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer
+    {
+        return $this->getEntityManager()->createOptimizerRun(
+            (new SearchRankingOptimizerRunTransfer())
+                ->setStoreName($storeName)
+                ->setLocaleName($localeName)
+                ->setAlgorithm($algorithm),
+        );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function runNextOptimization(): ?SearchRankingOptimizerRunTransfer
+    {
+        return $this->getFactory()->createOptimizationRunner()->runNext();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer
+    {
+        return $this->getRepository()->findOptimizerRunInProgress();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer
+    {
+        return $this->getRepository()->findLatestOptimizerRunByStoreLocale($storeName, $localeName);
     }
 }

@@ -30,6 +30,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluati
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdater;
@@ -224,6 +226,19 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingFacade(),
             $this->createAutoTuneNotificationRecipientResolver(),
             $this->getSymfonyMailerFacade(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface
+     */
+    public function createOptimizationRunner(): OptimizationRunnerInterface
+    {
+        return new OptimizationRunner(
+            $this->getRepository(),
+            $this->getEntityManager(),
+            $this->getSearchRankingFacade(),
+            $this->createRankEvaluationRunner(),
         );
     }
 }

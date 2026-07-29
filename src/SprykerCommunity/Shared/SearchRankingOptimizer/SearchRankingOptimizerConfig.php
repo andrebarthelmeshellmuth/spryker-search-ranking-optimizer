@@ -220,6 +220,43 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - Generation count both CmaEsAlgorithm and DifferentialEvolutionAlgorithm run for, when
+     *   OptimizationRunner drives an optimizer run — a fixed stopping criterion, not a fitness-plateau
+     *   detector (matches both algorithms' own kept-simple stopping rule). Also used, together with a
+     *   population size derived from the parameter vector's own dimensionality, to compute the progress
+     *   counter's denominator before a run actually starts.
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getOptimizationMaxGenerations(): int
+    {
+        return 150;
+    }
+
+    /**
+     * Specification:
+     * - The bound (both directions) placed on each free z value {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization}
+     *   works over — deliberately finite, NOT the mathematically-unconstrained +-INF that reparametrization
+     *   alone would allow. Both CmaEsAlgorithm (needs a finite midpoint to default its initial mean to) and
+     *   DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given bounds,
+     *   which is undefined arithmetic against an infinite range) need real, finite bounds to even start a
+     *   run — confirmed live, not a hypothetical. 10.0 is already an extreme corner of the simplex (a
+     *   softmax ratio of e^10 =~ 22000:1 against the other metrics), so this is not a meaningful
+     *   restriction on what the optimizer can actually reach in practice.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getMetricWeightZSpaceBound(): float
+    {
+        return 10.0;
+    }
+
+    /**
+     * Specification:
      * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
      *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
      *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.

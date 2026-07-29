@@ -11,6 +11,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper;
 
 /**
@@ -71,15 +72,21 @@ class ParameterVectorMapperTest extends Unit
     /**
      * @return void
      */
-    public function testFreeZDimensionsAreUnbounded(): void
+    public function testFreeZDimensionsAreBoundedByTheConfiguredZSpaceBoundNotLiterallyInfinite(): void
     {
+        // Arrange -- both CmaEsAlgorithm (needs a finite midpoint for its default initial mean) and
+        // DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given
+        // bounds) need real, finite bounds to even start a run -- confirmed live.
         $mapper = new ParameterVectorMapper($this->buildThreeMetrics(), 0.75);
+        $zSpaceBound = SearchRankingOptimizerConfig::getMetricWeightZSpaceBound();
 
         $lowerBounds = $mapper->getLowerBounds();
         $upperBounds = $mapper->getUpperBounds();
 
-        $this->assertTrue(is_infinite($lowerBounds[1]) && $lowerBounds[1] < 0);
-        $this->assertTrue(is_infinite($upperBounds[1]) && $upperBounds[1] > 0);
+        $this->assertFalse(is_infinite($lowerBounds[1]));
+        $this->assertFalse(is_infinite($upperBounds[1]));
+        $this->assertSame(-$zSpaceBound, $lowerBounds[1]);
+        $this->assertSame($zSpaceBound, $upperBounds[1]);
     }
 
     /**

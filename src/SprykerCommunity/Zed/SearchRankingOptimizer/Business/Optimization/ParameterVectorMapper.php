@@ -87,9 +87,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     {
         $bounds = [$this->relevanceWeightLowerBound];
         $freeDimensionCount = $this->getFreeMetricWeightDimensionCount();
+        $zSpaceBound = SearchRankingOptimizerConfig::getMetricWeightZSpaceBound();
 
         for ($i = 0; $i < $freeDimensionCount; $i++) {
-            $bounds[] = -INF;
+            $bounds[] = -$zSpaceBound;
         }
 
         return $bounds;
@@ -102,9 +103,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     {
         $bounds = [$this->relevanceWeightUpperBound];
         $freeDimensionCount = $this->getFreeMetricWeightDimensionCount();
+        $zSpaceBound = SearchRankingOptimizerConfig::getMetricWeightZSpaceBound();
 
         for ($i = 0; $i < $freeDimensionCount; $i++) {
-            $bounds[] = INF;
+            $bounds[] = $zSpaceBound;
         }
 
         return $bounds;
