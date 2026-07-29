@@ -312,6 +312,13 @@ shift-invariant direction softmax would otherwise introduce), and `ParameterVect
 from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
 valid, real configuration by construction, with no rejection/repair step needed.
 
+The actual black-box optimization — the algorithms, their generic `Parameter`/`ProblemInterface`
+vocabulary, and the objective-function contract — lives in a separate, Spryker-agnostic package,
+[andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer),
+a real `require` of this one. `ParameterVectorMapper` and `SimplexSoftmaxReparametrization` are this
+package's own side of that boundary — the domain-specific glue translating `search-ranking`'s real
+configuration to and from the unconstrained vectors the generic optimizer works with.
+
 Two black-box algorithms ship, selectable per run:
 
 - **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) — the default. Adapts both a step size and a
@@ -570,8 +577,8 @@ other way.
   console commands, Zed GUI (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight
   Checkpoints, Auto-Tune Settings, and Automated Optimization + Apply controllers), the raw-Elastica search
   components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model,
-  the generic (Spryker-agnostic) CMA-ES/differential-evolution optimizer algorithms and simplex softmax
-  reparametrization, and the Zed Gateway endpoint that persists a rating.
+  the simplex softmax reparametrization bridging this package's own weight-simplex constraint to the
+  generic optimizer (see below), and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
@@ -635,8 +642,11 @@ composer check-floors
 
 ### Test suite
 
-**196 tests, 588 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
-`Client/SearchRankingOptimizer`). From a shop that has the package installed:
+**179 tests, 511 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+`Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
+`DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
+they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
+own test suite. From a shop that has the package installed:
 
 ```bash
 vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizer
@@ -653,9 +663,7 @@ the CompanyUser facade; grants access if *any* of a customer's active company us
 groups), `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
 threshold check-only path, proposing vs. applying a refit, parameters-only staying within the current
 shape vs. falling back to program's-choice for an unknown shape, and the notify batching — exactly one
-combined email covering every metric that both crossed its threshold and has notify on), `CmaEsAlgorithm`
-and `DifferentialEvolutionAlgorithm` (each verified against standard benchmark functions — sphere,
-Rosenbrock — converging to the known minimum from a random start, not just "doesn't crash"),
+combined email covering every metric that both crossed its threshold and has notify on),
 `SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
 softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
 (the trust-region bound around the run's starting `relevanceWeight`, round-tripping a configuration through
@@ -744,9 +752,9 @@ I'd particularly like to thank:
 I'd also like to acknowledge the Spryker engineering team for creating an extensible platform that made
 community packages like Search Ranking Optimizer possible.
 
-This package's `CmaEsAlgorithm` implementation is a PHP port of **Nikolaus Hansen**'s own simplified
-reference implementation of CMA-ES ("purecma") — the algorithm and its careful, from-scratch-avoiding
-implementation approach are entirely his life's work; any bugs introduced in adapting it to PHP are mine
-alone.
+The CMA-ES implementation this package's automated weight optimization depends on credits
+**Nikolaus Hansen** directly — see
+[andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
+own Acknowledgements, since that's where the actual port now lives.
 
 Any mistakes, questionable design decisions or bugs in this project are, of course, entirely my own.

@@ -13,6 +13,7 @@
     ],
     "require": {
         "php": ">=8.3",
+        "andrebarthelmeshellmuth/blackbox-optimizer": "^1.0",
         "spryker-community/search-ranking": "^1.0",
         "spryker/acl": "^3.27.0",
         "spryker/catalog": "^5.7.0",
@@ -43,6 +44,10 @@
         {
             "type": "vcs",
             "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/andrebarthelmeshellmuth/blackbox-optimizer"
         }
     ],
     "scripts": {

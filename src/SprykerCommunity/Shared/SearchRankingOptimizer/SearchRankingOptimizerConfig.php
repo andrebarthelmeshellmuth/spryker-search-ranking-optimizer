@@ -314,7 +314,7 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\CmaEsAlgorithm}.
+     * - {@see \BlackboxOptimizer\Algorithm\CmaEsAlgorithm}.
      *
      * @api
      *
@@ -324,7 +324,7 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\DifferentialEvolutionAlgorithm}.
+     * - {@see \BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm}.
      *
      * @api
      *

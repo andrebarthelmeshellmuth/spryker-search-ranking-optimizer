@@ -12,7 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 
 /**
- * The adapter between {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\OptimizerAlgorithmInterface}'s
+ * The adapter between {@see \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface}'s
  * generic, Spryker-agnostic vectors and this package's own real domain: a `relevanceWeight` scalar plus a
  * simplex of metric weights (summing to 1). One mapper instance is scoped to a single optimization run's
  * fixed set of active metrics — build a fresh one per run, never share one across runs with a different

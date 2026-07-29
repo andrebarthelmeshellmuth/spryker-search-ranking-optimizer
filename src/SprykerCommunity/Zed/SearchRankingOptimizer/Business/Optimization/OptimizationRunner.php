@@ -9,12 +9,13 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 
+use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
+use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
+use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
+use BlackboxOptimizer\Problem\CallableProblem;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
-use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\CmaEsAlgorithm;
-use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\DifferentialEvolutionAlgorithm;
-use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\OptimizerAlgorithmInterface;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
@@ -140,7 +141,8 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
         $algorithm = $this->buildAlgorithm($algorithmName, $populationSize, $maxGenerations);
         $objectiveFunction = $this->buildObjectiveFunction($mapper, $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(), $storeName, $localeName, $idOptimizerRun);
-        $result = $algorithm->optimize($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
+        $problem = new CallableProblem($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
+        $result = $algorithm->optimize($problem);
 
         $bestConfigurationTransfer = $mapper->mapVectorToConfiguration($result->getBestVector(), $liveConfigurationTransfer->getRelevanceSaturationPointOrFail());
 
@@ -211,25 +213,25 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param int $populationSize
      * @param int $maxGenerations
      *
-     * @return \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\OptimizerAlgorithmInterface
+     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
      */
     protected function buildAlgorithm(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface
     {
         if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION) {
             $algorithm = new DifferentialEvolutionAlgorithm();
-            $algorithm->setDifferentialEvolutionParameters(populationSize: $populationSize, maxGenerations: $maxGenerations);
+            $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
 
             return $algorithm;
         }
 
         $cmaEsAlgorithm = new CmaEsAlgorithm();
-        $cmaEsAlgorithm->setCmaEsParameters(populationSize: $populationSize, maxGenerations: $maxGenerations);
+        $cmaEsAlgorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
 
         return $cmaEsAlgorithm;
     }
 
     /**
-     * Builds the closure {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Algorithm\OptimizerAlgorithmInterface::optimize()}
+     * Builds the closure {@see \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface::optimize()}
      * treats as an opaque objective function: converts an optimizer vector into a real candidate
      * configuration, scores it via the non-persisting evaluation path, updates this run's live progress
      * counter, and negates the score (every algorithm here MINIMIZES, this package wants to MAXIMIZE nDCG).
