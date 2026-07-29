@@ -161,6 +161,19 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - The checkpoint recorded automatically when a human clicks Apply on an automated optimization
+     *   run's (Phase O6) winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
+     *   history honestly shows which changes came from an optimizer run rather than a direct manual edit
+     *   or restore.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CHECKPOINT_SOURCE_OPTIMIZER = 'optimizer';
+
+    /**
+     * Specification:
      * - Auto-tune refits a metric's formula while deliberately keeping its CURRENT curve family — only
      *   the shape's own free parameter is re-searched (e.g. keep `atan` and just recompute its `k`).
      * - Only meaningful for a metric whose `shape` is set (see spryker-community/search-ranking's own

@@ -483,4 +483,23 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setErrorMessage($errorMessage);
         $optimizerRunEntity->save();
     }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return void
+     */
+    public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setAppliedAt(new DateTime());
+        $optimizerRunEntity->save();
+    }
 }

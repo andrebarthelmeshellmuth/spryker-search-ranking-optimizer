@@ -289,6 +289,7 @@ class SearchRankingOptimizerMapper
             ->setBestScore($optimizerRunEntity->getBestScore())
             ->setCompletedAt($optimizerRunEntity->getCompletedAt()?->format(DATE_ATOM))
             ->setErrorMessage($optimizerRunEntity->getErrorMessage())
+            ->setAppliedAt($optimizerRunEntity->getAppliedAt()?->format(DATE_ATOM))
             ->setCreatedAt($optimizerRunEntity->getCreatedAt()?->format(DATE_ATOM))
             ->setUpdatedAt($optimizerRunEntity->getUpdatedAt()?->format(DATE_ATOM));
 

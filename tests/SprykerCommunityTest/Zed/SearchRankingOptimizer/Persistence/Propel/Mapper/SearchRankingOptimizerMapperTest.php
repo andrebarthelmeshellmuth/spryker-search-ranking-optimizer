@@ -316,6 +316,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $optimizerRunEntity->setBestRelevanceWeight(0.8);
         $optimizerRunEntity->setBestMetricWeights('[{"idSearchRankingMetric":1,"name":"top_seller","weight":0.6}]');
         $optimizerRunEntity->setBestScore(0.91);
+        $optimizerRunEntity->setAppliedAt('2026-07-29 12:00:00');
 
         // Act
         $optimizerRunTransfer = (new SearchRankingOptimizerMapper())->mapOptimizerRunEntityToTransfer(
@@ -334,6 +335,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(0.65, $optimizerRunTransfer->getBaselineScore());
         $this->assertSame(0.8, $optimizerRunTransfer->getBestRelevanceWeight());
         $this->assertSame(0.91, $optimizerRunTransfer->getBestScore());
+        $this->assertNotNull($optimizerRunTransfer->getAppliedAt());
 
         $bestMetricWeights = iterator_to_array($optimizerRunTransfer->getBestMetricWeights());
         $this->assertCount(1, $bestMetricWeights);

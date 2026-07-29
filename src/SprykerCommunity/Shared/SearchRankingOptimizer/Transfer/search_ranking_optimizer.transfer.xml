@@ -275,6 +275,7 @@
         <property name="bestScore" type="float"/>
         <property name="completedAt" type="string"/>
         <property name="errorMessage" type="string"/>
+        <property name="appliedAt" type="string"/>
         <property name="createdAt" type="string"/>
         <property name="updatedAt" type="string"/>
     </transfer>

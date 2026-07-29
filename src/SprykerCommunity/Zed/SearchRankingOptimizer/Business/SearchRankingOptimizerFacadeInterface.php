@@ -335,4 +335,22 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - Writes a done run's winning candidate through search-ranking's own facade and records a new
+     *   weight checkpoint (source = optimizer) — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface::apply()}
+     *   for the full specification. Returns null when the run doesn't exist or isn't status=done yet.
+     * - Callers MUST also republish (search-ranking-storage's own facade) afterward for this to actually
+     *   reach the live storefront — same discipline the Calibration apply action and the Checkpoint
+     *   restore action both already follow; this Facade method only writes Zed-side settings.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function applyOptimizationRun(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 }

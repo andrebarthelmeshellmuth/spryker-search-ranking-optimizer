@@ -38,6 +38,13 @@
                 <action>edit</action>
                 <visible>0</visible>
             </search-ranking-optimizer-query-edit>
+            <search-ranking-optimizer-evaluation>
+                <label>Evaluation</label>
+                <title>Rank Evaluation</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>evaluation</controller>
+                <action>index</action>
+            </search-ranking-optimizer-evaluation>
             <search-ranking-optimizer-checkpoint>
                 <label>Weight Checkpoints</label>
                 <title>Weight Checkpoints</title>
@@ -52,6 +59,21 @@
                 <controller>auto-tune</controller>
                 <action>index</action>
             </search-ranking-optimizer-auto-tune>
+            <search-ranking-optimizer-optimization>
+                <label>Automated Optimization</label>
+                <title>Automated Weight Optimization</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>optimization</controller>
+                <action>index</action>
+            </search-ranking-optimizer-optimization>
+            <search-ranking-optimizer-optimization-apply>
+                <label>Apply Optimization</label>
+                <title>Apply Optimization</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>optimization-apply</controller>
+                <action>index</action>
+                <visible>0</visible>
+            </search-ranking-optimizer-optimization-apply>
         </pages>
     </search-ranking-optimizer-gui>
 </config>

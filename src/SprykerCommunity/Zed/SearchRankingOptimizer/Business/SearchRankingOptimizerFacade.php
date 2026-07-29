@@ -352,4 +352,18 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     {
         return $this->getRepository()->findLatestOptimizerRunByStoreLocale($storeName, $localeName);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function applyOptimizationRun(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
+    {
+        return $this->getFactory()->createOptimizationApplier()->apply($idSearchRankingOptimizerRun);
+    }
 }

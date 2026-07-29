@@ -226,4 +226,15 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return void
      */
     public function failOptimizerRun(int $idSearchRankingOptimizerRun, string $errorMessage): void;
+
+    /**
+     * Sets appliedAt to now — a run's winning candidate is applied at most meaningfully once (the Zed
+     * page hides/disables Apply once this is set), but calling this again is harmless (just bumps the
+     * timestamp). A safe no-op if the id no longer exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return void
+     */
+    public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void;
 }

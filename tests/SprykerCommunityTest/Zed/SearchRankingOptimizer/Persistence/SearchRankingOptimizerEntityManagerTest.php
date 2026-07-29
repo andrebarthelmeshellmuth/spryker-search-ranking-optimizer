@@ -539,6 +539,31 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testMarkOptimizerRunAppliedSetsAppliedAt(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->markOptimizerRunApplied($idSearchRankingOptimizerRun);
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertNotNull($entity->getAppliedAt());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMarkOptimizerRunAppliedIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->markOptimizerRunApplied(999999999);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
      * @return int
      */
     protected function createTestOptimizerRun(): int
