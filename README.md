@@ -550,7 +550,7 @@ composer check-floors
 
 ### Test suite
 
-**173 tests, 542 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**196 tests, 588 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash

@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Optimization\Reparametrization;
 
 use Codeception\Test\Unit;
+use InvalidArgumentException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization;
 
 /**
@@ -137,5 +138,21 @@ class SimplexSoftmaxReparametrizationTest extends Unit
 
         // Assert
         $this->assertSame([1.0], $weights);
+    }
+
+    /**
+     * @return void
+     */
+    public function testToFreeZThrowsForAnEmptyWeightsArray(): void
+    {
+        // Arrange
+        $reparametrization = new SimplexSoftmaxReparametrization();
+
+        // Assert
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('weights must contain at least one entry.');
+
+        // Act
+        $reparametrization->toFreeZ([]);
     }
 }
