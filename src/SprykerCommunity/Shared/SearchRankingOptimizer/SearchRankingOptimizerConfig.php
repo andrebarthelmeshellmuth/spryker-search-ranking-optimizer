@@ -270,6 +270,30 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - Function names, as they appear in a `search-ranking` metric's own formula DSL (see that package's
+     *   `MathFunctionProvider`), that make a formula's output non-deterministic across evaluations —
+     *   `random()` is the one such function that ships there today, deliberately returning a fresh
+     *   uniformly-distributed value on every call. A metric whose formula calls one of these is a
+     *   placeholder/noise signal, not a real business signal: automated weight optimization excludes it
+     *   from the searchable simplex (its weight is held fixed instead — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}),
+     *   and auto-tune never applies a refit to it (fitting a "better" curve to noise would just overfit to
+     *   whatever randomness happened to be in that digest snapshot, then silently swap in a formula that
+     *   *looks* like a real fit but carries no more signal than before) — though it's still checked and
+     *   logged normally, since observing a persistently bad fit is legitimate, only auto-*applying* a
+     *   refit for one isn't.
+     *
+     * @api
+     *
+     * @return array<int, string>
+     */
+    public static function getNonDeterministicFormulaFunctionNames(): array
+    {
+        return ['random'];
+    }
+
+    /**
+     * Specification:
      * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
      *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
      *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.

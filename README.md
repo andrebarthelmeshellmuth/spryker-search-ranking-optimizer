@@ -283,9 +283,19 @@ Running `vendor/bin/console search-ranking-optimizer:auto-tune` (intended for th
 
 ```
 pdp_impressions: fit still adequate (R² = 0.9883), no change.
-random: fit dropped to R² = -1.2734 (below threshold) — applied x / (x + 3) (R² = 0.91).
-Notified 2 admin(s) by email.
+random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+Notified 0 admin(s) by email.
 ```
+
+A metric whose formula calls a non-deterministic function (`random()` is the one that ships in
+`search-ranking`'s own formula DSL today — see
+[Automated weight optimization](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+below for the other place this same concept applies) is deliberately never refit, even with auto-update on
+and even though its fit is genuinely, persistently bad: fitting a "better" curve to noise would just overfit
+to whatever randomness happened to be in that one digest snapshot, then silently swap in a formula that
+*looks* like a real fit but carries no more signal than `random()` did. It's still checked and shows up in
+history/the summary email with its real fit — that observation is legitimate, only auto-*applying* a refit
+for one isn't.
 
 Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
 every metric that crossed its threshold with notify on, to every admin holding an ACL role named
@@ -311,6 +321,16 @@ ever sees an unconstrained real-valued vector (one free coordinate pinned to rem
 shift-invariant direction softmax would otherwise introduce), and `ParameterVectorMapper` converts it to and
 from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
 valid, real configuration by construction, with no rejection/repair step needed.
+
+Any active metric whose own formula calls a non-deterministic function (`random()` — see
+[Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric) above for the same concept applied there)
+is excluded from the search entirely rather than folded into the simplex: `FormulaDeterminismChecker`
+flags it, and its weight is held **fixed at its current live value** for the whole run — searching a weight
+against pure noise would be meaningless. Excluding it isn't just "drop it from the simplex," though:
+`ParameterVectorMapper` reserves that metric's exact weight as a fixed budget up front, and scales the
+*optimizable* metrics' own simplex to fill only what's left, so the full set (optimizable + fixed) still
+sums to `1` on every candidate this mapper produces — a naive filter would either silently zero the
+excluded metric's weight on apply, or let the other metrics quietly absorb its whole share.
 
 The actual black-box optimization — the algorithms, their generic `Parameter`/`ProblemInterface`
 vocabulary, and the objective-function contract — lives in a separate, Spryker-agnostic package,
@@ -642,7 +662,7 @@ composer check-floors
 
 ### Test suite
 
-**179 tests, 511 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**189 tests, 531 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
@@ -661,16 +681,20 @@ query on first rating, rejecting an unknown rating type before touching persiste
 the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission),
 `AutoTuneNotificationRecipientResolver` (no role yet vs. de-duplicating usernames across multiple ACL
 groups), `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
-threshold check-only path, proposing vs. applying a refit, parameters-only staying within the current
-shape vs. falling back to program's-choice for an unknown shape, and the notify batching — exactly one
-combined email covering every metric that both crossed its threshold and has notify on),
+threshold check-only path, proposing vs. applying a refit, never refitting a non-deterministic formula even
+with auto-update on, parameters-only staying within the current shape vs. falling back to program's-choice
+for an unknown shape, and the notify batching — exactly one combined email covering every metric that both
+crossed its threshold and has notify on), `FormulaDeterminismChecker` (detects a non-deterministic function
+call by name, precisely enough not to false-positive on an unrelated function merely sharing a prefix),
 `SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
 softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
 (the trust-region bound around the run's starting `relevanceWeight`, round-tripping a configuration through
-`mapConfigurationToVector`/`mapVectorToConfiguration`), `OptimizationRunner` (queues and processes a run,
-population/generation-count sizing, the objective function's sign flip since the algorithms minimize but a
-higher rank-evaluation score is better, always propose-only), and `OptimizationApplier` (null when the run
-doesn't exist or isn't done yet, writing the winning candidate through the facade, recording an
+`mapConfigurationToVector`/`mapVectorToConfiguration`, a fixed metric's weight held exactly constant while
+the optimizable metrics' own simplex is scaled to fill only the remaining budget), `OptimizationRunner`
+(queues and processes a run, population/generation-count sizing, the objective function's sign flip since
+the algorithms minimize but a higher rank-evaluation score is better, always propose-only, a
+non-deterministic-formula metric excluded from the search end-to-end), and `OptimizationApplier` (null when
+the run doesn't exist or isn't done yet, writing the winning candidate through the facade, recording an
 optimizer-sourced checkpoint, marking the run applied) are covered as pure unit tests — no database needed.
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders

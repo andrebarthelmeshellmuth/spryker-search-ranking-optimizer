@@ -215,15 +215,20 @@
 
     <!-- One metric processed by a single auto-tune run. wasThresholdMet=true means the live formula's fit
          was already at or above autoTuneThreshold - nothing else on this transfer is meaningful (no refit
-         was computed, since none was needed). wasThresholdMet=false means a refit WAS computed
-         (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether it was
-         actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be persisted
-         through search-ranking's own facade, or it was only proposed (logged/emailed, formula left
-         untouched). -->
+         was computed, since none was needed). wasThresholdMet=false + wasSkippedNonDeterministic=true
+         means the fit dropped below threshold but the metric's own formula calls a non-deterministic
+         function (e.g. random()) - still checked and visible, but no refit was ever computed, since
+         fitting a "better" curve to noise would just overfit to whatever randomness happened to be in
+         that digest snapshot. wasThresholdMet=false + wasSkippedNonDeterministic=false means a refit WAS
+         computed (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether
+         it was actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be
+         persisted through search-ranking's own facade, or it was only proposed (logged/emailed, formula
+         left untouched). -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="metricName" type="string"/>
         <property name="wasThresholdMet" type="bool"/>
+        <property name="wasSkippedNonDeterministic" type="bool"/>
         <property name="beforeFormula" type="string"/>
         <property name="beforeFitRSquared" type="float"/>
         <property name="afterFormula" type="string"/>

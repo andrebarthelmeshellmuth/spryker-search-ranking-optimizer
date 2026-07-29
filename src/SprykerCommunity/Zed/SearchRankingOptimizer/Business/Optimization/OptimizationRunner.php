@@ -18,6 +18,7 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -46,6 +47,11 @@ class OptimizationRunner implements OptimizationRunnerInterface
     protected RankEvaluationRunnerInterface $rankEvaluationRunner;
 
     /**
+     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface
+     */
+    protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker;
+
+    /**
      * @var int|null
      */
     protected ?int $maxGenerations;
@@ -55,6 +61,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface $rankEvaluationRunner
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
      * @param int|null $maxGenerations Null uses SearchRankingOptimizerConfig::getOptimizationMaxGenerations() --
      *   overridable only to keep tests fast (a real run doesn't need hundreds of generations to verify this
      *   class's own orchestration logic), never exposed via SearchRankingOptimizerBusinessFactory.
@@ -64,12 +71,14 @@ class OptimizationRunner implements OptimizationRunnerInterface
         SearchRankingOptimizerEntityManagerInterface $entityManager,
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         RankEvaluationRunnerInterface $rankEvaluationRunner,
+        FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
         ?int $maxGenerations = null,
     ) {
         $this->repository = $repository;
         $this->entityManager = $entityManager;
         $this->searchRankingFacade = $searchRankingFacade;
         $this->rankEvaluationRunner = $rankEvaluationRunner;
+        $this->formulaDeterminismChecker = $formulaDeterminismChecker;
         $this->maxGenerations = $maxGenerations;
     }
 
@@ -128,7 +137,8 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        $mapper = new ParameterVectorMapper($activeMetrics, $liveConfigurationTransfer->getRelevanceWeightOrFail());
+        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer);
+        $mapper = new ParameterVectorMapper($optimizableMetrics, $fixedMetricWeights, $liveConfigurationTransfer->getRelevanceWeightOrFail());
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
@@ -174,6 +184,40 @@ class OptimizationRunner implements OptimizationRunnerInterface
             ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
             ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint())
             ->setMetricWeights($metricWeightsByName);
+    }
+
+    /**
+     * Splits the active metrics into the ones this run actually searches (a deterministic formula — the
+     * normal case) and the ones it holds fixed at their current live weight instead (a non-deterministic
+     * formula, e.g. a placeholder/noise metric — searching a weight against pure noise is meaningless, and
+     * a metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
+     * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run).
+     *
+     * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
+     *
+     * @return array{0: array<int, array{idSearchRankingMetric: int, name: string}>, 1: array<string, float>}
+     */
+    protected function splitMetricsByDeterminism(array $activeMetrics, SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer): array
+    {
+        $optimizableMetrics = [];
+        $fixedMetricWeights = [];
+        $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
+
+        foreach ($activeMetrics as $metric) {
+            $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric']);
+            $isDeterministic = $metricDetail === null || $this->formulaDeterminismChecker->isDeterministic($metricDetail['formula']);
+
+            if ($isDeterministic) {
+                $optimizableMetrics[] = $metric;
+
+                continue;
+            }
+
+            $fixedMetricWeights[$metric['name']] = (float)($liveMetricWeightsByName[$metric['name']] ?? 0.0);
+        }
+
+        return [$optimizableMetrics, $fixedMetricWeights];
     }
 
     /**

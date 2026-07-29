@@ -15,6 +15,7 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use RuntimeException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
@@ -161,6 +162,67 @@ class OptimizationRunnerTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testRunNextHoldsANonDeterministicMetricsWeightFixedAndNeverIncludesItInTheSearch(): void
+    {
+        // Arrange -- "random" (formula calls random()) sits alongside two real metrics. It must keep
+        // EXACTLY its current live weight (0.2) in the persisted result, never something the objective
+        // function's own optimization touched.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('getActiveMetrics')->willReturn([
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller'],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions'],
+            ['idSearchRankingMetric' => 3, 'name' => 'random'],
+        ]);
+        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.4],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4],
+            ['idSearchRankingMetric' => 3, 'name' => 'random', 'weight' => 0.2],
+        ]);
+        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
+        $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
+            [1, ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
+            [2, ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
+            [3, ['idSearchRankingMetric' => 3, 'name' => 'random', 'formula' => 'random()', 'isHigherBetter' => true, 'shape' => null]],
+        ]);
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedBestMetricWeightTransfers = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 4 arguments; only the metric weight transfers are used below.
+        $captureCallback = function (int $idOptimizerRun, float $bestRelevanceWeight, array $bestMetricWeightTransfers) use (&$capturedBestMetricWeightTransfers): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedBestMetricWeightTransfers = $bestMetricWeightTransfers;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $weightsByName = [];
+
+        foreach ($capturedBestMetricWeightTransfers as $metricWeightTransfer) {
+            $weightsByName[$metricWeightTransfer->getName()] = $metricWeightTransfer->getWeight();
+        }
+
+        $this->assertSame(0.2, $weightsByName['random'], "random's weight must be exactly its current live value, untouched by the search.");
+        $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
+    }
+
+    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null $searchRankingFacade
@@ -184,6 +246,7 @@ class OptimizationRunnerTest extends Unit
             $entityManager ?? $this->createMock(SearchRankingOptimizerEntityManagerInterface::class),
             $searchRankingFacade ?? $this->createBasicSearchRankingFacadeMock(),
             $rankEvaluationRunner,
+            new FormulaDeterminismChecker(),
             // Deliberately tiny -- these tests verify orchestration, not optimization quality (already
             // covered by CmaEsAlgorithmTest's own benchmark-function tests).
             maxGenerations: 2,

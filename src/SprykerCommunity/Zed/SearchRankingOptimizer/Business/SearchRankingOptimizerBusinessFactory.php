@@ -30,6 +30,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluati
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
@@ -228,7 +230,16 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingFacade(),
             $this->createAutoTuneNotificationRecipientResolver(),
             $this->getSymfonyMailerFacade(),
+            $this->createFormulaDeterminismChecker(),
         );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface
+     */
+    public function createFormulaDeterminismChecker(): FormulaDeterminismCheckerInterface
+    {
+        return new FormulaDeterminismChecker();
     }
 
     /**
@@ -241,6 +252,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getEntityManager(),
             $this->getSearchRankingFacade(),
             $this->createRankEvaluationRunner(),
+            $this->createFormulaDeterminismChecker(),
         );
     }
 

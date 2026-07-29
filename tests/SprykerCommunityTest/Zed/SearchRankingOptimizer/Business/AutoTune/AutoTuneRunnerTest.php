@@ -14,6 +14,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -110,6 +111,47 @@ class AutoTuneRunnerTest extends Unit
         $this->assertTrue($metricResults[0]->getWasThresholdMet());
         $this->assertFalse($metricResults[0]->getWasApplied());
         $this->assertSame(0, $result->getNotifiedEmailCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testRecordsACheckOnlyRowAndNeverRefitsWhenTheFormulaIsNonDeterministic(): void
+    {
+        // Arrange -- a placeholder/noise metric (formula calls random()) with a genuinely bad fit, well
+        // below threshold. Fitting a "better" curve to noise would just overfit to whatever randomness
+        // happened to be in this digest snapshot, so it must never reach getFitCandidates()/
+        // saveMetricFormula() -- even though auto-update is enabled here, proving this isn't merely that
+        // toggle happening to be off.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8, true, true),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturn([
+            'idSearchRankingMetric' => 7,
+            'name' => 'random',
+            'formula' => 'random()',
+            'isHigherBetter' => true,
+            'shape' => null,
+        ]);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(-1.08);
+        $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(7);
+        $searchRankingFacadeMock->expects($this->never())->method('getFitCandidates');
+        $searchRankingFacadeMock->expects($this->never())->method('saveMetricFormula');
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock);
+
+        // Act
+        $result = $runner->run();
+
+        // Assert -- still checked and visible (unlike "no digest yet", which is dropped entirely), just
+        // never refit.
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(1, $metricResults);
+        $this->assertFalse($metricResults[0]->getWasThresholdMet());
+        $this->assertFalse($metricResults[0]->getWasApplied());
     }
 
     /**
@@ -322,7 +364,7 @@ class AutoTuneRunnerTest extends Unit
         $recipientResolver ??= $this->createMock(AutoTuneNotificationRecipientResolverInterface::class);
         $mailerFacade ??= $this->createMock(SearchRankingOptimizerToSymfonyMailerFacadeInterface::class);
 
-        return new AutoTuneRunner($repository, $searchRankingFacade, $recipientResolver, $mailerFacade);
+        return new AutoTuneRunner($repository, $searchRankingFacade, $recipientResolver, $mailerFacade, new FormulaDeterminismChecker());
     }
 
     /**

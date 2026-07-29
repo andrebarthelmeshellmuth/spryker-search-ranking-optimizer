@@ -18,11 +18,11 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * - Index 0: `relevanceWeight`, box-bounded to a trust region around the value it had when this mapper
  *   was built (see {@see SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance()}),
  *   clipped to [0;1].
- * - Indices 1..(n-1), where n = the number of active metrics: the free z values feeding
- *   {@see SimplexSoftmaxReparametrization} (metric 0 is the pinned reference weight, never a free
- *   dimension) — omitted entirely when there are 0 or 1 active metrics, since a simplex of size <= 1 has
- *   no real degrees of freedom (0 metrics: nothing to weight at all; 1 metric: its weight is trivially
- *   always 1.0).
+ * - Indices 1..(n-1), where n = the number of OPTIMIZABLE metrics (excluding any fixed-weight ones, see
+ *   $fixedMetricWeights below): the free z values feeding {@see SimplexSoftmaxReparametrization} (metric 0
+ *   is the pinned reference weight, never a free dimension) — omitted entirely when there are 0 or 1
+ *   optimizable metrics, since a simplex of size <= 1 has no real degrees of freedom (0 metrics: nothing
+ *   to weight at all; 1 metric: its weight is trivially always the full remaining budget).
  *
  * relevanceSaturationPoint is deliberately never part of this vector at all -- see
  * {@see ParameterVectorMapperInterface} and this package's own README/memory for why (Calibration's own,
@@ -34,6 +34,16 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      * @var array<int, array{idSearchRankingMetric: int, name: string}>
      */
     protected array $metrics;
+
+    /**
+     * @var array<string, float>
+     */
+    protected array $fixedMetricWeights;
+
+    /**
+     * @var float
+     */
+    protected float $fixedWeightBudget;
 
     /**
      * @var float
@@ -51,20 +61,30 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     protected SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization;
 
     /**
-     * @param array<int, array{idSearchRankingMetric: int, name: string}> $metrics The active metrics this
-     *   optimization run covers — same plain shape as
-     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()}.
-     *   Order matters: metrics[0] becomes the simplex's pinned reference weight.
+     * @param array<int, array{idSearchRankingMetric: int, name: string}> $metrics The OPTIMIZABLE active
+     *   metrics this run's simplex searches over — same plain shape as
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()},
+     *   already filtered to exclude any metric a {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface}
+     *   found non-deterministic. Order matters: metrics[0] becomes the simplex's pinned reference weight.
+     * @param array<string, float> $fixedMetricWeights Active metrics EXCLUDED from the search (a
+     *   non-deterministic formula, e.g. a placeholder/noise metric — optimizing a weight against pure
+     *   noise is meaningless) — name => current live weight, held constant for the whole run. Reserves
+     *   that much of the [0;1] simplex budget up front; the optimizable metrics' own simplex is scaled to
+     *   fill exactly what's left, so the full set (optimizable + fixed) still sums to 1 on every candidate
+     *   this mapper produces.
      * @param float $relevanceWeightAtRunStart The relevanceWeight value to center this run's trust region
      *   on — normally the LIVE value at the moment the run starts, read once and fixed for the whole run.
      * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization|null $simplexSoftmaxReparametrization
      */
     public function __construct(
         array $metrics,
+        array $fixedMetricWeights,
         float $relevanceWeightAtRunStart,
         ?SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization = null,
     ) {
         $this->metrics = array_values($metrics);
+        $this->fixedMetricWeights = $fixedMetricWeights;
+        $this->fixedWeightBudget = array_sum($fixedMetricWeights);
         $this->simplexSoftmaxReparametrization = $simplexSoftmaxReparametrization ?? new SimplexSoftmaxReparametrization();
 
         $maxDistance = SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance();
@@ -166,19 +186,23 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      */
     protected function buildMetricWeightsByName(array $freeZ): array
     {
+        $metricWeightsByName = $this->fixedMetricWeights;
+        $availableBudget = max(0.0, 1.0 - $this->fixedWeightBudget);
+
         if (count($this->metrics) === 0) {
-            return [];
+            return $metricWeightsByName;
         }
 
         if (count($this->metrics) === 1) {
-            return [$this->metrics[0]['name'] => 1.0];
+            $metricWeightsByName[$this->metrics[0]['name']] = $availableBudget;
+
+            return $metricWeightsByName;
         }
 
         $weights = $this->simplexSoftmaxReparametrization->toSimplex($freeZ);
-        $metricWeightsByName = [];
 
         foreach ($this->metrics as $index => $metric) {
-            $metricWeightsByName[$metric['name']] = $weights[$index];
+            $metricWeightsByName[$metric['name']] = $weights[$index] * $availableBudget;
         }
 
         return $metricWeightsByName;

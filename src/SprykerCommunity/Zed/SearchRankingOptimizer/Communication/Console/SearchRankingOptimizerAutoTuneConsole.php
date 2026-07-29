@@ -70,6 +70,16 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
                 continue;
             }
 
+            if ($metricResultTransfer->getWasSkippedNonDeterministic()) {
+                $output->writeln(sprintf(
+                    '%s: fit dropped to R² = %.4f (below threshold) — skipped, no refit: formula is non-deterministic.',
+                    $metricResultTransfer->getMetricNameOrFail(),
+                    $metricResultTransfer->getBeforeFitRSquaredOrFail(),
+                ));
+
+                continue;
+            }
+
             $output->writeln(sprintf(
                 '%s: fit dropped to R² = %.4f (below threshold) — %s %s (R² = %.4f).',
                 $metricResultTransfer->getMetricNameOrFail(),
