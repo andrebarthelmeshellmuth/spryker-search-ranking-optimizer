@@ -10,15 +10,19 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Client\SearchRankingOptimizer\Search;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationProductGainTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
+use SprykerCommunity\Client\SearchRankingStorage\SearchRankingStorageClient;
 
 /**
  * INTEGRATION TEST — talks to a real Elasticsearch/OpenSearch, against this shop's own real product page
@@ -84,6 +88,63 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
+     * Proves the fix for the gap where evaluation never applied search-ranking's own function_score
+     * formula (it only ever fired the bare catalog query, so tuning relevanceWeight/metric weights could
+     * never move the measured score at all). An explicit override with relevanceWeight=0 and a weight on a
+     * metric name that deterministically doesn't exist on ANY document collapses every document's business
+     * signal to a uniform 0 — turning ranking into an effectively arbitrary tie order — which must produce
+     * a DIFFERENT score than the real, text-relevance-driven baseline for the exact same rated pair.
+     *
+     * @return void
+     */
+    public function testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne(): void
+    {
+        // Arrange
+        $buildRequestTransfer = function (): SearchRankingEvaluationRequestTransfer {
+            return (new SearchRankingEvaluationRequestTransfer())
+                ->setStoreName('DE')
+                ->setLocaleName('en_US')
+                ->setCutoff(10)
+                ->addQuery(
+                    (new SearchRankingEvaluationQueryTransfer())
+                        ->setIdSearchRankingQuery(1)
+                        ->setSearchTerm('chair')
+                        ->setImportanceWeight(1.0)
+                        ->addProductGain(
+                            (new SearchRankingEvaluationProductGainTransfer())
+                                ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL)
+                                ->setGain(3.0),
+                        )
+                        ->addProductGain(
+                            (new SearchRankingEvaluationProductGainTransfer())
+                                ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_KONFERENZSTUHL)
+                                ->setGain(1.0),
+                        ),
+                );
+        };
+
+        $overriddenConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.0)
+            ->setRelevanceSaturationPoint(1.0)
+            ->setMetricWeights(['definitely_nonexistent_metric_for_this_test' => 1.0]);
+
+        $runner = $this->createRankEvalRunner();
+
+        // Act
+        $baselineResponseTransfer = $runner->evaluate($buildRequestTransfer());
+        $overriddenResponseTransfer = $runner->evaluate($buildRequestTransfer()->setRankingConfiguration($overriddenConfigurationTransfer));
+
+        // Assert
+        $baselineScore = iterator_to_array($baselineResponseTransfer->getQueryScores())[0]->getMetricScoreOrFail();
+        $overriddenScore = iterator_to_array($overriddenResponseTransfer->getQueryScores())[0]->getMetricScoreOrFail();
+        $this->assertNotSame(
+            $baselineScore,
+            $overriddenScore,
+            'An explicit ranking-configuration override must change the fired query (and therefore the score) -- if it doesn\'t, evaluation is still blind to the ranking formula.',
+        );
+    }
+
+    /**
      * @return void
      */
     public function testEvaluateSkipsAQueryWithNoRatedProductsRatherThanSendingAnEmptyRatingsArray(): void
@@ -137,6 +198,12 @@ class RankEvalRunnerTest extends Unit
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        return new RankEvalRunner($elasticaClient, $indexNameResolver, new LiveCatalogSearchQueryBuilder());
+        return new RankEvalRunner(
+            $elasticaClient,
+            $indexNameResolver,
+            new LiveCatalogSearchQueryBuilder(),
+            new FunctionScoreBuilder(),
+            new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+        );
     }
 }

@@ -111,12 +111,18 @@
 
     <!-- Zed business layer -> Client bridge request: fire one _rank_eval call covering every rated query
          for a single (storeName, localeName) — mirrors Calibration's own store/locale scoping. cutoff is
-         the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). -->
+         the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). rankingConfiguration is
+         OPTIONAL: when null, RankEvalRunner fetches the LIVE synced search-ranking configuration (the
+         normal Evaluation-page path — "how good is our currently-configured ranking formula, really?").
+         When set, RankEvalRunner uses THIS configuration instead of the live one — never touching synced
+         storage — so a candidate weight vector can be scored without ever being applied. This is the exact
+         extension point Phase O6's optimizer needs to evaluate proposals it hasn't (and might never) apply. -->
     <transfer name="SearchRankingEvaluationRequest" strict="true">
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="cutoff" type="int"/>
         <property name="queries" type="SearchRankingEvaluationQuery[]" singular="query"/>
+        <property name="rankingConfiguration" type="SearchRankingConfigurationStorage"/>
     </transfer>
 
     <!-- One query's own nDCG@cutoff, read out of _rank_eval's response `details` map (NOT the response's

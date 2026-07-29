@@ -12,10 +12,13 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer\Search;
 use Elastica\Client;
 use Elastica\Query\AbstractQuery;
 use Elastica\Request;
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryScoreTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 class RankEvalRunner implements RankEvalRunnerInterface
@@ -36,18 +39,34 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder;
 
     /**
+     * @var \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface
+     */
+    protected FunctionScoreBuilderInterface $functionScoreBuilder;
+
+    /**
+     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface
+     */
+    protected SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient;
+
+    /**
      * @param \Elastica\Client $elasticaClient
      * @param \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface $indexNameResolver
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
+     * @param \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface $functionScoreBuilder
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
      */
     public function __construct(
         Client $elasticaClient,
         IndexNameResolverInterface $indexNameResolver,
         LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder,
+        FunctionScoreBuilderInterface $functionScoreBuilder,
+        SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
     ) {
         $this->elasticaClient = $elasticaClient;
         $this->indexNameResolver = $indexNameResolver;
         $this->liveCatalogSearchQueryBuilder = $liveCatalogSearchQueryBuilder;
+        $this->functionScoreBuilder = $functionScoreBuilder;
+        $this->searchRankingStorageClient = $searchRankingStorageClient;
     }
 
     /**
@@ -64,8 +83,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $storeName = $requestTransfer->getStoreNameOrFail();
         $localeName = $requestTransfer->getLocaleNameOrFail();
         $indexName = $this->indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, $storeName);
+        $configurationTransfer = $requestTransfer->getRankingConfiguration() ?? $this->searchRankingStorageClient->findRankingConfiguration();
 
-        $rankEvalRequests = $this->buildRankEvalRequests($requestTransfer, $storeName, $localeName, $indexName);
+        $rankEvalRequests = $this->buildRankEvalRequests($requestTransfer, $storeName, $localeName, $indexName, $configurationTransfer);
 
         if ($rankEvalRequests === []) {
             return $responseTransfer;
@@ -102,6 +122,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $indexName
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
      *
      * @return array<int, array<string, mixed>>
      */
@@ -110,6 +131,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         string $storeName,
         string $localeName,
         string $indexName,
+        ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
     ): array {
         $rankEvalRequests = [];
 
@@ -129,7 +151,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             }
 
             $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($queryTransfer->getSearchTermOrFail(), $storeName, $localeName);
-            $queryClause = $elasticaQuery->getQuery();
+            $queryClause = $this->applyRankingFormula($elasticaQuery->getQuery(), $configurationTransfer);
 
             $rankEvalRequests[] = [
                 'id' => (string)$queryTransfer->getIdSearchRankingQueryOrFail(),
@@ -141,6 +163,32 @@ class RankEvalRunner implements RankEvalRunnerInterface
         }
 
         return $rankEvalRequests;
+    }
+
+    /**
+     * Wraps the base catalog query in search-ranking's own business-signal function_score — the same
+     * blend `SearchRankingFunctionScoreQueryExpanderPlugin` applies to every real storefront search — so
+     * this evaluation measures the ACTUAL configured (or candidate) ranking formula's quality, not raw
+     * Elasticsearch text relevance. Falls back to the unwrapped query whenever there's nothing to blend
+     * (no configuration at all, or a configuration with no active non-zero metric weight) — exactly
+     * mirroring that plugin's own "leave the query untouched" fallback.
+     *
+     * @param mixed $queryClause
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
+     *
+     * @return mixed
+     */
+    protected function applyRankingFormula(
+        mixed $queryClause,
+        ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
+    ): mixed {
+        if ($configurationTransfer === null || !($queryClause instanceof AbstractQuery)) {
+            return $queryClause;
+        }
+
+        $functionScore = $this->functionScoreBuilder->build($queryClause, $configurationTransfer);
+
+        return $functionScore ?? $queryClause;
     }
 
     /**
