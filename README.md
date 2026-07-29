@@ -9,6 +9,35 @@ This package is a real, one-directional dependent of `search-ranking`: it reads 
 tuning parameters through that package's own facade. `search-ranking` has no knowledge of this package and
 installs and runs completely standalone without it (see [Relationship to search-ranking](#relationship-to-search-ranking)).
 
+## Contents
+
+- [Status](#status)
+- [What it does today](#what-it-does-today)
+  - [Calibration — empirically sampling `relevanceSaturationPoint` (k)](#calibration--empirically-sampling-relevancesaturationpoint-k)
+  - [SRP relevance rating — capturing real (query, product) judgments](#srp-relevance-rating--capturing-real-query-product-judgments)
+  - [Rank evaluation — a real objective score, not averaged opinion](#rank-evaluation--a-real-objective-score-not-averaged-opinion)
+  - [Weight checkpoints — a way back before changing anything by hand](#weight-checkpoints--a-way-back-before-changing-anything-by-hand)
+  - [Auto-tune — a monthly fit-quality check per metric](#auto-tune--a-monthly-fit-quality-check-per-metric)
+- [Relationship to search-ranking](#relationship-to-search-ranking)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [1. Install the package](#1-install-the-package)
+  - [2. Register the core namespace](#2-register-the-core-namespace)
+  - [3. Register the console command](#3-register-the-console-command)
+  - [3a. Register the permission plugins (required for the SRP rating widget)](#3a-register-the-permission-plugins-required-for-the-srp-rating-widget)
+  - [3b. Register the Yves widget plugins](#3b-register-the-yves-widget-plugins)
+  - [4. Register the Zed navigation entry](#4-register-the-zed-navigation-entry)
+  - [5. Translations](#5-translations)
+  - [6. Build (transfers, Propel tables, caches)](#6-build-transfers-propel-tables-caches)
+  - [7. Schedule the calibration and auto-tune crons](#7-schedule-the-calibration-and-auto-tune-crons)
+- [Modules](#modules)
+- [Roadmap](#roadmap)
+- [Testing and CI](#testing-and-ci)
+  - [Automated checks](#automated-checks)
+  - [Test suite](#test-suite)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+
 ## Status
 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
@@ -545,3 +574,22 @@ vendor/bin/phpstan analyse -c packages/spryker-community/search-ranking-optimize
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+Search Ranking Optimizer is an original project, but it reflects more than a decade of building search
+solutions for e-commerce. Along the way, I had the privilege of working with engineers whose ideas and
+experience shaped my approach to search engineering.
+
+I'd particularly like to thank:
+
+- **Martin Loetsch** — for the architectural ideas behind Contorion's early search platform.
+- **Krešimir Slugan** — who handed over Contorion's search implementation to me and demonstrated an
+  uncompromising focus on performance.
+- **Alberto Reyer** (formerly Assmann) — for sharing the history and rationale behind Spryker Search's
+  original design decisions and the engineering trade-offs behind them.
+
+I'd also like to acknowledge the Spryker engineering team for creating an extensible platform that made
+community packages like Search Ranking Optimizer possible.
+
+Any mistakes, questionable design decisions or bugs in this project are, of course, entirely my own.
