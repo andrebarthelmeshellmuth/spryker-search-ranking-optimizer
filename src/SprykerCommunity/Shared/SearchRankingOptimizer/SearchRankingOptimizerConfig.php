@@ -198,4 +198,23 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const AUTO_TUNE_NOTIFICATION_ROLE_NAME = 'search-score-admin';
+
+    /**
+     * Specification:
+     * - How far a single automated weight-optimization run (Phase O6) may push relevanceWeight away from
+     *   its OWN value at the moment the run started, in either direction, before clipping back to [0;1]
+     *   at either edge -- a trust-region safety limit, not a general-purpose bound on relevanceWeight
+     *   itself (which is always [0;1] regardless of this setting). Deliberately conservative by default:
+     *   a single run finding "relevanceWeight should apparently be 0.05" from a 0.75 starting point is a
+     *   signal worth a human's attention before being trusted outright, not something to let one run swing
+     *   all the way to on its own.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getRelevanceWeightTrustRegionMaxDistance(): float
+    {
+        return 0.15;
+    }
 }
