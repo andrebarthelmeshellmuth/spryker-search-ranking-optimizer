@@ -38,6 +38,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 - [Testing and CI](#testing-and-ci)
   - [Automated checks](#automated-checks)
   - [Test suite](#test-suite)
+  - [Opt-in ground-truth suite (not part of the default test run)](#opt-in-ground-truth-suite-not-part-of-the-default-test-run)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -92,7 +93,8 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
-(CMA-ES/differential evolution against the rank-evaluation score) are all built, tested, and shipping.**
+(CMA-ES/differential evolution against the rank-evaluation score, including `search-ranking`'s
+entropy-aware relevance weighting knobs) are all built, tested, and shipping.**
 The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
 [Roadmap](#roadmap) but not built yet.
 
@@ -322,6 +324,24 @@ shift-invariant direction softmax would otherwise introduce), and `ParameterVect
 from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
 valid, real configuration by construction, with no rejection/repair step needed.
 
+Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 3
+entropy-aware relevance weighting parameters — `entropyWeightExponent`, `entropyWeightShiftMagnitude`, and
+`entropyProbeResultSize` (see `search-ranking`'s own README for what these do: shifting `relevanceWeight`
+per query based on how peaked vs. flat that query's raw text-relevance scores are). Each gets its own
+independent trust region around its current live value, the same "can't wander off in one shot" shape as
+`relevanceWeight`'s own trust region. This closes what would otherwise be a real gap: `search-ranking`'s
+evaluation path builds its own `function_score` query directly rather than going through the live
+storefront's query-expander plugin stack, so without this, a candidate's entropy settings would silently
+never be exercised at all during optimization, no matter how they were configured live.
+
+These 3 dimensions are only ever searched at all when `search-ranking`'s
+`SearchRankingConfig::isEntropyWeightingEnabled()` is on — a project-level code flag, off by default, the
+same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live probe
+query. When it's off, this package respects that at every layer: evaluation never applies the shift
+regardless of what a candidate's own entropy fields say, and the 3 dimensions are omitted from the search
+vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no live
+effect for the optimizer to spend search budget improving.
+
 Any active metric whose own formula calls a non-deterministic function (`random()` — see
 [Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric) above for the same concept applied there)
 is excluded from the search entirely rather than folded into the simplex: `FormulaDeterminismChecker`
@@ -358,11 +378,11 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
    `vendor/bin/console search-ranking-optimizer:optimize` on a cron instead, one run at a time (FIFO —
    oldest queued run first), and let the page's poll pick up the result once it lands.
 2. **Compare.** Once done, the page shows the baseline score (the live configuration's own rank-evaluation
-   score) against the winning candidate's score, plus the concrete `relevanceWeight` and per-metric weight
-   values that produced it — never applied automatically.
+   score) against the winning candidate's score, plus the concrete `relevanceWeight`, per-metric weight, and
+   entropy-knob values that produced it — never applied automatically.
 3. **Apply**, only if the comparison looks like a real improvement. Applying writes the winning
-   `relevanceWeight` and metric weights through `search-ranking`'s own facade, records an optimizer-sourced
-   weight checkpoint first (so it's one click back to the prior state via the
+   `relevanceWeight`, metric weights, and entropy knobs through `search-ranking`'s own facade, records an
+   optimizer-sourced weight checkpoint first (so it's one click back to the prior state via the
    [Weight checkpoints](#weight-checkpoints--a-way-back-before-changing-anything-by-hand) page), and
    republishes the live storefront configuration — the same "write through facade, checkpoint first,
    publish explicitly" shape every other apply action in this package follows.
@@ -662,7 +682,7 @@ composer check-floors
 
 ### Test suite
 
-**189 tests, 531 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**199 tests, 657 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
@@ -688,14 +708,35 @@ crossed its threshold and has notify on), `FormulaDeterminismChecker` (detects a
 call by name, precisely enough not to false-positive on an unrelated function merely sharing a prefix),
 `SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
 softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
-(the trust-region bound around the run's starting `relevanceWeight`, round-tripping a configuration through
-`mapConfigurationToVector`/`mapVectorToConfiguration`, a fixed metric's weight held exactly constant while
+(the trust-region bound around the run's starting `relevanceWeight` and each entropy knob, round-tripping a
+configuration through `mapConfigurationToVector`/`mapVectorToConfiguration`, rounding/clamping
+`entropyProbeResultSize` back to a safe integer, a fixed metric's weight held exactly constant while
 the optimizable metrics' own simplex is scaled to fill only the remaining budget), `OptimizationRunner`
 (queues and processes a run, population/generation-count sizing, the objective function's sign flip since
 the algorithms minimize but a higher rank-evaluation score is better, always propose-only, a
-non-deterministic-formula metric excluded from the search end-to-end), and `OptimizationApplier` (null when
-the run doesn't exist or isn't done yet, writing the winning candidate through the facade, recording an
-optimizer-sourced checkpoint, marking the run applied) are covered as pure unit tests — no database needed.
+non-deterministic-formula metric excluded from the search end-to-end, the live entropy knobs seeding the
+run's baseline candidate and every subsequent candidate staying within its own trust region), and
+`OptimizationApplier` (null when the run doesn't exist or isn't done yet, writing the winning candidate and
+entropy knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied) are
+covered as pure unit tests — no database needed.
+
+Three real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove
+the entropy wiring isn't just plumbed through but actually changes behavior:
+`RankEvalRunner::applyEntropyWeighting()` shifts `relevanceWeight` for a real, non-symmetric "chair" query's
+score distribution when entropy weighting is force-enabled (it's off by default — see [above](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)),
+is a no-op when `entropyProbeResultSize` isn't configured at all, and is *also* a no-op — even with a fully
+populated entropy configuration — when the feature flag itself is disabled, which documents this shop's own
+real current behavior (entropy weighting is inert end-to-end here today). A
+synthetic ground-truth exercise went further still — two throwaway rated queries against this shop's real
+catalog, one with a single dominant text match (a peaked score distribution) and one with several
+identically-scored matches (a maximally flat distribution), each rated so that only the "correct" per-query
+relevanceWeight would rank the intended product first. A real automated optimization run (not a toy) found
+a positive `entropyWeightShiftMagnitude` and reached a perfect combined score, and — the important
+part — disabling the entropy shift on the exact same winning configuration reproduced the peaked query's
+score exactly but dropped the flat query's score substantially, confirming the shift (not just
+`relevanceWeight` alone) is what makes the difference. Both throwaway queries, their ratings, and the run
+itself were deleted afterward; nothing from this exercise is part of the shipped test suite (it depends on
+this demoshop's specific catalog content, not something portable to another shop's data).
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
 real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button
@@ -706,6 +747,34 @@ class-naming mismatch between the Twig and the SCSS/JS, a missing permission fix
 undetected in this package's own history despite every automated check passing throughout, and was only
 caught by a manual click-through. A real WebDriver-based Presentation/Cest suite would close this gap; not
 built yet.
+
+### Opt-in ground-truth suite (not part of the default test run)
+
+A third suite, `tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer` (its own `codeception.yml`,
+deliberately outside the `Zed/SearchRankingOptimizer`/`Client/SearchRankingOptimizer` paths the commands
+above and CI actually run), proves the automated optimizer genuinely discovers the right answer rather than
+just producing *a* score. Each test constructs a real, live ground truth — a synthetic rated query with an
+overwhelming `importanceWeight` so it dominates the aggregate without touching any real query's own weight,
+and controlled `scores.*` overrides on 2 real products, backed up and restored in a `finally` block — runs
+the REAL automated optimizer end-to-end (this package's own public Facade, the same "Run now" Zed button's
+code path), and asserts the winning value moved in the expected direction. No product IDs, search terms, or
+metric names are hardcoded anywhere; everything is discovered at runtime from whatever real rated queries
+and active metrics the shop running it happens to have.
+
+```bash
+composer dump-autoload
+vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer
+vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer
+```
+
+Why this isn't a CI gate: each test runs a REAL population × generations optimization (tens of seconds to
+a few minutes), and — the more fundamental reason — a single rated pair per query gives `rank_eval`'s nDCG
+an almost step-function landscape (flat everywhere except right at the exact parameter value where the 2
+rated products' relative order flips), which a population-based search can occasionally fail to climb from
+an unlucky random initialization even on an easy, unambiguous ground truth. Confirmed empirically: the same
+construction passed on some runs and landed on the *wrong* extreme on others. The fix applied throughout
+this suite is exactly what a real optimizer's own randomness calls for — run each scenario 3 times and
+compare medians, not single runs — rather than trying to eliminate the randomness itself.
 
 `SearchRankingOptimizerEntityManagerTest` and `SearchRankingOptimizerRepositoryTest` are **real database**
 integration tests, not mocked: every method here is a thin Propel read-modify-write, so the one thing

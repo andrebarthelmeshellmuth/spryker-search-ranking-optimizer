@@ -159,6 +159,9 @@
         <column name="best_relevance_weight" type="DOUBLE" required="false" description="The winning candidate's relevanceWeight. Null until status=done."/>
         <column name="best_metric_weights" type="LONGVARCHAR" required="false" description="JSON array of {idSearchRankingMetric, name, weight} for the winning candidate — same shape/encoding as spy_search_ranking_weight_checkpoint.metric_weights. Null until status=done."/>
         <column name="best_score" type="DOUBLE" required="false" description="The winning candidate's own weighted nDCG score. Null until status=done."/>
+        <column name="best_entropy_weight_exponent" type="DOUBLE" required="false" description="The winning candidate's entropyWeightExponent. Null until status=done."/>
+        <column name="best_entropy_weight_shift_magnitude" type="DOUBLE" required="false" description="The winning candidate's entropyWeightShiftMagnitude. Null until status=done."/>
+        <column name="best_entropy_probe_result_size" type="INTEGER" required="false" description="The winning candidate's entropyProbeResultSize. Null until status=done."/>
         <column name="completed_at" type="TIMESTAMP" required="false"/>
         <column name="error_message" type="VARCHAR" size="1024" required="false"/>
         <column name="applied_at" type="TIMESTAMP" required="false" description="When a human clicked Apply on this run's winning candidate — writing it through search-ranking's own facade and republishing. Null means either not done yet, or done but never applied. Always propose-only: nothing here is ever set automatically."/>

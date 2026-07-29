@@ -446,6 +446,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         float $bestRelevanceWeight,
         array $bestMetricWeightTransfers,
         float $bestScore,
+        float $bestEntropyWeightExponent,
+        float $bestEntropyWeightShiftMagnitude,
+        int $bestEntropyProbeResultSize,
     ): void {
         $optimizerRunEntity = $this->getFactory()
             ->createSearchRankingOptimizerRunQuery()
@@ -459,6 +462,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setBestRelevanceWeight($bestRelevanceWeight);
         $optimizerRunEntity->setBestMetricWeights($this->getFactory()->createSearchRankingOptimizerMapper()->encodeMetricWeights($bestMetricWeightTransfers));
         $optimizerRunEntity->setBestScore($bestScore);
+        $optimizerRunEntity->setBestEntropyWeightExponent($bestEntropyWeightExponent);
+        $optimizerRunEntity->setBestEntropyWeightShiftMagnitude($bestEntropyWeightShiftMagnitude);
+        $optimizerRunEntity->setBestEntropyProbeResultSize($bestEntropyProbeResultSize);
         $optimizerRunEntity->setCompletedAt(new DateTime());
         $optimizerRunEntity->save();
     }

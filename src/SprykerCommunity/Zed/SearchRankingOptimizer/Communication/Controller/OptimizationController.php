@@ -67,6 +67,9 @@ class OptimizationController extends AbstractController
             'storeName' => $storeName,
             'localeName' => $localeName,
             'currentRelevanceWeight' => $this->getFactory()->getSearchRankingFacade()->getRelevanceWeight(),
+            'currentEntropyWeightExponent' => $this->getFactory()->getSearchRankingFacade()->getEntropyWeightExponent(),
+            'currentEntropyWeightShiftMagnitude' => $this->getFactory()->getSearchRankingFacade()->getEntropyWeightShiftMagnitude(),
+            'currentEntropyProbeResultSize' => $this->getFactory()->getSearchRankingFacade()->getEntropyProbeResultSize(),
             'inProgressOptimizerRun' => $this->getFacade()->findOptimizerRunInProgress(),
             'latestOptimizerRun' => $latestOptimizerRunTransfer,
             'applyForm' => $latestOptimizerRunTransfer !== null

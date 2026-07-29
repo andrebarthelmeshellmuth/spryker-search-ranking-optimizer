@@ -233,6 +233,141 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyWeightExponent` instead — how far a single run may push it away from its own value at the
+     *   moment the run started, before clipping to the absolute bounds
+     *   {@see getEntropyWeightExponentLowerBound()}/{@see getEntropyWeightExponentUpperBound()}.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentTrustRegionMaxDistance(): float
+    {
+        return 0.5;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `entropyWeightExponent` regardless of trust region — an exponent must stay
+     *   strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0` is
+     *   always 1 regardless of `x`, discarding the entropy signal entirely; a negative exponent inverts it
+     *   in an unintended way).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentLowerBound(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute upper bound on `entropyWeightExponent` — deliberately generous (an exponent this high
+     *   makes the shift's response to entropy extremely steep/near-binary, a real if aggressive choice a
+     *   run should be allowed to reach, not artificially capped tighter than that).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentUpperBound(): float
+    {
+        return 5.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyWeightShiftMagnitude` instead.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeTrustRegionMaxDistance(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute bounds on `entropyWeightShiftMagnitude` regardless of trust region — a shift can never
+     *   usefully exceed the [0;1] range `relevanceWeight` itself lives in (the calculated relevanceWeight
+     *   is clamped to [0;1] regardless, so anything past 1.0 would only ever be reached by an
+     *   already-maximal entropy deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeLowerBound(): float
+    {
+        return 0.0;
+    }
+
+    /**
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeUpperBound(): float
+    {
+        return 1.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyProbeResultSize` instead (rounded to the nearest integer when read back off the optimizer's
+     *   own continuous vector — see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}).
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getEntropyProbeResultSizeTrustRegionMaxDistance(): int
+    {
+        return 10;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `entropyProbeResultSize` — {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
+     *   itself defines entropy as 0 for fewer than 2 scores, so anything below that has no real signal to
+     *   search over at all.
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getEntropyProbeResultSizeLowerBound(): int
+    {
+        return 2;
+    }
+
+    /**
+     * Specification:
+     * - Absolute upper bound on `entropyProbeResultSize`, and the actual number of raw `_score` values
+     *   fetched ONCE per query at the start of an optimization run (every candidate evaluation then
+     *   truncates that same cached list to its own proposed size instead of firing a fresh probe query per
+     *   candidate — the probe's raw scores don't depend on relevanceWeight/metric weights/exponent/shift at
+     *   all, only on which raw scores exist for that search term, so re-fetching per candidate would be
+     *   pure waste at the scale a real optimization run evaluates candidates).
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getMaxEntropyProbeResultSize(): int
+    {
+        return 50;
+    }
+
+    /**
+     * Specification:
      * - Generation count both CmaEsAlgorithm and DifferentialEvolutionAlgorithm run for, when
      *   OptimizationRunner drives an optimizer run — a fixed stopping criterion, not a fitness-plateau
      *   detector (matches both algorithms' own kept-simple stopping rule). Also used, together with a

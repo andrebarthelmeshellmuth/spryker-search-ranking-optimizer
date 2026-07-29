@@ -72,6 +72,9 @@ class OptimizationApplier implements OptimizationApplierInterface
         }
 
         $this->searchRankingFacade->saveRelevanceWeight($optimizerRunTransfer->getBestRelevanceWeightOrFail());
+        $this->searchRankingFacade->saveEntropyWeightExponent($optimizerRunTransfer->getBestEntropyWeightExponentOrFail());
+        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($optimizerRunTransfer->getBestEntropyWeightShiftMagnitudeOrFail());
+        $this->searchRankingFacade->saveEntropyProbeResultSize($optimizerRunTransfer->getBestEntropyProbeResultSizeOrFail());
 
         foreach ($optimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
             $this->searchRankingFacade->saveMetricWeight(

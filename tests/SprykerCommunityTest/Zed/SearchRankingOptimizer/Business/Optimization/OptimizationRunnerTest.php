@@ -152,7 +152,15 @@ class OptimizationRunnerTest extends Unit
         $entityManagerMock->expects($this->atLeastOnce())->method('updateOptimizerRunProgress');
         $entityManagerMock->expects($this->once())
             ->method('completeOptimizerRun')
-            ->with(1, $this->isType('float'), $this->isType('array'), $this->isType('float'));
+            ->with(
+                1,
+                $this->isType('float'),
+                $this->isType('array'),
+                $this->isType('float'),
+                $this->isType('float'),
+                $this->isType('float'),
+                $this->isType('int'),
+            );
         $entityManagerMock->expects($this->never())->method('failOptimizerRun');
 
         $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
@@ -223,6 +231,60 @@ class OptimizationRunnerTest extends Unit
     }
 
     /**
+     * @return void
+     */
+    public function testRunNextSeedsTheBaselineWithTheLiveEntropySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
+    {
+        // Arrange -- the live facade reports entropyWeightExponent=1.5, entropyWeightShiftMagnitude=0.25,
+        // entropyProbeResultSize=12 (see createBasicSearchRankingFacadeMock()). The very first
+        // evaluateCandidate() call is the baseline (unmodified buildLiveConfiguration() output), every
+        // later call is a real search candidate that must stay inside the configured trust region around
+        // those same live values.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $seenConfigurationTransfers = [];
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match evaluateCandidate()'s real 3 arguments; only the configuration transfer is captured below.
+        $captureCallback = function (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer) use (&$seenConfigurationTransfers): float {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $seenConfigurationTransfers[] = $configurationTransfer;
+
+            return 0.5;
+        };
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, null, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertGreaterThan(1, count($seenConfigurationTransfers), 'A real search must evaluate more than just the baseline.');
+
+        $baselineTransfer = $seenConfigurationTransfers[0];
+        $this->assertSame(1.5, $baselineTransfer->getEntropyWeightExponent(), 'The baseline call must carry the LIVE value, untouched.');
+        $this->assertSame(0.25, $baselineTransfer->getEntropyWeightShiftMagnitude());
+        $this->assertSame(12, $baselineTransfer->getEntropyProbeResultSize());
+
+        $exponentMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightExponentTrustRegionMaxDistance();
+        $shiftMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightShiftMagnitudeTrustRegionMaxDistance();
+        $probeSizeMaxDistance = SearchRankingOptimizerConfig::getEntropyProbeResultSizeTrustRegionMaxDistance();
+
+        foreach ($seenConfigurationTransfers as $configurationTransfer) {
+            $this->assertEqualsWithDelta(1.5, $configurationTransfer->getEntropyWeightExponent(), $exponentMaxDistance + 1e-9);
+            $this->assertEqualsWithDelta(0.25, $configurationTransfer->getEntropyWeightShiftMagnitude(), $shiftMaxDistance + 1e-9);
+            $this->assertEqualsWithDelta(12, $configurationTransfer->getEntropyProbeResultSize(), $probeSizeMaxDistance + 1e-9);
+        }
+    }
+
+    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null $searchRankingFacade
@@ -269,6 +331,10 @@ class OptimizationRunnerTest extends Unit
         ]);
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
+        $searchRankingFacadeMock->method('getEntropyWeightExponent')->willReturn(1.5);
+        $searchRankingFacadeMock->method('getEntropyWeightShiftMagnitude')->willReturn(0.25);
+        $searchRankingFacadeMock->method('getEntropyProbeResultSize')->willReturn(12);
+        $searchRankingFacadeMock->method('isEntropyWeightingEnabled')->willReturn(true);
 
         return $searchRankingFacadeMock;
     }

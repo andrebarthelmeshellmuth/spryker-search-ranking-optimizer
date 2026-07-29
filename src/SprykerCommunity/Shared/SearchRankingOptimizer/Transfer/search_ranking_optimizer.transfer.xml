@@ -278,6 +278,9 @@
         <property name="bestRelevanceWeight" type="float"/>
         <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>
         <property name="bestScore" type="float"/>
+        <property name="bestEntropyWeightExponent" type="float"/>
+        <property name="bestEntropyWeightShiftMagnitude" type="float"/>
+        <property name="bestEntropyProbeResultSize" type="int"/>
         <property name="completedAt" type="string"/>
         <property name="errorMessage" type="string"/>
         <property name="appliedAt" type="string"/>

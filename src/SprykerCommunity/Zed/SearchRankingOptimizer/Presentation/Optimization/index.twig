@@ -72,6 +72,18 @@
                                 <th>Winning relevanceWeight</th>
                                 <td>{{ latestOptimizerRun.bestRelevanceWeight }} (live was {{ currentRelevanceWeight }})</td>
                             </tr>
+                            <tr>
+                                <th>Winning entropyWeightExponent</th>
+                                <td>{{ latestOptimizerRun.bestEntropyWeightExponent }} (live was {{ currentEntropyWeightExponent }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning entropyWeightShiftMagnitude</th>
+                                <td>{{ latestOptimizerRun.bestEntropyWeightShiftMagnitude }} (live was {{ currentEntropyWeightShiftMagnitude }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning entropyProbeResultSize</th>
+                                <td>{{ latestOptimizerRun.bestEntropyProbeResultSize }} (live was {{ currentEntropyProbeResultSize }})</td>
+                            </tr>
                         {% endif %}
                     </tbody>
                 </table>

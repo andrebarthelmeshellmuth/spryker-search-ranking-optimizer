@@ -138,7 +138,15 @@ class OptimizationRunner implements OptimizationRunnerInterface
         }
 
         [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer);
-        $mapper = new ParameterVectorMapper($optimizableMetrics, $fixedMetricWeights, $liveConfigurationTransfer->getRelevanceWeightOrFail());
+        $mapper = new ParameterVectorMapper(
+            $optimizableMetrics,
+            $fixedMetricWeights,
+            $liveConfigurationTransfer->getRelevanceWeightOrFail(),
+            $liveConfigurationTransfer->getEntropyWeightExponentOrFail(),
+            $liveConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
+            $liveConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
+            $this->searchRankingFacade->isEntropyWeightingEnabled(),
+        );
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
@@ -161,6 +169,9 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $bestConfigurationTransfer->getRelevanceWeightOrFail(),
             $this->buildBestMetricWeightTransfers($activeMetrics, $bestConfigurationTransfer),
             -$result->getBestValue(),
+            $bestConfigurationTransfer->getEntropyWeightExponentOrFail(),
+            $bestConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
+            $bestConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
         );
     }
 
@@ -183,7 +194,10 @@ class OptimizationRunner implements OptimizationRunnerInterface
         return (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
             ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint())
-            ->setMetricWeights($metricWeightsByName);
+            ->setMetricWeights($metricWeightsByName)
+            ->setEntropyWeightExponent($this->searchRankingFacade->getEntropyWeightExponent())
+            ->setEntropyWeightShiftMagnitude($this->searchRankingFacade->getEntropyWeightShiftMagnitude())
+            ->setEntropyProbeResultSize($this->searchRankingFacade->getEntropyProbeResultSize());
     }
 
     /**

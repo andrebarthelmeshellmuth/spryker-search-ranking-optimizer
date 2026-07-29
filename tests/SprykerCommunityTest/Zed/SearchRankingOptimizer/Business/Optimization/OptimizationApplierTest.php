@@ -89,6 +89,9 @@ class OptimizationApplierTest extends Unit
             ->setIdSearchRankingOptimizerRun(1)
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
+            ->setBestEntropyWeightExponent(1.2)
+            ->setBestEntropyWeightShiftMagnitude(0.25)
+            ->setBestEntropyProbeResultSize(12)
             ->addBestMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(1)
@@ -115,6 +118,9 @@ class OptimizationApplierTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with(0.85);
+        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightExponent')->with(1.2);
+        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightShiftMagnitude')->with(0.25);
+        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyProbeResultSize')->with(12);
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
