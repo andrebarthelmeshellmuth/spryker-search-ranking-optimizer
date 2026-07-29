@@ -392,14 +392,12 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - **One-directional dependency.** This package depends on `search-ranking`; `search-ranking` never depends
   on this one. That keeps `search-ranking`'s scope to "use business signals to rank" and this package's to
   "decide what the parameters should be."
-- **Declared under `suggest`, not `require` — deliberately.** `search-ranking` is currently a **private**
-  repository, and GitHub Actions cannot `git clone` a private cross-repo VCS dependency, so declaring it as
-  a hard `require` would break this package's own CI. It is listed under `suggest` instead, with a note that
-  it is **required at runtime**. The coupling is real but loose: the Zed dependency bridges reference
-  `search-ranking`'s facade only in docblock `@param`/`@var` type hints (Spryker's standard untyped-bridge
-  convention), never as `use` imports, so nothing here fails to autoload when `search-ranking` is absent —
-  only the actual apply path needs it at runtime. Promote it to `require` once `search-ranking` is public
-  (or CI can authenticate against it).
+- **A real `require` (`^1.1`).** `search-ranking` is public, so a hard `require` resolves cleanly in CI too
+  — no `suggest`-plus-runtime-note workaround needed. The coupling goes beyond the Zed dependency bridges'
+  own docblock `@param`/`@var` type hints (Spryker's standard untyped-bridge convention): the Client layer
+  (`RankEvalRunner`) also imports `search-ranking`'s `FunctionScoreBuilder`/`ShannonEntropyCalculator`
+  directly, to apply the exact same ranking formula and entropy-aware relevance-weight shift a real
+  storefront search would, rather than reimplementing either.
 
 ## Requirements
 
@@ -407,9 +405,14 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/permission-extension/
   company-user/acl/symfony-mailer — see `composer.json` for floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
-- **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.0`); the Apply step
-  writes into its `relevanceSaturationPoint` setting via its facade, and the auto-tune job writes into its
-  metric formulas the same way
+- **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.1`, since
+  `RankEvalRunner`'s entropy-aware relevance weighting support depends on `ShannonEntropyCalculator`,
+  only introduced in `search-ranking` v1.1.1); the Apply step writes into its `relevanceSaturationPoint`
+  setting via its facade, and the auto-tune job writes into its metric formulas the same way
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.0`); not on Packagist, so
+  it needs the same repository-entry treatment as `search-ranking` below (see
+  [Installation](#installation)). Provides the actual CMA-ES/Differential Evolution algorithms the
+  automated weight optimization feature searches with.
 - **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
   active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
   shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
@@ -426,7 +429,10 @@ shares its `SprykerCommunity` core namespace and its `spryker-community/*` trans
 
 ### 1. Install the package
 
-Not yet published on Packagist — install from a path repository:
+Not yet published on Packagist — install from a path repository. Its 2 real, non-Spryker `require`s
+(`spryker-community/search-ranking` and `andrebarthelmeshellmuth/blackbox-optimizer`) aren't on Packagist
+either, so both need their own `vcs` repository entries too (skip whichever you already have —
+`search-ranking`'s is often already present if it's separately installed):
 
 ```json
 "repositories": [
@@ -434,6 +440,14 @@ Not yet published on Packagist — install from a path repository:
         "type": "path",
         "url": "packages/spryker-community/search-ranking-optimizer",
         "options": { "symlink": true }
+    },
+    {
+        "type": "vcs",
+        "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking"
+    },
+    {
+        "type": "vcs",
+        "url": "https://github.com/andrebarthelmeshellmuth/blackbox-optimizer"
     }
 ]
 ```
