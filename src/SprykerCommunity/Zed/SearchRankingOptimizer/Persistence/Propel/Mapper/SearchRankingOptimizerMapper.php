@@ -89,7 +89,7 @@ class SearchRankingOptimizerMapper
             return [];
         }
 
-        return array_map('floatval', explode(',', $scores));
+        return array_map(static fn (string $value): float => (float)$value, explode(',', $scores));
     }
 
     /**

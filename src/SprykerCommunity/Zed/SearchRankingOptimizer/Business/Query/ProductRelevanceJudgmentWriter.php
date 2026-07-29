@@ -29,33 +29,15 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
     ];
 
     /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface
-     */
-    protected SearchTermCanonicalizerInterface $searchTermCanonicalizer;
-
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
-    protected SearchRankingOptimizerRepositoryInterface $repository;
-
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
-    protected SearchRankingOptimizerEntityManagerInterface $entityManager;
-
-    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface $searchTermCanonicalizer
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      */
     public function __construct(
-        SearchTermCanonicalizerInterface $searchTermCanonicalizer,
-        SearchRankingOptimizerRepositoryInterface $repository,
-        SearchRankingOptimizerEntityManagerInterface $entityManager,
+        protected SearchTermCanonicalizerInterface $searchTermCanonicalizer,
+        protected SearchRankingOptimizerRepositoryInterface $repository,
+        protected SearchRankingOptimizerEntityManagerInterface $entityManager,
     ) {
-        $this->searchTermCanonicalizer = $searchTermCanonicalizer;
-        $this->repository = $repository;
-        $this->entityManager = $entityManager;
     }
 
     /**

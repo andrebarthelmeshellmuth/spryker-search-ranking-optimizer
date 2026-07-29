@@ -14,16 +14,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 class QueryImportanceWeightUpdater implements QueryImportanceWeightUpdaterInterface
 {
     /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
-    protected SearchRankingOptimizerEntityManagerInterface $entityManager;
-
-    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      */
-    public function __construct(SearchRankingOptimizerEntityManagerInterface $entityManager)
+    public function __construct(protected SearchRankingOptimizerEntityManagerInterface $entityManager)
     {
-        $this->entityManager = $entityManager;
     }
 
     /**

@@ -18,33 +18,15 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
 {
     /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParserInterface
-     */
-    protected CsvSearchTermParserInterface $csvSearchTermParser;
-
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
-    protected SearchRankingOptimizerRepositoryInterface $repository;
-
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
-    protected SearchRankingOptimizerEntityManagerInterface $entityManager;
-
-    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParserInterface $csvSearchTermParser
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      */
     public function __construct(
-        CsvSearchTermParserInterface $csvSearchTermParser,
-        SearchRankingOptimizerRepositoryInterface $repository,
-        SearchRankingOptimizerEntityManagerInterface $entityManager,
+        protected CsvSearchTermParserInterface $csvSearchTermParser,
+        protected SearchRankingOptimizerRepositoryInterface $repository,
+        protected SearchRankingOptimizerEntityManagerInterface $entityManager,
     ) {
-        $this->csvSearchTermParser = $csvSearchTermParser;
-        $this->repository = $repository;
-        $this->entityManager = $entityManager;
     }
 
     /**
