@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation;
 
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationProductGainTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
@@ -69,22 +70,7 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
      */
     public function evaluate(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
-        $queryTransfers = $this->repository->findQueriesByStoreLocale($storeName, $localeName);
-        $ratingTransfers = $this->repository->findRatingsByStoreLocale($storeName, $localeName);
-
-        if ($queryTransfers === [] || $ratingTransfers === []) {
-            return null;
-        }
-
-        $meanGainsByQueryAndProduct = $this->buildMeanGainsByQueryAndProduct($ratingTransfers);
-        $requestTransfer = $this->buildEvaluationRequest($storeName, $localeName, $queryTransfers, $meanGainsByQueryAndProduct);
-
-        if (count($requestTransfer->getQueries()) === 0) {
-            return null;
-        }
-
-        $responseTransfer = $this->searchRankingClient->evaluateRankings($requestTransfer);
-        $weightedAggregate = $this->computeWeightedAggregate($requestTransfer, $responseTransfer);
+        $weightedAggregate = $this->computeWeightedAggregateFor($storeName, $localeName, null);
 
         if ($weightedAggregate === null) {
             return null;
@@ -99,6 +85,68 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
                 ->setMetricScore($metricScore)
                 ->setQueryCount($queryCount),
         );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $candidateConfigurationTransfer
+     *
+     * @return float|null
+     */
+    public function evaluateCandidate(
+        string $storeName,
+        string $localeName,
+        SearchRankingConfigurationStorageTransfer $candidateConfigurationTransfer,
+    ): ?float {
+        $weightedAggregate = $this->computeWeightedAggregateFor($storeName, $localeName, $candidateConfigurationTransfer);
+
+        if ($weightedAggregate === null) {
+            return null;
+        }
+
+        [$metricScore] = $weightedAggregate;
+
+        return $metricScore;
+    }
+
+    /**
+     * The pipeline shared by {@see evaluate()} and {@see evaluateCandidate()} — differ only in whether a
+     * candidate configuration override is passed through to the fired query (null = the live synced
+     * configuration) and in what the caller does with the result (persist a full evaluation vs. return a
+     * bare float). This method itself never persists anything.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $rankingConfigurationOverride
+     *
+     * @return array{0: float, 1: int}|null
+     */
+    protected function computeWeightedAggregateFor(
+        string $storeName,
+        string $localeName,
+        ?SearchRankingConfigurationStorageTransfer $rankingConfigurationOverride,
+    ): ?array {
+        $queryTransfers = $this->repository->findQueriesByStoreLocale($storeName, $localeName);
+        $ratingTransfers = $this->repository->findRatingsByStoreLocale($storeName, $localeName);
+
+        if ($queryTransfers === [] || $ratingTransfers === []) {
+            return null;
+        }
+
+        $meanGainsByQueryAndProduct = $this->buildMeanGainsByQueryAndProduct($ratingTransfers);
+        $requestTransfer = $this->buildEvaluationRequest($storeName, $localeName, $queryTransfers, $meanGainsByQueryAndProduct);
+        $requestTransfer->setRankingConfiguration($rankingConfigurationOverride);
+
+        if (count($requestTransfer->getQueries()) === 0) {
+            return null;
+        }
+
+        $responseTransfer = $this->searchRankingClient->evaluateRankings($requestTransfer);
+
+        return $this->computeWeightedAggregate($requestTransfer, $responseTransfer);
     }
 
     /**
