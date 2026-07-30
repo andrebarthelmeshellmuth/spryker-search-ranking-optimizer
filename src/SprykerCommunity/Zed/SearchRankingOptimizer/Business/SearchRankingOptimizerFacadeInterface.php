@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -146,4 +147,46 @@ interface SearchRankingOptimizerFacadeInterface
      * @return void
      */
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void;
+
+    /**
+     * Specification:
+     * - Fires one batched `_rank_eval` evaluation across every rated query for (storeName, localeName),
+     *   persists a query-importance-weighted nDCG aggregate, and returns it.
+     * - Returns null (persists nothing) when there is nothing to evaluate for that store/locale.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
+
+    /**
+     * Specification:
+     * - Returns the most recently persisted evaluation run for (storeName, localeName), or null when none
+     *   has ever run.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
+
+    /**
+     * Specification:
+     * - Returns every persisted evaluation run for (storeName, localeName), newest first.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
+     */
+    public function findEvaluationHistory(string $storeName, string $localeName): array;
 }

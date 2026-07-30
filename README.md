@@ -11,11 +11,10 @@ installs and runs completely standalone without it (see [Relationship to search-
 
 ## Status
 
-**Calibration, the SRP relevance-rating widget, and the Zed Queries curation page are all built, tested,
-and shipping.** The rest of the
-tuning layer (weight-slider preview, a propose/review/apply workflow, offline `rank_eval` evaluation, a
-monthly auto-tune job, automated weight search) is designed and on the [Roadmap](#roadmap) but not built
-yet.
+**Calibration, the SRP relevance-rating widget, the Zed Queries curation page, and offline `rank_eval`
+evaluation are all built, tested, and shipping.** The rest of the
+tuning layer (weight-slider preview, a propose/review/apply workflow, a monthly auto-tune job, automated
+weight search) is designed and on the [Roadmap](#roadmap) but not built yet.
 
 Verified live end-to-end in a real browser (not just the automated test suite — see
 [Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
@@ -99,9 +98,42 @@ gets built, one click at a time, directly on the storefront search results page 
   persisting anything.
 
 This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
-the next calibration run with no export/import step. [GAP-2 evaluation and beyond](#roadmap) will eventually
-score against these ratings directly too; that consumer doesn't exist yet, but the ratings themselves
-accumulate from real traffic starting the moment this is installed.
+the next calibration run with no export/import step. The ratings are also the direct input to rank_eval
+evaluation, below.
+
+### Rank evaluation — a real objective score, not averaged opinion
+
+Phases like a weight-slider preview or a propose/review/apply workflow can't answer "did that change make
+search better?" without something to measure against. Rank evaluation turns the ratings the widget above
+already collects into a real nDCG (Normalized Discounted Cumulative Gain) score via OpenSearch/
+Elasticsearch's `_rank_eval` API — a genuine information-retrieval metric, not human opinion averaged
+together.
+
+The workflow, from the **Search Ranking Optimizer → Evaluation** Zed page:
+
+1. **Pick a store and locale** and click **Evaluate now**. Unlike Calibration's upload-then-cron-then-poll
+   flow, `_rank_eval` fires as a single batched HTTP request covering every rated query at once — fast
+   enough to run synchronously, so there's no progress counter or polling needed here.
+2. Every individual rating for that store/locale is grouped into a mean gain per (query, product) pair
+   (heart/check/x → a configurable numeric gain, default 3/1/0 —
+   `SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()`; a query rated by multiple admins is
+   averaged, never overwritten, the same disagreement-preserving design the rating widget itself uses).
+3. One `_rank_eval` request per query is built from the exact same live catalog query Calibration fires
+   (shared via `LiveCatalogSearchQueryBuilder`), paired with that query's rated products as judgments.
+   `metric.dcg.normalize=true` computes nDCG@10 (cutoff configurable —
+   `SearchRankingOptimizerConfig::getRankEvalCutoff()`).
+4. A **query-importance-weighted aggregate** is computed in PHP from each query's own nDCG score — rank_eval's
+   own top-level `metric_score` is a plain *unweighted* mean across queries, confirmed unusable directly.
+   The result is persisted (score, query count, timestamp) and the page shows both the latest run and a
+   short history, so the score can be tracked over time as ratings accumulate.
+
+```
+Evaluated 12 rated queries: weighted nDCG@10 = 0.7123.
+```
+
+Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Calibration
+established (`Client\SearchRankingOptimizer\Search` component), verified live against this shop's real
+OpenSearch index and real catalog products.
 
 ## Relationship to search-ranking
 
@@ -302,22 +334,18 @@ also just run it by hand after each upload.)
 
 ## Modules
 
-- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration business logic, persistence, console
-  command, Zed GUI (Calibration + Apply controllers, and the Queries listing/edit-importance controllers),
-  the raw-Elastica search component, the rated-query data model, and the Zed Gateway endpoint that persists
-  a rating.
+- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration and rank_eval evaluation business
+  logic, persistence, console command, Zed GUI (Calibration + Apply, Queries listing/edit-importance, and
+  Evaluation controllers), the raw-Elastica search components (shared query builder, calibration searcher,
+  rank_eval runner), the rated-query data model, and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
-Calibration and judgment capture (rating collection + curation) are the first two pieces of a larger
-tuning layer. Designed, not yet built:
+Calibration, judgment capture (rating collection + curation), and rank_eval evaluation are the first three
+pieces of a larger tuning layer. Designed, not yet built:
 
-- **`_rank_eval` scoring** — turn the ratings this widget already collects into a numeric objective score
-  (nDCG) via OpenSearch/Elasticsearch's `_rank_eval` API, so a tuning change can be measured against a real
-  objective instead of judged by eye. Heart/check/X → numeric gain mapping stays configurable, not
-  hardcoded.
 - **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
   metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
   and a "fetch with these settings" button for a real, verified re-rank.
@@ -325,9 +353,9 @@ tuning layer. Designed, not yet built:
   algorithmic) writes a full snapshot, listed and restorable from a simple Zed page.
 - **Monthly auto-tune job** — per metric, check whether its live formula still fits the data; on a drop
   below a configurable threshold, propose (or, if enabled, apply) a refit and notify the configured admins.
-- **Automated weight search** — once `_rank_eval` scoring exists, search the blend weight plus per-metric
-  weights against the judgment set algorithmically (e.g. Bayesian optimization) rather than only via human
-  proposals.
+- **Automated weight search** — search the blend weight plus per-metric weights against the judgment set
+  algorithmically (e.g. Bayesian optimization) rather than only via human proposals, using rank_eval's
+  score as the objective function.
 
 ## Testing and CI
 
@@ -353,7 +381,7 @@ composer check-floors
 
 ### Test suite
 
-**67 tests, 172 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**87 tests, 226 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash

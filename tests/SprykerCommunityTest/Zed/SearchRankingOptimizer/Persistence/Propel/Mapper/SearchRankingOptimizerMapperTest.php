@@ -12,8 +12,10 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence\Propel\Map
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
 /**
@@ -181,5 +183,32 @@ class SearchRankingOptimizerMapperTest extends Unit
 
         // Assert
         $this->assertNull($scores);
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapsEvaluationEntityFieldsOntoTheTransfer(): void
+    {
+        // Arrange
+        $evaluationEntity = new SpySearchRankingEvaluation();
+        $evaluationEntity->setIdSearchRankingEvaluation(7);
+        $evaluationEntity->setStoreName('DE');
+        $evaluationEntity->setLocaleName('en_US');
+        $evaluationEntity->setMetricScore(0.7123);
+        $evaluationEntity->setQueryCount(12);
+
+        // Act
+        $evaluationTransfer = (new SearchRankingOptimizerMapper())->mapEvaluationEntityToTransfer(
+            $evaluationEntity,
+            new SearchRankingEvaluationTransfer(),
+        );
+
+        // Assert
+        $this->assertSame(7, $evaluationTransfer->getIdSearchRankingEvaluation());
+        $this->assertSame('DE', $evaluationTransfer->getStoreName());
+        $this->assertSame('en_US', $evaluationTransfer->getLocaleName());
+        $this->assertSame(0.7123, $evaluationTransfer->getMetricScore());
+        $this->assertSame(12, $evaluationTransfer->getQueryCount());
     }
 }

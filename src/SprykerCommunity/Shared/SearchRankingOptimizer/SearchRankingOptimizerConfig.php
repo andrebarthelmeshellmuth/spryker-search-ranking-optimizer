@@ -109,4 +109,39 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const RATING_TYPE_X = 'x';
+
+    /**
+     * Specification:
+     * - Maps each RATING_TYPE_* to the numeric gain rank_eval scores against — deliberately
+     *   project-overridable rather than hardcoded (nDCG's standard gain function is `2^rating - 1`, so this
+     *   3/1/0 default gives heart a much bigger gain-weight (7) than check (1); a linear scale may fit a
+     *   given shop's judgments better once tested against real data).
+     *
+     * @api
+     *
+     * @return array<string, float>
+     */
+    public static function getRelevanceJudgmentGainMap(): array
+    {
+        return [
+            static::RATING_TYPE_HEART => 3.0,
+            static::RATING_TYPE_CHECK => 1.0,
+            static::RATING_TYPE_X => 0.0,
+        ];
+    }
+
+    /**
+     * Specification:
+     * - The `k` cutoff rank_eval's nDCG metric is computed against (how many of the query's own top-ranked
+     *   results count towards the score). Project-overridable; 10 is a conventional default for this kind
+     *   of cutoff (also used by spryker-community/search-ranking's own rank_eval capability probe).
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getRankEvalCutoff(): int
+    {
+        return 10;
+    }
 }

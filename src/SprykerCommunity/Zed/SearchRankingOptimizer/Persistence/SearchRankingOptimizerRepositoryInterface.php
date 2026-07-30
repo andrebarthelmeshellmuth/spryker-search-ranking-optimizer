@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 
 interface SearchRankingOptimizerRepositoryInterface
@@ -82,4 +83,51 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return array<string>
      */
     public function findDistinctSearchTermsByStoreLocale(string $storeName, string $localeName): array;
+
+    /**
+     * Every query for a given store/locale, rated or not — a rank_eval evaluation run only ever acts on
+     * the ones that turn out to have ratings (see {@see findRatingsByStoreLocale()}), so this
+     * deliberately does not pre-filter; the caller decides what "rated" means for its own purpose.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function findQueriesByStoreLocale(string $storeName, string $localeName): array;
+
+    /**
+     * Every individual rating (one row per admin/query/product) belonging to a query in the given
+     * store/locale — the raw input a rank_eval evaluation run groups-and-averages into per-(query,
+     * product) gains itself (kept as individual rows here, not pre-aggregated, since the numeric gain a
+     * rating_type maps to is a Business-layer/Config concern, not a Persistence one).
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryRatingTransfer>
+     */
+    public function findRatingsByStoreLocale(string $storeName, string $localeName): array;
+
+    /**
+     * The most recently persisted rank_eval evaluation run for a given store/locale, or null when none has
+     * ever run.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
+
+    /**
+     * Every persisted evaluation run for a given store/locale, newest first — backs a simple score-over-
+     * time history list on the Zed Evaluation page.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
+     */
+    public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array;
 }

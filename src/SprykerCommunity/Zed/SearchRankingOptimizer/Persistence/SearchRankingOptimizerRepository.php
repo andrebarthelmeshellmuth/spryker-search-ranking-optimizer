@@ -11,6 +11,8 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Propel\Runtime\ActiveQuery\Criteria;
 use Spryker\Zed\Kernel\Persistence\AbstractRepository;
@@ -200,5 +202,104 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
             ->distinct()
             ->find()
             ->getArrayCopy();
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function findQueriesByStoreLocale(string $storeName, string $localeName): array
+    {
+        $queryEntities = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $queryTransfers = [];
+
+        foreach ($queryEntities as $queryEntity) {
+            $queryTransfers[] = $mapper->mapQueryEntityToTransfer($queryEntity, new SearchRankingQueryTransfer());
+        }
+
+        return $queryTransfers;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryRatingTransfer>
+     */
+    public function findRatingsByStoreLocale(string $storeName, string $localeName): array
+    {
+        $ratingEntities = $this->getFactory()
+            ->createSearchRankingQueryRatingQuery()
+            ->useSearchRankingQueryQuery()
+                ->filterByStoreName($storeName)
+                ->filterByLocaleName($localeName)
+            ->endUse()
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $ratingTransfers = [];
+
+        foreach ($ratingEntities as $ratingEntity) {
+            $ratingTransfers[] = $mapper->mapQueryRatingEntityToTransfer($ratingEntity, new SearchRankingQueryRatingTransfer());
+        }
+
+        return $ratingTransfers;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
+    {
+        $evaluationEntity = $this->getFactory()
+            ->createSearchRankingEvaluationQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->orderByCreatedAt(Criteria::DESC)
+            ->findOne();
+
+        if ($evaluationEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapEvaluationEntityToTransfer($evaluationEntity, new SearchRankingEvaluationTransfer());
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
+     */
+    public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array
+    {
+        $evaluationEntities = $this->getFactory()
+            ->createSearchRankingEvaluationQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->orderByCreatedAt(Criteria::DESC)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $evaluationTransfers = [];
+
+        foreach ($evaluationEntities as $evaluationEntity) {
+            $evaluationTransfers[] = $mapper->mapEvaluationEntityToTransfer($evaluationEntity, new SearchRankingEvaluationTransfer());
+        }
+
+        return $evaluationTransfers;
     }
 }

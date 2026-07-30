@@ -97,4 +97,20 @@
         </index>
     </table>
 
+    <table name="spy_search_ranking_evaluation" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_evaluation" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="store_name" type="VARCHAR" size="64" required="true"/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true"/>
+        <column name="metric_score" type="DOUBLE" required="true" description="Query-importance-weighted nDCG aggregate across every rated query for this store/locale at this point in time (NOT rank_eval's own top-level metric_score, which is a plain unweighted mean — see RankEvaluationRunner)."/>
+        <column name="query_count" type="INTEGER" required="true" description="How many rated queries actually contributed to this run."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_evaluation_pk_seq"/>
+
+        <index name="index-spy_sre-store_locale">
+            <index-column name="store_name"/>
+            <index-column name="locale_name"/>
+        </index>
+    </table>
+
 </database>

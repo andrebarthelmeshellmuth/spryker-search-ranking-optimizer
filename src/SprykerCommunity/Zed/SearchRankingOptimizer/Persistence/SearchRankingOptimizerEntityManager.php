@@ -11,10 +11,12 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use DateTime;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
@@ -289,5 +291,24 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
             ->filterByCustomerReference($customerReference)
             ->filterByFkProductAbstract($fkProductAbstract)
             ->delete();
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
+     */
+    public function createEvaluation(SearchRankingEvaluationTransfer $evaluationTransfer): SearchRankingEvaluationTransfer
+    {
+        $evaluationEntity = new SpySearchRankingEvaluation();
+        $evaluationEntity->setStoreName($evaluationTransfer->getStoreNameOrFail());
+        $evaluationEntity->setLocaleName($evaluationTransfer->getLocaleNameOrFail());
+        $evaluationEntity->setMetricScore($evaluationTransfer->getMetricScoreOrFail());
+        $evaluationEntity->setQueryCount($evaluationTransfer->getQueryCountOrFail());
+        $evaluationEntity->save();
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapEvaluationEntityToTransfer($evaluationEntity, $evaluationTransfer);
     }
 }

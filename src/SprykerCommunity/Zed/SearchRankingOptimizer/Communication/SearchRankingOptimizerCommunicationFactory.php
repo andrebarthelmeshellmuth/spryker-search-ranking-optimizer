@@ -15,6 +15,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\Rele
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\QueryImportanceWeightForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
@@ -46,6 +47,29 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return $this->getFormFactory()->create(CalibrationUploadForm::class, null, [
             CalibrationUploadForm::OPTION_STORE_CHOICES => $storeChoices,
             CalibrationUploadForm::OPTION_LOCALE_CHOICES => $localeChoices,
+        ]);
+    }
+
+    /**
+     * @param array<string, string> $data
+     *
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createEvaluationForm(array $data = []): FormInterface
+    {
+        $storeChoices = [];
+        foreach ($this->getStoreFacade()->getAllStores() as $storeTransfer) {
+            $storeChoices[$storeTransfer->getNameOrFail()] = $storeTransfer->getNameOrFail();
+        }
+
+        $localeChoices = [];
+        foreach ($this->getLocaleFacade()->getAvailableLocales() as $localeName) {
+            $localeChoices[$localeName] = $localeName;
+        }
+
+        return $this->getFormFactory()->create(EvaluationForm::class, $data, [
+            EvaluationForm::OPTION_STORE_CHOICES => $storeChoices,
+            EvaluationForm::OPTION_LOCALE_CHOICES => $localeChoices,
         ]);
     }
 

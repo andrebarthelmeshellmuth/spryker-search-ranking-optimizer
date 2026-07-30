@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 
@@ -128,4 +129,13 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return void
      */
     public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void;
+
+    /**
+     * Persists one rank_eval evaluation run's query-importance-weighted aggregate score.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
+     */
+    public function createEvaluation(SearchRankingEvaluationTransfer $evaluationTransfer): SearchRankingEvaluationTransfer;
 }

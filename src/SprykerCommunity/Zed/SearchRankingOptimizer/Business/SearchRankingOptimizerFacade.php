@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -147,5 +148,50 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void
     {
         $this->getFactory()->createQueryImportanceWeightUpdater()->update($idSearchRankingQuery, $importanceWeight);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
+    {
+        return $this->getFactory()->createRankEvaluationRunner()->evaluate($storeName, $localeName);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
+     */
+    public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
+    {
+        return $this->getRepository()->findLatestEvaluation($storeName, $localeName);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
+     */
+    public function findEvaluationHistory(string $storeName, string $localeName): array
+    {
+        return $this->getRepository()->findEvaluationHistoryByStoreLocale($storeName, $localeName);
     }
 }

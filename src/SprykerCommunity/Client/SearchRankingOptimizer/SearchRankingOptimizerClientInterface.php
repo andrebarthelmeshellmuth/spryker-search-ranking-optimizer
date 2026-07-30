@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
+use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 
@@ -66,4 +68,18 @@ interface SearchRankingOptimizerClientInterface
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer;
+
+    /**
+     * Specification:
+     * - Fires one batched `_rank_eval` call directly against Elasticsearch (same bypass reasoning as
+     *   {@see getCalibrationScores()}) covering every query in $requestTransfer, returning each query's own
+     *   nDCG@cutoff score.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
+     */
+    public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
 }
