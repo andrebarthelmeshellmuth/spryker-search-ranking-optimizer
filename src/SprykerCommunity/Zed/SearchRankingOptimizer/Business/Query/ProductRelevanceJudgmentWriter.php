@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Propel\Runtime\Exception\PropelException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException;
@@ -87,12 +88,7 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
         $queryTransfer = $this->repository->findQueryByTermStoreLocale($canonicalSearchTerm, $storeName, $localeName);
 
         if ($queryTransfer === null) {
-            $queryTransfer = $this->entityManager->createQuery(
-                (new SearchRankingQueryTransfer())
-                    ->setSearchTerm($canonicalSearchTerm)
-                    ->setStoreName($storeName)
-                    ->setLocaleName($localeName),
-            );
+            $queryTransfer = $this->createQueryHandlingConcurrentInsert($canonicalSearchTerm, $storeName, $localeName);
         }
 
         $ratingTransfer = (new SearchRankingQueryRatingTransfer())
@@ -102,6 +98,48 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
             ->setRatingType($ratingType);
 
         return $this->entityManager->upsertRating($ratingTransfer);
+    }
+
+    /**
+     * Two raters submitting a judgment for the SAME never-before-rated (term, store, locale) at nearly the
+     * same time can both reach here after both find nothing to attach their rating to yet -- a genuine
+     * time-of-check-to-time-of-use race, not a corner case worth ignoring, since a new search term is
+     * exactly the moment two impatient raters are most likely to click within the same instant. The real
+     * guarantee against a duplicate query row is the DB's own unique (search_term, store_name, locale_name)
+     * constraint (see schema), which lets exactly one insert win; this re-fetches on the loser's failure
+     * rather than losing that rater's judgment entirely -- the winner's row is exactly what was wanted
+     * anyway. If the re-fetch ALSO comes back empty, the original failure was something else (a genuine
+     * DB problem), so it's rethrown rather than silently swallowed.
+     *
+     * @param string $canonicalSearchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @throws \Propel\Runtime\Exception\PropelException
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
+     */
+    protected function createQueryHandlingConcurrentInsert(
+        string $canonicalSearchTerm,
+        string $storeName,
+        string $localeName,
+    ): SearchRankingQueryTransfer {
+        try {
+            return $this->entityManager->createQuery(
+                (new SearchRankingQueryTransfer())
+                    ->setSearchTerm($canonicalSearchTerm)
+                    ->setStoreName($storeName)
+                    ->setLocaleName($localeName),
+            );
+        } catch (PropelException $propelException) {
+            $queryTransfer = $this->repository->findQueryByTermStoreLocale($canonicalSearchTerm, $storeName, $localeName);
+
+            if ($queryTransfer === null) {
+                throw $propelException;
+            }
+
+            return $queryTransfer;
+        }
     }
 
     /**

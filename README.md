@@ -169,7 +169,10 @@ gets built, one click at a time, directly on the storefront search results page 
   `spy_search_ranking_query_rating`, unique on `(query, customer_reference, product_abstract)`. The same
   customer re-rating the same pair upserts in place; **different customers rating the same (query, product)
   each keep their own row** — disagreement between raters is a signal to preserve, not average away at
-  write time.
+  write time. A brand-new search term is a genuine find-or-create race the moment two raters rate it within
+  the same instant: the DB's own unique `(search_term, store_name, locale_name)` constraint lets exactly one
+  insert win, and the loser recovers by re-fetching the winner's row rather than losing that rater's
+  judgment entirely.
 - **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a **Query Curator** mark some
   queries as mattering more than others once they've accumulated ratings — a deliberately separate skill
   from rating relevance itself. Edited from the **Search Ranking Optimizer → Queries** Zed page: every

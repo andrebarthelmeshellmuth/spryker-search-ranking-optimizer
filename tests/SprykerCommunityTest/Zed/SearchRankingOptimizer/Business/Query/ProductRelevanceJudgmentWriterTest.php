@@ -13,6 +13,7 @@ use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Propel\Runtime\Exception\PropelException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException;
@@ -89,6 +90,71 @@ class ProductRelevanceJudgmentWriterTest extends Unit
             ->willReturnArgument(0);
 
         $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+
+        // Act
+        $writer->submitJudgment($requestTransfer);
+    }
+
+    /**
+     * A time-of-check-to-time-of-use race: two raters submitting a judgment for the SAME never-before-rated
+     * term at nearly the same time can both find null and both reach createQuery() -- the DB's own unique
+     * (search_term, store_name, locale_name) constraint lets exactly one insert win, and the loser must
+     * recover by re-fetching rather than losing that rater's judgment entirely.
+     *
+     * @return void
+     */
+    public function testSubmitJudgmentRecoversWhenCreateQueryLosesARaceToAConcurrentInsert(): void
+    {
+        // Arrange
+        $requestTransfer = $this->createRequestTransfer('desk', SearchRankingOptimizerConfig::RATING_TYPE_CHECK);
+
+        $canonicalizerMock = $this->createMock(SearchTermCanonicalizerInterface::class);
+        $canonicalizerMock->method('canonicalize')->willReturn('desk');
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueryByTermStoreLocale')->willReturnOnConsecutiveCalls(
+            null,
+            (new SearchRankingQueryTransfer())->setIdSearchRankingQuery(9),
+        );
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->once())
+            ->method('createQuery')
+            ->willThrowException(new PropelException('Duplicate entry for key unique-spy_search_ranking_query-term_store_locale'));
+        $entityManagerMock->expects($this->once())
+            ->method('upsertRating')
+            ->with($this->callback(fn (SearchRankingQueryRatingTransfer $ratingTransfer): bool => $ratingTransfer->getFkSearchRankingQuery() === 9))
+            ->willReturnArgument(0);
+
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+
+        // Act
+        $writer->submitJudgment($requestTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testSubmitJudgmentRethrowsWhenCreateQueryFailsForAReasonOtherThanARace(): void
+    {
+        // Arrange -- the re-fetch after the failure STILL comes back null, so this was never a race in the
+        // first place (e.g. a genuine connection failure) and must propagate rather than being swallowed.
+        $requestTransfer = $this->createRequestTransfer('desk', SearchRankingOptimizerConfig::RATING_TYPE_CHECK);
+
+        $canonicalizerMock = $this->createMock(SearchTermCanonicalizerInterface::class);
+        $canonicalizerMock->method('canonicalize')->willReturn('desk');
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueryByTermStoreLocale')->willReturn(null);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->method('createQuery')->willThrowException(new PropelException('Connection lost.'));
+        $entityManagerMock->expects($this->never())->method('upsertRating');
+
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+
+        // Assert
+        $this->expectException(PropelException::class);
 
         // Act
         $writer->submitJudgment($requestTransfer);
