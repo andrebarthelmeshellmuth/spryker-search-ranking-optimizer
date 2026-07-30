@@ -18,8 +18,11 @@ interface SearchRankingOptimizerFacadeInterface
 {
     /**
      * Specification:
-     * - Parses $csvContent (one search term per line) and creates a new calibration run in
-     *   status=uploaded, with one child row per search term.
+     * - When $csvContent is null (the default), sources search terms from the distinct, organically rated
+     *   queries already collected via the SRP widget for this store/locale.
+     * - When $csvContent is given (one search term per line), parses it into search terms instead,
+     *   bypassing organic queries — a bootstrap/test path, not the primary one.
+     * - Either way, creates a new calibration run in status=uploaded, with one child row per search term.
      * - Fires no search queries — {@see runNextCalibration()} does that, on its own schedule.
      *
      * @api
@@ -27,11 +30,16 @@ interface SearchRankingOptimizerFacadeInterface
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
-     * @param string $csvContent
+     * @param string|null $csvContent
      *
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
-    public function createCalibration(int $relevantProductCount, string $storeName, string $localeName, string $csvContent): SearchRankingCalibrationTransfer;
+    public function createCalibration(
+        int $relevantProductCount,
+        string $storeName,
+        string $localeName,
+        ?string $csvContent = null,
+    ): SearchRankingCalibrationTransfer;
 
     /**
      * Specification:
@@ -56,6 +64,17 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
+
+    /**
+     * Specification:
+     * - Returns the run currently in status=calculating, if any — at most one at a time by design. Backs
+     *   the Calibration page's live progress counter.
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
 
     /**
      * Specification:

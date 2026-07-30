@@ -113,6 +113,7 @@ class ScoreCalibrator implements ScoreCalibratorInterface
                 count($scores),
                 $scores,
             );
+            $this->entityManager->incrementCalibrationProcessedCount($idSearchRankingCalibration);
 
             array_push($pooledScores, ...$scores);
         }

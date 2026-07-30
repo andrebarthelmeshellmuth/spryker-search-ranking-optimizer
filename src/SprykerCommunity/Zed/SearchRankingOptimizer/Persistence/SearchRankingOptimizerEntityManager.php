@@ -37,6 +37,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $calibrationEntity->setStoreName($calibrationTransfer->getStoreNameOrFail());
         $calibrationEntity->setLocaleName($calibrationTransfer->getLocaleNameOrFail());
         $calibrationEntity->setStatus($calibrationTransfer->getStatus() ?? SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
+        // Known up front (the caller already populated every search term before calling this) — the
+        // denominator half of the live "X/Y processed" counter never needs to change again after this.
+        $calibrationEntity->setTotalCount(count($calibrationTransfer->getSearchTerms()));
         $calibrationEntity->save();
 
         foreach ($calibrationTransfer->getSearchTerms() as $searchTermTransfer) {
@@ -95,6 +98,29 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $searchTermEntity->setProductsFound($productsFound);
         $searchTermEntity->setScores($this->getFactory()->createSearchRankingOptimizerMapper()->implodeScores($scores));
         $searchTermEntity->save();
+    }
+
+    /**
+     * Called once per search term inside {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibrator::calculate()}'s
+     * own loop — the calculation run is a single sequential process, so a plain read-modify-write (same
+     * pattern every other method here uses) needs no extra locking.
+     *
+     * @param int $idSearchRankingCalibration
+     *
+     * @return void
+     */
+    public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void
+    {
+        $calibrationEntity = $this->getFactory()
+            ->createSearchRankingCalibrationQuery()
+            ->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+
+        if ($calibrationEntity === null) {
+            return;
+        }
+
+        $calibrationEntity->setProcessedCount($calibrationEntity->getProcessedCount() + 1);
+        $calibrationEntity->save();
     }
 
     /**

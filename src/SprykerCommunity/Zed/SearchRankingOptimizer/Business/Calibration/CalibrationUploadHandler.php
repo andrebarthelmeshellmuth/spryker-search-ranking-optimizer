@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
 class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
 {
@@ -22,19 +23,27 @@ class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
     protected CsvSearchTermParserInterface $csvSearchTermParser;
 
     /**
+     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
+     */
+    protected SearchRankingOptimizerRepositoryInterface $repository;
+
+    /**
      * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
      */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParserInterface $csvSearchTermParser
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      */
     public function __construct(
         CsvSearchTermParserInterface $csvSearchTermParser,
+        SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerEntityManagerInterface $entityManager,
     ) {
         $this->csvSearchTermParser = $csvSearchTermParser;
+        $this->repository = $repository;
         $this->entityManager = $entityManager;
     }
 
@@ -44,19 +53,27 @@ class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
-     * @param string $csvContent
+     * @param string|null $csvContent
      *
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
-    public function createCalibration(int $relevantProductCount, string $storeName, string $localeName, string $csvContent): SearchRankingCalibrationTransfer
-    {
+    public function createCalibration(
+        int $relevantProductCount,
+        string $storeName,
+        string $localeName,
+        ?string $csvContent = null,
+    ): SearchRankingCalibrationTransfer {
         $calibrationTransfer = (new SearchRankingCalibrationTransfer())
             ->setRelevantProductCount($relevantProductCount)
             ->setStoreName($storeName)
             ->setLocaleName($localeName)
             ->setStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
 
-        foreach ($this->csvSearchTermParser->parse($csvContent) as $searchTerm) {
+        $searchTerms = $csvContent !== null
+            ? $this->csvSearchTermParser->parse($csvContent)
+            : $this->repository->findDistinctSearchTermsByStoreLocale($storeName, $localeName);
+
+        foreach ($searchTerms as $searchTerm) {
             $calibrationTransfer->addSearchTerm(
                 (new SearchRankingCalibrationSearchTermTransfer())->setSearchTerm($searchTerm),
             );

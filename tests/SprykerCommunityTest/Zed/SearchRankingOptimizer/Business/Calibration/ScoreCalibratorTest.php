@@ -187,6 +187,50 @@ class ScoreCalibratorTest extends Unit
     }
 
     /**
+     * The live progress counter's numerator: one increment per search term as the loop works through
+     * them, regardless of whether that term actually matched anything (a "0 products found" term still
+     * counts as processed).
+     *
+     * @return void
+     */
+    public function testCalculateIncrementsProcessedCountOnceForEverySearchTermRegardlessOfResult(): void
+    {
+        // Arrange
+        $searchTerms = [
+            $this->createSearchTermTransfer(10, 'chair'),
+            $this->createSearchTermTransfer(11, 'nomatch'),
+        ];
+        $calibrationTransfer = $this->createCalibrationTransfer(5, $searchTerms);
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('getUploadedCalibrations')->willReturn([$calibrationTransfer]);
+        $repositoryMock->method('findCalibrationWithSearchTerms')->willReturn($calibrationTransfer);
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->method('getCalibrationScores')
+            ->willReturnCallback(fn (string $searchTerm): array => $searchTerm === 'chair' ? [12.5] : []);
+
+        $incrementedIds = [];
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->exactly(2))
+            ->method('incrementCalibrationProcessedCount')
+            ->willReturnCallback(function (int $id) use (&$incrementedIds): void {
+                $incrementedIds[] = $id;
+            });
+
+        $statisticsCalculatorMock = $this->createMock(StatisticsCalculatorInterface::class);
+        $statisticsCalculatorMock->method('calculate')->willReturn(new SearchRankingCalibrationTransfer());
+
+        $calibrator = new ScoreCalibrator($repositoryMock, $entityManagerMock, $searchRankingClientMock, $statisticsCalculatorMock);
+
+        // Act
+        $calibrator->runNextCalibration();
+
+        // Assert
+        $this->assertSame([5, 5], $incrementedIds);
+    }
+
+    /**
      * A real, if rare, race: the calibration row is deleted (or otherwise vanishes) between being listed
      * as "uploaded" and actually being picked up to calculate — `calculate()` must surface this loudly
      * rather than silently proceeding with a missing calibration.

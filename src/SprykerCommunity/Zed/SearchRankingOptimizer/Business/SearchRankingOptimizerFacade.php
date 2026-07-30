@@ -29,12 +29,16 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
-     * @param string $csvContent
+     * @param string|null $csvContent
      *
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
-    public function createCalibration(int $relevantProductCount, string $storeName, string $localeName, string $csvContent): SearchRankingCalibrationTransfer
-    {
+    public function createCalibration(
+        int $relevantProductCount,
+        string $storeName,
+        string $localeName,
+        ?string $csvContent = null,
+    ): SearchRankingCalibrationTransfer {
         return $this->getFactory()->createCalibrationUploadHandler()->createCalibration($relevantProductCount, $storeName, $localeName, $csvContent);
     }
 
@@ -60,6 +64,18 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer
     {
         return $this->getRepository()->findLatestCalculatedCalibration();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
+    {
+        return $this->getRepository()->findCalibrationInProgress();
     }
 
     /**

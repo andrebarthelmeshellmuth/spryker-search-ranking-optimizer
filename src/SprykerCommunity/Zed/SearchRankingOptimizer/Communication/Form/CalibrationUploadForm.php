@@ -10,10 +10,14 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form;
 
 use Spryker\Zed\Kernel\Communication\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\File;
 use Symfony\Component\Validator\Constraints\GreaterThan;
@@ -43,6 +47,11 @@ class CalibrationUploadForm extends AbstractType
      * @var string
      */
     public const FIELD_FILE = 'file';
+
+    /**
+     * @var string
+     */
+    public const FIELD_USE_CSV_UPLOAD = 'useCsvUpload';
 
     /**
      * @var string
@@ -89,17 +98,41 @@ class CalibrationUploadForm extends AbstractType
             'constraints' => [new NotBlank()],
         ]);
 
+        $builder->add(static::FIELD_USE_CSV_UPLOAD, CheckboxType::class, [
+            'label' => 'Bootstrap from CSV upload instead',
+            'help' => 'Unchecked (default): sources search terms from the distinct queries organically '
+                . 'rated via the SRP widget. Check this to bypass those and upload a CSV instead — use '
+                . 'this to bootstrap calibration before real ratings exist, or for testing.',
+            'required' => false,
+        ]);
+
         $builder->add(static::FIELD_FILE, FileType::class, [
             'label' => 'Search terms (CSV, one term per line)',
             'mapped' => false,
+            'required' => false,
             'constraints' => [
-                new NotBlank(['message' => 'Please select a CSV file to upload.']),
                 new File([
                     'mimeTypes' => ['text/csv', 'text/plain', 'application/vnd.ms-excel'],
                     'mimeTypesMessage' => 'Please upload a CSV file.',
                 ]),
             ],
         ]);
+
+        $builder->addEventListener(FormEvents::POST_SUBMIT, function (FormEvent $event): void {
+            $form = $event->getForm();
+
+            if (!$form->get(static::FIELD_USE_CSV_UPLOAD)->getData()) {
+                return;
+            }
+
+            $file = $form->get(static::FIELD_FILE)->getData();
+
+            if ($file !== null) {
+                return;
+            }
+
+            $form->get(static::FIELD_FILE)->addError(new FormError('Please select a CSV file to upload.'));
+        });
     }
 
     /**

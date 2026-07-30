@@ -73,6 +73,8 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame(2, $resultTransfer->getTotalCount(), 'totalCount is set from the search term count at creation time.');
+        $this->assertSame(0, $resultTransfer->getProcessedCount());
 
         $searchTermEntities = SpySearchRankingCalibrationSearchTermQuery::create()
             ->filterByFkSearchRankingCalibration($resultTransfer->getIdSearchRankingCalibrationOrFail())
@@ -111,6 +113,33 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->updateCalibrationStatus(-1, SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED);
+    }
+
+    /**
+     * @return void
+     */
+    public function testIncrementCalibrationProcessedCountAddsOneEachCall(): void
+    {
+        // Arrange
+        $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING);
+        $entityManager = new SearchRankingOptimizerEntityManager();
+
+        // Act
+        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingCalibration());
+        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingCalibration());
+
+        // Assert
+        $calibrationEntity->reload();
+        $this->assertSame(2, $calibrationEntity->getProcessedCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testIncrementCalibrationProcessedCountIsASafeNoOpForANonExistentId(): void
+    {
+        // Act & Assert (must not throw)
+        (new SearchRankingOptimizerEntityManager())->incrementCalibrationProcessedCount(-1);
     }
 
     /**

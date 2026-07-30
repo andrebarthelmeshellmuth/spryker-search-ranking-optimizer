@@ -96,6 +96,30 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
+     * The run `ScoreCalibrator::calculate()` is currently working through, if any — at most one at a
+     * time by design (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibrator::runNextCalibration()}'s
+     * own skip-older-uploads step). Backs the Calibration page's live progress counter; polled, so
+     * deliberately cheap — no search terms loaded.
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     */
+    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
+    {
+        $calibrationEntity = $this->getFactory()
+            ->createSearchRankingCalibrationQuery()
+            ->filterByStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING)
+            ->findOne();
+
+        if ($calibrationEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapCalibrationEntityToTransfer($calibrationEntity, new SearchRankingCalibrationTransfer());
+    }
+
+    /**
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
@@ -158,5 +182,23 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         }
 
         return $queryTransfers;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function findDistinctSearchTermsByStoreLocale(string $storeName, string $localeName): array
+    {
+        return $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->select('SearchTerm')
+            ->distinct()
+            ->find()
+            ->getArrayCopy();
     }
 }
