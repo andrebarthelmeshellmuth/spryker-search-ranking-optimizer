@@ -11,14 +11,18 @@ installs and runs completely standalone without it (see [Relationship to search-
 
 ## Status
 
-**Calibration is built, tested, and shipping.** The rest of the tuning layer (weight-slider preview, a
-propose/review/apply workflow, offline `rank_eval` evaluation, a monthly auto-tune job, automated weight
-search) is designed and on the [Roadmap](#roadmap) but not built yet.
+**Calibration, the SRP relevance-rating widget, and the Zed Queries curation page are all built, tested,
+and shipping.** The rest of the
+tuning layer (weight-slider preview, a propose/review/apply workflow, offline `rank_eval` evaluation, a
+monthly auto-tune job, automated weight search) is designed and on the [Roadmap](#roadmap) but not built
+yet.
 
-Verified: dependency floors resolved and checked at their oldest allowed versions (`composer
-check-floors`), 44 tests / 113 assertions (real database and real live-engine integration tests where a
-mocked collaborator couldn't actually prove the thing worth proving — see [Testing and CI](#testing-and-ci)),
-phpcs, phpmd, and phpstan level 8 all clean.
+Verified live end-to-end in a real browser (not just the automated test suite — see
+[Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
+button on the storefront, the judgment round-trips through the Yves→Zed gateway with a server-side
+permission re-check, and lands correctly in the database.
+
+![The SRP relevance-rating widget: heart/check/X buttons below each product tile, colorized once rated — heart red, check green, X red](docs/screenshots/srp-rating-widget.png)
 
 ## What it does today
 
@@ -57,6 +61,41 @@ Firing the query from Zed reuses `search-ranking`'s solved raw-Elastica bypass p
 `Client\Search` stack assumes a Yves request context that doesn't exist in a console/Zed process), shipped
 here as the `Client\SearchRankingOptimizer\Search` component.
 
+### SRP relevance rating — capturing real (query, product) judgments
+
+Calibration answers "what should `relevanceSaturationPoint` be" from a *sample* of search terms. Longer
+term, tuning any part of the ranking formula needs a real, organically-grown judgment set — actual people
+saying "this product was/wasn't a good result for this query." The rating widget is how that judgment set
+gets built, one click at a time, directly on the storefront search results page (SRP).
+
+- **Heart / check / X buttons** render below every product tile on the SRP, for any customer holding the
+  **Relevance Rater** permission (`RateSearchRelevancePermissionPlugin`) — heart = highly relevant, check =
+  acceptably relevant, X = not relevant. Default grey, colorized on click (heart/X share a red-family
+  accent, check is green); only one button is ever pressed per (customer, product) pair on a given SRP.
+  Clicking the already-pressed button unselects it, deleting the underlying rating row — the one case
+  where a click means "remove my judgment" rather than "set it."
+- **One row per (query, customer, product).** The canonical search term (trimmed, lowercased,
+  whitespace-collapsed — deliberately *not* tokenized, so two genuinely different queries never get merged)
+  is stored once in `spy_search_ranking_query`; each rating is its own row in
+  `spy_search_ranking_query_rating`, unique on `(query, customer_reference, product_abstract)`. The same
+  customer re-rating the same pair upserts in place; **different customers rating the same (query, product)
+  each keep their own row** — disagreement between raters is a signal to preserve, not average away at
+  write time.
+- **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a separate **Query Curator**
+  permission (`SetSearchQueryImportancePermissionPlugin`) mark some queries as mattering more than others
+  once they've accumulated ratings — a deliberately separate skill/permission from rating relevance itself.
+  Edited from the **Search Ranking Optimizer → Queries** Zed page: every rated query, newest-activity-first,
+  with an "Edit importance" action per row (a plain, paginated/sortable/searchable `Gui` table — the same
+  component `spryker-community/search-ranking`'s own Metrics page uses).
+- **Server-side authorization, not just a hidden button.** The Yves widget only *renders* for a permitted
+  customer, but the write itself goes through a Zed `GatewayController` that independently re-checks the
+  permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
+  persisting anything.
+
+This is the data-capture half of what [GAP-2 evaluation and beyond](#roadmap) will eventually score against
+— nothing consumes these ratings yet (see Roadmap), but they accumulate from real traffic starting the
+moment this is installed.
+
 ## Relationship to search-ranking
 
 - **One-directional dependency.** This package depends on `search-ranking`; `search-ranking` never depends
@@ -74,11 +113,14 @@ here as the `Client\SearchRankingOptimizer\Search` component.
 ## Requirements
 
 - PHP >= 8.3
-- Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch — see `composer.json` for
-  floors, verified by `composer check-floors`)
+- Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/company-user — see
+  `composer.json` for floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
 - **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.0`); the Apply step
   writes into its `relevanceSaturationPoint` setting via its facade
+- **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
+  active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
+  shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
 
 ## Installation
 
@@ -118,6 +160,71 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRank
 new SearchRankingOptimizerCalibrateConsole(),
 ```
 
+### 3a. Register the permission plugins (required for the SRP rating widget)
+
+In **both** `Pyz\Zed\Permission\PermissionDependencyProvider::getPermissionPlugins()` and
+`Pyz\Client\Permission\PermissionDependencyProvider::getPermissionPlugins()`:
+
+```php
+use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\RateSearchRelevancePermissionPlugin;
+use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\SetSearchQueryImportancePermissionPlugin;
+
+new RateSearchRelevancePermissionPlugin(),
+new SetSearchQueryImportancePermissionPlugin(),
+```
+
+Registering the plugin only makes the permission *grantable* — the widget stays invisible until a
+customer's company role is actually given `RateSearchRelevancePermissionPlugin` (via your project's own
+company-role/permission fixture data, e.g. `company_role_permission.csv` if you use the standard
+`CompanyRoleDataImport`). A customer already logged in when the grant is added needs to log out and back
+in for the permission to take effect in their session.
+
+### 3b. Register the Yves widget plugins
+
+In `Pyz\Yves\Router\RouterDependencyProvider::getRouteProviderPlugins()`:
+
+```php
+use SprykerCommunity\Yves\SearchRankingOptimizerWidget\Plugin\Router\SearchRankingOptimizerWidgetRouteProviderPlugin;
+
+new SearchRankingOptimizerWidgetRouteProviderPlugin(),
+```
+
+In `Pyz\Yves\Twig\TwigDependencyProvider::getGlobalPlugins()` (or wherever your project registers Twig
+plugins):
+
+```php
+use SprykerCommunity\Yves\SearchRankingOptimizerWidget\Plugin\Twig\SearchRankingOptimizerWidgetTwigPlugin;
+
+new SearchRankingOptimizerWidgetTwigPlugin(),
+```
+
+Then render the widget below each product tile in your SRP template (this package does not override
+`page-layout-catalog.twig` itself — that stays project-owned):
+
+```twig
+{% include molecule('search-ranking-optimizer-product-rating', 'SearchRankingOptimizerWidget') with {
+    data: {
+        canRate: canRateSearchRelevance(),
+        searchTerm: data.searchString,
+        idProductAbstract: product.id_product_abstract,
+    }
+} only %}
+```
+
+Compute `canRateSearchRelevance()` **once per page**, not once per product, and pass the same value into
+every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
+`.search-debug-product-wrapper` (or any other wrapper that stretches to a fixed row height via CSS Grid/
+flex `align-items: stretch`), make sure that wrapper's first child does not have a hard `height: 100%` —
+combined with `flex-shrink: 0` that silently eats all the wrapper's height and pushes this widget outside
+the wrapper's visible box instead of the wrapper growing to fit it. This project's own fix (a scoped
+`height: auto` override, not touching either package) lives in
+`src/Pyz/Yves/CatalogPage/Theme/default/templates/page-layout-catalog/page-layout-catalog.scss` if you want
+a working reference.
+
+**Yves build gotcha:** a template-paired `.scss` file is silently never bundled unless that same template
+directory also has an `index.ts` (`import './your-template';`) — webpack's entry-point discovery keys off
+`templates/*/index.ts`, SCSS discovery only piggybacks on that entry point already existing.
+
 ### 4. Register the Zed navigation entry
 
 Zed navigation has no glob auto-discovery for `vendor/spryker-community/*` (standard Spryker behavior).
@@ -131,11 +238,11 @@ rm -f src/Generated/Zed/Navigation/codeBucket/navigation*.cache
 vendor/bin/console navigation:build-cache
 ```
 
-### 5. Translations for the Zed GUI
+### 5. Translations
 
-Like its siblings, this package ships its Zed strings as `spryker/translator` CSV catalogs under
-[`data/translation/Zed/`](data/translation/Zed/) (Zed's `trans` filter does **not** use the Yves-facing
-Glossary module). If your project already extended
+**Zed GUI** (Calibration page): like its siblings, this package ships its Zed strings as
+`spryker/translator` CSV catalogs under [`data/translation/Zed/`](data/translation/Zed/) (Zed's `trans`
+filter does **not** use the Yves-facing Glossary module). If your project already extended
 `Pyz\Zed\Translator\TranslatorConfig::getCoreTranslationFilePathPatterns()` with the
 `spryker-community/*` glob for `search-ranking`, this package is auto-discovered by the same glob — no
 extra step. Otherwise add it once:
@@ -144,15 +251,32 @@ extra step. Otherwise add it once:
 $coreTranslationFilePathPatterns[] = APPLICATION_VENDOR_DIR . '/spryker-community/*/data/translation/Zed/[a-z][a-z]_[A-Z][A-Z].csv';
 ```
 
+**Yves widget** (the three button titles): the opposite mechanism — a plain
+[`data/glossary.csv`](data/glossary.csv), imported the normal Spryker way (this is the same
+Redis-backed Glossary module every Yves-facing string in a Spryker shop already uses):
+
+```bash
+vendor/bin/console data:import glossary
+```
+
 ### 6. Build (transfers, Propel tables, caches)
 
-This package ships a Propel schema for two tables (`spy_search_ranking_calibration`,
-`spy_search_ranking_calibration_search_term`). Generate transfers and install the schema:
+This package ships a Propel schema for **four** tables: `spy_search_ranking_calibration` +
+`spy_search_ranking_calibration_search_term` (Calibration), and `spy_search_ranking_query` +
+`spy_search_ranking_query_rating` (the SRP rating widget). Generate transfers and install the schema:
 
 ```bash
 vendor/bin/console transfer:generate
-vendor/bin/console propel:install       # creates the calibration tables + builds ORM classes
+vendor/bin/console propel:install       # creates all four tables + builds ORM classes
 vendor/bin/console router:cache:warm-up:backoffice
+```
+
+If you wired the Yves widget (step 3b), also warm up the **BackendGateway** router — its cache is separate
+from the Backoffice one above and is not covered by it, so a fresh install of just this package's Gateway
+controller will 404 with "No route found" until this runs too:
+
+```bash
+vendor/bin/console router:cache:warm-up:backend-gateway
 ```
 
 ### 7. Schedule the calibration cron
@@ -171,28 +295,31 @@ also just run it by hand after each upload.)
 
 ## Modules
 
-- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration business logic, persistence,
-  console command, Zed GUI (Calibration + Apply controllers), and the raw-Elastica search component.
+- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration business logic, persistence, console
+  command, Zed GUI (Calibration + Apply controllers, and the Queries listing/edit-importance controllers),
+  the raw-Elastica search component, the rated-query data model, and the Zed Gateway endpoint that persists
+  a rating.
+- **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
+  plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
-Calibration is the first piece of a larger tuning layer. Designed, not yet built:
+Calibration and judgment capture (rating collection + curation) are the first two pieces of a larger
+tuning layer. Designed, not yet built:
 
+- **`_rank_eval` scoring** — turn the ratings this widget already collects into a numeric objective score
+  (nDCG) via OpenSearch/Elasticsearch's `_rank_eval` API, so a tuning change can be measured against a real
+  objective instead of judged by eye. Heart/check/X → numeric gain mapping stays configurable, not
+  hardcoded.
 - **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
   metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
   and a "fetch with these settings" button for a real, verified re-rank.
-- **Tier-2/tier-3 propose → review → apply workflow** — admins submit weight proposals against a search
-  term; a reviewer checks/unchecks proposals and applies a learn-rate blend, saved as a named, restorable
-  checkpoint.
-- **Offline relevance evaluation** — judgment capture (rate products relevant/irrelevant for a query,
-  directly on the live SRP) plus a `_rank_eval` (nDCG) scoring pass, so a tuning change can be measured
-  against a real objective instead of judged by eye. This extends Calibration.
+- **Weight checkpoint/rollback** — every applied weight change (manual, auto-tune, or eventually
+  algorithmic) writes a full snapshot, listed and restorable from a simple Zed page.
 - **Monthly auto-tune job** — per metric, check whether its live formula still fits the data; on a drop
   below a configurable threshold, propose (or, if enabled, apply) a refit and notify the configured admins.
-  `search-ranking` already carries the config fields (threshold, notify toggle) and the ACL role this job
-  will read.
-- **Automated weight search** — once evaluation exists, search the blend weight plus per-metric weights
-  against the judgment set algorithmically (e.g. Bayesian optimization) rather than only via human
+- **Automated weight search** — once `_rank_eval` scoring exists, search the blend weight plus per-metric
+  weights against the judgment set algorithmically (e.g. Bayesian optimization) rather than only via human
   proposals.
 
 ## Testing and CI
@@ -219,7 +346,7 @@ composer check-floors
 
 ### Test suite
 
-**44 tests, 113 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**62 tests, 160 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash
@@ -228,8 +355,22 @@ vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer
 ```
 
 The CSV search-term parser, the score calibrator (skip-older-uploads, failing-term-treated-as-zero,
-fail-when-nothing-scored, the vanished-row race), the statistics calculator, and the persistence mapper
+fail-when-nothing-scored, the vanished-row race), the statistics calculator, the persistence mapper, the
+search-term canonicalizer, `ProductRelevanceJudgmentWriter` (canonicalization-before-lookup, creating a
+query on first rating, rejecting an unknown rating type before touching persistence), and
+`RelevanceJudgmentAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
+the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission)
 are covered as pure unit tests — no database needed.
+
+**Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
+real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button
+render at the right size, does the click round-trip actually reach the Gateway route, does the permission
+fixture grant what the code expects) can only be confirmed with a real browser against a real running shop.
+This is not hypothetical: exactly that class of bug (a wrapper-CSS interaction hiding the widget, a
+class-naming mismatch between the Twig and the SCSS/JS, a missing permission fixture row) shipped
+undetected in this package's own history despite every automated check passing throughout, and was only
+caught by a manual click-through. A real WebDriver-based Presentation/Cest suite would close this gap; not
+built yet.
 
 `SearchRankingOptimizerEntityManagerTest` and `SearchRankingOptimizerRepositoryTest` are **real database**
 integration tests, not mocked: every method here is a thin Propel read-modify-write, so the one thing
@@ -255,18 +396,26 @@ those unit tests assume is the same shape confirmed live against this shop's rea
 satisfies an interface but is documented, by construction, to never actually be called — the same
 exemption this project's own audit convention already grants exception/boilerplate classes.
 
-Coverage (Codeception + pcov): 100% of methods/lines on every class except the two documented exemptions
-above (`NeverInvokedStoreClient`, and the one unreachable-in-this-shop branch in
-`SearchRankingOptimizerRepository`).
+Coverage (Codeception + pcov): 100% of methods/lines on every business-logic class except the two
+documented exemptions above (`NeverInvokedStoreClient`, and the one unreachable-in-this-shop branch in
+`SearchRankingOptimizerRepository`). `GatewayController::submitProductRelevanceJudgmentAction()` itself is
+the one further exemption, same class as those two: it is a thin pass-through to
+`RelevanceJudgmentAuthorizer` and `SearchRankingOptimizerFacade` (both independently unit-tested above) and
+needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
+verification in [Status](#status) instead of a unit test.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 45
+Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 80
 files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
 generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
-`transfer:generate`:
+`transfer:generate`. **Invoke it via the real `packages/` path, not the `vendor/` symlink** — running it
+against `vendor/spryker-community/search-ranking-optimizer/...` produces spurious "return statement is
+missing" errors on every Propel `Query::create()`-returning factory method (a path-resolution artifact of
+analyzing a symlinked package, not a real defect); the identical source analyzed via its real path is
+clean:
 
 ```bash
-vendor/bin/phpstan clear-result-cache -c vendor/spryker-community/search-ranking-optimizer/phpstan.neon
-vendor/bin/phpstan analyse -c vendor/spryker-community/search-ranking-optimizer/phpstan.neon vendor/spryker-community/search-ranking-optimizer/src
+vendor/bin/phpstan clear-result-cache -c packages/spryker-community/search-ranking-optimizer/phpstan.neon
+vendor/bin/phpstan analyse -c packages/spryker-community/search-ranking-optimizer/phpstan.neon packages/spryker-community/search-ranking-optimizer/src
 ```
 
 ## License

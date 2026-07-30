@@ -1,0 +1,79 @@
+{% extends model('component') %}
+
+{# `tag` matching `name` makes this a real custom element (see ShopUi's model('component')) — required so
+   the click/submit behavior (search-ranking-optimizer-product-rating.ts) can attach to it as a
+   Component/HTMLElement subclass. #}
+{% define config = {
+    name: 'search-ranking-optimizer-product-rating',
+    tag: 'search-ranking-optimizer-product-rating',
+} %}
+
+{% define data = {
+    canRate: required,
+    searchTerm: required,
+    idProductAbstract: required,
+} %}
+
+{# component.twig (the base every molecule extends) only ever puts `config.name` on the outer tag's own
+   class list — the `js-`-prefixed hook class has to be added explicitly via this block, same as
+   search-form.twig's own `extraClass` block does, or `this.querySelectorAll('.${this.jsName}__button')`
+   in the .ts below would still work (jsName is computed from the tag name, not read off the DOM), but the
+   outer element itself wouldn't be reliably selectable by its own js- hook class from outside this
+   component. #}
+{% block extraClass %}
+    {{ config.jsName }}
+{% endblock %}
+
+{# Rendered on the OUTER custom element itself — readyCallback() in the .ts reads `this.dataset.searchTerm`/
+   `this.dataset.idProductAbstract` off `this`, i.e. the outer tag, not a nested wrapper div. #}
+{% define attributes = {
+    'data-search-term': data.searchTerm,
+    'data-id-product-abstract': data.idProductAbstract,
+} %}
+
+{% block body %}
+    {# Rendered only for a customer holding RateSearchRelevancePermissionPlugin — canRate is computed ONCE
+       per page (canRateSearchRelevance(), registered by SearchRankingOptimizerWidgetTwigPlugin) and passed
+       into every product's include, rather than re-checking the permission once per product. #}
+    {% if data.canRate %}
+        {# The outer custom element (config.name = "search-ranking-optimizer-product-rating") is already
+           the flex row (see the scss) — no extra wrapper div around the three buttons, they are its direct
+           children. Sits in NORMAL document flow (unlike search-debug's absolutely-positioned hover
+           overlay) — positioned BELOW it when both are active, growing the tile's own height to fit, per
+           the package's design spec: this component adds real height rather than floating over the card,
+           so it can simply be appended after the product widget/search-debug's own wrapper in
+           page-layout-catalog.twig.
+
+           Each button carries BOTH its plain BEM class (what the scss actually styles — see
+           search-debug-pin-toggle for the same dual-class convention elsewhere in this shop) AND the
+           `{{ config.jsName }}__button` hook class the .ts queries for; jsName-only classes are a JS hook
+           by convention, never a styling target. #}
+
+        {# type="button": this component renders inside page-layout-catalog.twig's <form method="GET">
+           (the filter/sort form) — without an explicit type a <button> defaults to type="submit", and
+           an accidental click would submit the filter form (same reasoning as search-debug's own
+           trigger/pin buttons). #}
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--heart {{ config.jsName }}__button" data-rating-type="heart" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.heart' | trans }}">
+            {# Inlined rather than referenced via `atom('icon')`, same reasoning search-debug's own pin
+               icon documents: a shop's icon sprite has no guaranteed heart/check/x symbols, so relying
+               on the atom would render empty buttons until the adopter hand-added them. Standard
+               Material Symbols "favorite" glyph, 0 0 24 24 viewBox, `currentColor` so it inherits the
+               button's own color (grey by default, colorized on toggle — see the scss). #}
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+        </button>
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--check {{ config.jsName }}__button" data-rating-type="check" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.check' | trans }}">
+            {# Material Symbols "check_circle" glyph. #}
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+        </button>
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--x {{ config.jsName }}__button" data-rating-type="x" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.x' | trans }}">
+            {# Material Symbols "cancel" glyph. #}
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
+            </svg>
+        </button>
+    {% endif %}
+{% endblock %}

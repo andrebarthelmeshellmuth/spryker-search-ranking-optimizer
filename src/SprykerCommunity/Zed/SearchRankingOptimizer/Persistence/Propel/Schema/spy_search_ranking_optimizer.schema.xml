@@ -45,4 +45,54 @@
         </index>
     </table>
 
+    <table name="spy_search_ranking_query" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_query" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="search_term" type="VARCHAR" size="255" required="true" description="Canonical form: trimmed, lowercased, whitespace-collapsed — deliberately NOT tokenized, since real tokenization risks silently merging queries that are actually different asks."/>
+        <column name="store_name" type="VARCHAR" size="64" required="true"/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true"/>
+        <column name="importance_weight" type="FLOAT" required="true" defaultValue="1" description="Query Curator-editable (SetSearchQueryImportancePermissionPlugin). Flat default of 1 for every query until a human assigns real importance — see README."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_query_pk_seq"/>
+
+        <unique name="unique-spy_search_ranking_query-term_store_locale">
+            <unique-column name="search_term"/>
+            <unique-column name="store_name"/>
+            <unique-column name="locale_name"/>
+        </unique>
+    </table>
+
+    <table name="spy_search_ranking_query_rating" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_query_rating" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="fk_search_ranking_query" type="INTEGER" required="true"/>
+        <column name="customer_reference" type="VARCHAR" size="255" required="true" description="A unique reference for a customer — same convention as spy_product_review.customer_reference, deliberately not a real foreign key to spy_customer (loose coupling across the Client/Zed boundary, standard Spryker pattern)."/>
+        <column name="fk_product_abstract" type="INTEGER" required="true"/>
+        <column name="rating_type" type="VARCHAR" size="16" required="true" description="heart, check, or x — see SearchRankingOptimizerConfig::RATING_TYPE_*."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_query_rating_pk_seq"/>
+
+        <foreign-key name="spy_srqr-fk_query" foreignTable="spy_search_ranking_query" phpName="SearchRankingQuery" refPhpName="SearchRankingQueryRating" onDelete="CASCADE">
+            <reference local="fk_search_ranking_query" foreign="id_search_ranking_query"/>
+        </foreign-key>
+
+        <foreign-key name="spy_srqr-fk_product_abstract" foreignTable="spy_product_abstract" onDelete="CASCADE">
+            <reference local="fk_product_abstract" foreign="id_product_abstract"/>
+        </foreign-key>
+
+        <unique name="unique-spy_srqr-query_customer_product">
+            <unique-column name="fk_search_ranking_query"/>
+            <unique-column name="customer_reference"/>
+            <unique-column name="fk_product_abstract"/>
+        </unique>
+
+        <index name="index-spy_srqr-fk_product_abstract">
+            <index-column name="fk_product_abstract"/>
+        </index>
+
+        <index name="index-spy_srqr-customer_reference">
+            <index-column name="customer_reference"/>
+        </index>
+    </table>
+
 </database>

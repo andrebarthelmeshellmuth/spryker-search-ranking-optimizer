@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 
 interface SearchRankingOptimizerEntityManagerInterface
 {
@@ -59,4 +61,60 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return void
      */
     public function markCalibrationFailed(int $idSearchRankingCalibration, string $errorMessage): void;
+
+    /**
+     * Creates a new query row. `$queryTransfer` must already carry a CANONICAL `searchTerm` — canonicalize
+     * before calling this (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizer}),
+     * this layer does not re-derive it. `importanceWeight`, if unset, defaults to 1 via the column's own
+     * schema default.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
+     */
+    public function createQuery(SearchRankingQueryTransfer $queryTransfer): SearchRankingQueryTransfer;
+
+    /**
+     * @param int $idSearchRankingQuery
+     * @param float $importanceWeight
+     *
+     * @return void
+     */
+    public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void;
+
+    /**
+     * Bumps `updated_at` with no other column change — called after every rating upsert so the query's
+     * "last activity" sort (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface::findAllQueriesOrderedByUpdatedAt()})
+     * reflects real rating activity, not just importance-weight edits.
+     *
+     * @param int $idSearchRankingQuery
+     *
+     * @return void
+     */
+    public function touchQuery(int $idSearchRankingQuery): void;
+
+    /**
+     * UPSERTs one rater's judgment for a (query, product) pair: the same rater re-submitting for the same
+     * pair updates the existing row in place (idempotent — a misclick is trivially fixed by clicking a
+     * different button); a DIFFERENT rater on the same pair always gets their own row (see README for why
+     * disagreement across raters is preserved, never overwritten). Also touches the parent query.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
+     */
+    public function upsertRating(SearchRankingQueryRatingTransfer $ratingTransfer): SearchRankingQueryRatingTransfer;
+
+    /**
+     * Backs the widget's "click an already-pressed button to unselect" affordance — the same identifying
+     * triple {@see upsertRating()} matches an existing row against. A safe no-op when there is nothing to
+     * delete.
+     *
+     * @param int $fkSearchRankingQuery
+     * @param string $customerReference
+     * @param int $fkProductAbstract
+     *
+     * @return void
+     */
+    public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void;
 }

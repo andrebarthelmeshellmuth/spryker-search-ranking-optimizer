@@ -11,8 +11,12 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 
 class SearchRankingOptimizerMapper
 {
@@ -85,5 +89,45 @@ class SearchRankingOptimizerMapper
     public function implodeScores(array $scores): ?string
     {
         return $scores === [] ? null : implode(',', $scores);
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery $queryEntity
+     * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
+     */
+    public function mapQueryEntityToTransfer(
+        SpySearchRankingQuery $queryEntity,
+        SearchRankingQueryTransfer $queryTransfer,
+    ): SearchRankingQueryTransfer {
+        return $queryTransfer
+            ->setIdSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+            ->setSearchTerm($queryEntity->getSearchTerm())
+            ->setStoreName($queryEntity->getStoreName())
+            ->setLocaleName($queryEntity->getLocaleName())
+            ->setImportanceWeight($queryEntity->getImportanceWeight())
+            ->setCreatedAt($queryEntity->getCreatedAt()?->format(DATE_ATOM))
+            ->setUpdatedAt($queryEntity->getUpdatedAt()?->format(DATE_ATOM));
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating $ratingEntity
+     * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
+     */
+    public function mapQueryRatingEntityToTransfer(
+        SpySearchRankingQueryRating $ratingEntity,
+        SearchRankingQueryRatingTransfer $ratingTransfer,
+    ): SearchRankingQueryRatingTransfer {
+        return $ratingTransfer
+            ->setIdSearchRankingQueryRating($ratingEntity->getIdSearchRankingQueryRating())
+            ->setFkSearchRankingQuery($ratingEntity->getFkSearchRankingQuery())
+            ->setCustomerReference($ratingEntity->getCustomerReference())
+            ->setFkProductAbstract($ratingEntity->getFkProductAbstract())
+            ->setRatingType($ratingEntity->getRatingType())
+            ->setCreatedAt($ratingEntity->getCreatedAt()?->format(DATE_ATOM))
+            ->setUpdatedAt($ratingEntity->getUpdatedAt()?->format(DATE_ATOM));
     }
 }

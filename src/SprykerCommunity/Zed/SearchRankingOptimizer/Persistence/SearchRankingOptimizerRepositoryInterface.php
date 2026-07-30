@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 
 interface SearchRankingOptimizerRepositoryInterface
 {
@@ -34,4 +35,31 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
+
+    /**
+     * Looks up a query by its exact canonical (searchTerm, storeName, localeName) key — the same key
+     * {@see SearchRankingOptimizerEntityManagerInterface::findOrCreateQuery()} upserts against.
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryByTermStoreLocale(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryTransfer;
+
+    /**
+     * Every rated query, newest-activity-first (`updated_at` DESC — bumped on every new rating, not just
+     * on an importance-weight edit) — a triage aid for the Query Curator role.
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryTransfer>
+     */
+    public function findAllQueriesOrderedByUpdatedAt(): array;
+
+    /**
+     * @param int $idSearchRankingQuery
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
+     */
+    public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
 }

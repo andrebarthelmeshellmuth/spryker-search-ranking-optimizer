@@ -9,9 +9,14 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
+use DateTime;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
@@ -140,5 +145,123 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $calibrationEntity->setStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_FAILED);
         $calibrationEntity->setErrorMessage($errorMessage);
         $calibrationEntity->save();
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
+     */
+    public function createQuery(SearchRankingQueryTransfer $queryTransfer): SearchRankingQueryTransfer
+    {
+        $queryEntity = new SpySearchRankingQuery();
+        $queryEntity->setSearchTerm($queryTransfer->getSearchTermOrFail());
+        $queryEntity->setStoreName($queryTransfer->getStoreNameOrFail());
+        $queryEntity->setLocaleName($queryTransfer->getLocaleNameOrFail());
+
+        if ($queryTransfer->getImportanceWeight() !== null) {
+            $queryEntity->setImportanceWeight($queryTransfer->getImportanceWeight());
+        }
+
+        $queryEntity->save();
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapQueryEntityToTransfer($queryEntity, $queryTransfer);
+    }
+
+    /**
+     * @param int $idSearchRankingQuery
+     * @param float $importanceWeight
+     *
+     * @return void
+     */
+    public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void
+    {
+        $queryEntity = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->findOneByIdSearchRankingQuery($idSearchRankingQuery);
+
+        if ($queryEntity === null) {
+            return;
+        }
+
+        $queryEntity->setImportanceWeight($importanceWeight);
+        $queryEntity->save();
+    }
+
+    /**
+     * @param int $idSearchRankingQuery
+     *
+     * @return void
+     */
+    public function touchQuery(int $idSearchRankingQuery): void
+    {
+        $queryEntity = $this->getFactory()
+            ->createSearchRankingQueryQuery()
+            ->findOneByIdSearchRankingQuery($idSearchRankingQuery);
+
+        if ($queryEntity === null) {
+            return;
+        }
+
+        $queryEntity->setUpdatedAt(new DateTime());
+        $queryEntity->save();
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
+     */
+    public function upsertRating(SearchRankingQueryRatingTransfer $ratingTransfer): SearchRankingQueryRatingTransfer
+    {
+        $fkSearchRankingQuery = $ratingTransfer->getFkSearchRankingQueryOrFail();
+        $customerReference = $ratingTransfer->getCustomerReferenceOrFail();
+        $fkProductAbstract = $ratingTransfer->getFkProductAbstractOrFail();
+
+        $ratingEntity = $this->getFactory()
+            ->createSearchRankingQueryRatingQuery()
+            ->filterByFkSearchRankingQuery($fkSearchRankingQuery)
+            ->filterByCustomerReference($customerReference)
+            ->filterByFkProductAbstract($fkProductAbstract)
+            ->findOne();
+
+        if ($ratingEntity === null) {
+            $ratingEntity = new SpySearchRankingQueryRating();
+            $ratingEntity->setFkSearchRankingQuery($fkSearchRankingQuery);
+            $ratingEntity->setCustomerReference($customerReference);
+            $ratingEntity->setFkProductAbstract($fkProductAbstract);
+        }
+
+        $ratingEntity->setRatingType($ratingTransfer->getRatingTypeOrFail());
+        $ratingEntity->save();
+
+        $this->touchQuery($fkSearchRankingQuery);
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapQueryRatingEntityToTransfer($ratingEntity, $ratingTransfer);
+    }
+
+    /**
+     * Backs the widget's "click an already-pressed button to unselect" affordance — the same identifying
+     * triple {@see upsertRating()} matches an existing row against. A safe no-op when there is nothing to
+     * delete (e.g. a duplicate clear request arriving after the first one already succeeded).
+     *
+     * @param int $fkSearchRankingQuery
+     * @param string $customerReference
+     * @param int $fkProductAbstract
+     *
+     * @return void
+     */
+    public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void
+    {
+        $this->getFactory()
+            ->createSearchRankingQueryRatingQuery()
+            ->filterByFkSearchRankingQuery($fkSearchRankingQuery)
+            ->filterByCustomerReference($customerReference)
+            ->filterByFkProductAbstract($fkProductAbstract)
+            ->delete();
     }
 }
