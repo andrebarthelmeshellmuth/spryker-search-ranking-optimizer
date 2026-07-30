@@ -40,6 +40,12 @@ class EvaluationController extends AbstractController
             ->createEvaluationForm($this->getDefaultFormData($request))
             ->handleRequest($request);
 
+        if ($evaluationForm->isSubmitted() && !$evaluationForm->isValid()) {
+            $this->addErrorMessage('CSRF token is not valid.');
+
+            return $this->redirectResponse(static::URL_EVALUATION);
+        }
+
         if ($evaluationForm->isSubmitted() && $evaluationForm->isValid()) {
             $formData = $evaluationForm->getData();
             $storeName = (string)$formData[EvaluationForm::FIELD_STORE_NAME];
