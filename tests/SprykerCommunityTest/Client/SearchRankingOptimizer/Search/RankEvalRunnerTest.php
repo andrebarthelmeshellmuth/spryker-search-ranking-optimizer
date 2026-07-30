@@ -19,6 +19,9 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
+use SprykerCommunity\Client\SearchRanking\SearchRankingClient;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
@@ -97,6 +100,15 @@ class RankEvalRunnerTest extends Unit
      * signal to a uniform 0 — turning ranking into an effectively arbitrary tie order — which must produce
      * a DIFFERENT score than the real, text-relevance-driven baseline for the exact same rated pair.
      *
+     * Cutoff deliberately set well above this shop's total "chair" match count (58, confirmed live) rather
+     * than the realistic top-10 window {@see testEvaluateReturnsAScoreForARealRatedQueryWithRealCatalogMatches}
+     * uses: this test's whole point is comparing two DIFFERENT rankings of the SAME candidate set, and with
+     * an all-tied degenerate override, the ES-internal tie-break order for a top-10 window is not
+     * meaningfully correlated with the live baseline's window — both windows can (and, confirmed live, do)
+     * miss both rated documents entirely, giving a false-negative 0.0-vs-0.0 regardless of whether the
+     * override actually applied. A cutoff covering every possible match makes both rated documents' presence
+     * (and therefore the assertion) independent of that ES tie-break/window-boundary noise.
+     *
      * @return void
      */
     public function testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne(): void
@@ -106,7 +118,7 @@ class RankEvalRunnerTest extends Unit
             return (new SearchRankingEvaluationRequestTransfer())
                 ->setStoreName('DE')
                 ->setLocaleName('en_US')
-                ->setCutoff(10)
+                ->setCutoff(100)
                 ->addQuery(
                     (new SearchRankingEvaluationQueryTransfer())
                         ->setIdSearchRankingQuery(1)
@@ -230,12 +242,12 @@ class RankEvalRunnerTest extends Unit
 
     /**
      * Proves Task #51's fix: evaluation must never apply an effect live traffic never applies, regardless
-     * of what a candidate configuration's own entropy fields say. Deliberately uses the REAL, unmodified
-     * `createRankEvalRunner()` (not the forced-enabled subclass) -- `SearchRankingConfig::isEntropyWeightingEnabled()`
-     * is a hardcoded `return false;` with no project override actually wired up anywhere in `search-ranking`
-     * today (see that class's own docblock vs. every real caller), so this also documents the real, current
-     * behavior of this shop: entropy weighting is inert end-to-end even with a fully-populated entropy
-     * configuration.
+     * of what a candidate configuration's own entropy fields say. Deliberately uses an EXPLICIT
+     * forced-disabled stub rather than the real, ambient `createRankEvalRunner()` -- now that
+     * `isEntropyWeightingEnabled()` genuinely resolves through a project override (see
+     * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s own docblock for the
+     * fix), `createRankEvalRunner()`'s result legitimately depends on whatever THIS shop's own project
+     * config says, which this test must not depend on to stay deterministic.
      *
      * @return void
      */
@@ -243,7 +255,7 @@ class RankEvalRunnerTest extends Unit
     {
         // Arrange -- a fully-populated entropy configuration that WOULD produce a real shift if entropy
         // weighting were enabled (see testApplyEntropyWeightingShiftsRelevanceWeightForARealAsymmetricScoreDistribution).
-        $runner = $this->createRankEvalRunner();
+        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedDisabled();
         $queryBuilder = new LiveCatalogSearchQueryBuilder();
         $baseQuery = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
 
@@ -311,7 +323,10 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
-     * Same composition `SearchRankingOptimizerFactory::createRankEvalRunner()` uses in production.
+     * Same composition `SearchRankingOptimizerFactory::createRankEvalRunner()` uses in production —
+     * including the real `SearchRankingOptimizerToSearchRankingClientBridge`, so this exercises the actual
+     * project-override-aware `isEntropyWeightingEnabled()` resolution (off by default, since nothing in
+     * this test environment overrides it), not the old, no-longer-needed hardcoded-Shared-static fallback.
      *
      * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
@@ -327,15 +342,15 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+            null,
+            new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
         );
     }
 
     /**
-     * `SearchRankingConfig::isEntropyWeightingEnabled()` (search-ranking's own Shared config) is a hardcoded
-     * `return false;` with no dependency-injectable or project-overridable path any real caller in either
-     * package actually uses -- so the only way to exercise the enabled branch in a test is to override the
-     * one protected instance method {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::isEntropyWeightingEnabled()}
-     * wraps that static call in, via an anonymous subclass.
+     * A real `SearchRankingOptimizerToSearchRankingClientInterface` stub forcing `true` — no longer an
+     * anonymous `RankEvalRunner` subclass overriding a protected method, now that the entropy-enabled flag
+     * genuinely IS dependency-injectable via the bridge {@see createRankEvalRunner()} also uses.
      *
      * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
@@ -345,20 +360,58 @@ class RankEvalRunnerTest extends Unit
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        return new class (
+        $entropyWeightingForcedEnabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
+            /**
+             * @return bool
+             */
+            public function isEntropyWeightingEnabled(): bool
+            {
+                return true;
+            }
+        };
+
+        return new RankEvalRunner(
             $elasticaClient,
             $indexNameResolver,
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-        ) extends RankEvalRunner {
+            null,
+            $entropyWeightingForcedEnabledClient,
+        );
+    }
+
+    /**
+     * The counterpart to {@see createRankEvalRunnerWithEntropyWeightingForcedEnabled()} — deterministically
+     * OFF regardless of what this shop's own project config says, for tests that specifically need to
+     * prove the disabled path rather than depend on ambient environment state.
+     *
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
+     */
+    protected function createRankEvalRunnerWithEntropyWeightingForcedDisabled(): RankEvalRunner
+    {
+        $searchElasticsearchConfig = new SearchElasticsearchConfig();
+        $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
+        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
+
+        $entropyWeightingForcedDisabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
             /**
              * @return bool
              */
-            protected function isEntropyWeightingEnabled(): bool
+            public function isEntropyWeightingEnabled(): bool
             {
-                return true;
+                return false;
             }
         };
+
+        return new RankEvalRunner(
+            $elasticaClient,
+            $indexNameResolver,
+            new LiveCatalogSearchQueryBuilder(),
+            new FunctionScoreBuilder(),
+            new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+            null,
+            $entropyWeightingForcedDisabledClient,
+        );
     }
 }
