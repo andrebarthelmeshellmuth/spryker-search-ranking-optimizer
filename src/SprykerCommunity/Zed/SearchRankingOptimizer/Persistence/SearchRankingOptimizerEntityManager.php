@@ -14,11 +14,13 @@ use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
@@ -310,5 +312,30 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         return $this->getFactory()
             ->createSearchRankingOptimizerMapper()
             ->mapEvaluationEntityToTransfer($evaluationEntity, $evaluationTransfer);
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     */
+    public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer
+    {
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+
+        $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
+        $weightCheckpointEntity->setSource($weightCheckpointTransfer->getSourceOrFail());
+        $weightCheckpointEntity->setRelevanceWeight($weightCheckpointTransfer->getRelevanceWeightOrFail());
+        $weightCheckpointEntity->setEntropyProbeResultSize($weightCheckpointTransfer->getEntropyProbeResultSizeOrFail());
+        $weightCheckpointEntity->setEntropyWeightExponent($weightCheckpointTransfer->getEntropyWeightExponentOrFail());
+        $weightCheckpointEntity->setEntropyWeightShiftMagnitude($weightCheckpointTransfer->getEntropyWeightShiftMagnitudeOrFail());
+        $weightCheckpointEntity->setIsEntropyWeightingEnabled($weightCheckpointTransfer->getIsEntropyWeightingEnabledOrFail());
+        $weightCheckpointEntity->setMetricWeights($mapper->encodeMetricWeights(iterator_to_array($weightCheckpointTransfer->getMetricWeights())));
+        $weightCheckpointEntity->save();
+
+        // A fresh transfer, not $weightCheckpointTransfer itself — mapWeightCheckpointEntityToTransfer()
+        // APPENDS decoded metric weights via addMetricWeight(), which would duplicate the ones already on
+        // the transfer passed in above.
+        return $mapper->mapWeightCheckpointEntityToTransfer($weightCheckpointEntity, new SearchRankingWeightCheckpointTransfer());
     }
 }

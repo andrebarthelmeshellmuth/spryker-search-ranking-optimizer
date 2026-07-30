@@ -144,4 +144,18 @@ class SearchRankingOptimizerConfig
     {
         return 10;
     }
+
+    /**
+     * Specification:
+     * - A weight checkpoint taken directly by a Query Curator — either an explicit "take checkpoint now",
+     *   or the checkpoint a restore itself writes to record the resulting state (restore is "apply",
+     *   same as any other weight change).
+     * - Later phases add further values here as new checkpoint producers get built (a monthly auto-tune
+     *   job, an eventual automated weight optimizer) — "one harness, three producers," per the roadmap.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CHECKPOINT_SOURCE_MANUAL = 'manual';
 }

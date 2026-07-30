@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
 interface SearchRankingOptimizerEntityManagerInterface
 {
@@ -138,4 +139,13 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
      */
     public function createEvaluation(SearchRankingEvaluationTransfer $evaluationTransfer): SearchRankingEvaluationTransfer;
+
+    /**
+     * Persists one weight checkpoint (a full point-in-time snapshot).
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     */
+    public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer;
 }

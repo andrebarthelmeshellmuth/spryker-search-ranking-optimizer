@@ -11,8 +11,8 @@ installs and runs completely standalone without it (see [Relationship to search-
 
 ## Status
 
-**Calibration, the SRP relevance-rating widget, the Zed Queries curation page, and offline `rank_eval`
-evaluation are all built, tested, and shipping.** The rest of the
+**Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
+evaluation, and weight checkpoint/rollback are all built, tested, and shipping.** The rest of the
 tuning layer (weight-slider preview, a propose/review/apply workflow, a monthly auto-tune job, automated
 weight search) is designed and on the [Roadmap](#roadmap) but not built yet.
 
@@ -134,6 +134,34 @@ Evaluated 12 rated queries: weighted nDCG@10 = 0.7123.
 Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Calibration
 established (`Client\SearchRankingOptimizer\Search` component), verified live against this shop's real
 OpenSearch index and real catalog products.
+
+### Weight checkpoints — a way back before changing anything by hand
+
+Every tuning knob this package will eventually set automatically (weight-slider preview, propose/review/
+apply, auto-tune) is still, today, something an admin edits directly on `search-ranking`'s own Settings
+page. A checkpoint is a point-in-time snapshot of every one of those knobs, so a manual edit — or a future
+automated one — is always reversible.
+
+From the **Search Ranking Optimizer → Weight Checkpoints** Zed page:
+
+1. **Current State** shows exactly what `search-ranking` is using right now, read live off its own facade:
+   `relevanceWeight`, every metric's own weight, the 3 entropy-weighting knobs (probe result size, weight
+   exponent, weight shift magnitude), and whether entropy weighting is currently enabled at the code level.
+   Deliberately excluded: `relevanceSaturationPoint` (k), which already has its own versioning story via
+   Calibration and stays out of checkpoint scope.
+2. **Take checkpoint now** persists that current state as a new row — a manual snapshot, before hand-editing
+   anything.
+3. **History** lists every checkpoint newest-first, each with a **Restore** button. Restoring writes that
+   checkpoint's `relevanceWeight`, metric weights, and 3 entropy knobs back through `search-ranking`'s own
+   facade (a metric that no longer exists is skipped silently — a safe, best-effort restore, not an
+   all-or-nothing transaction), then immediately records the resulting state as a **new** checkpoint of its
+   own. Restoring IS applying, not a special "undo" mechanism — there is always a way back from a restore
+   too.
+
+`isEntropyWeightingEnabled` is captured on every checkpoint for historical transparency but is **never**
+written back by a restore — it is a pure code-level project flag (`Pyz\Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
+in a host shop), with no corresponding save method on `search-ranking`'s facade, deliberately out of scope
+for anything database-driven.
 
 ## Relationship to search-ranking
 
@@ -334,23 +362,22 @@ also just run it by hand after each upload.)
 
 ## Modules
 
-- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration and rank_eval evaluation business
-  logic, persistence, console command, Zed GUI (Calibration + Apply, Queries listing/edit-importance, and
-  Evaluation controllers), the raw-Elastica search components (shared query builder, calibration searcher,
-  rank_eval runner), the rated-query data model, and the Zed Gateway endpoint that persists a rating.
+- **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, and weight
+  checkpoint/rollback business logic, persistence, console command, Zed GUI (Calibration + Apply, Queries
+  listing/edit-importance, Evaluation, and Weight Checkpoints controllers), the raw-Elastica search
+  components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model, and
+  the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
 ## Roadmap
 
-Calibration, judgment capture (rating collection + curation), and rank_eval evaluation are the first three
-pieces of a larger tuning layer. Designed, not yet built:
+Calibration, judgment capture (rating collection + curation), rank_eval evaluation, and weight checkpoint/
+rollback are the first four pieces of a larger tuning layer. Designed, not yet built:
 
 - **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
   metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
   and a "fetch with these settings" button for a real, verified re-rank.
-- **Weight checkpoint/rollback** — every applied weight change (manual, auto-tune, or eventually
-  algorithmic) writes a full snapshot, listed and restorable from a simple Zed page.
 - **Monthly auto-tune job** — per metric, check whether its live formula still fits the data; on a drop
   below a configurable threshold, propose (or, if enabled, apply) a refit and notify the configured admins.
 - **Automated weight search** — search the blend weight plus per-metric weights against the judgment set
@@ -381,7 +408,7 @@ composer check-floors
 
 ### Test suite
 
-**87 tests, 226 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**91 tests, 247 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`). From a shop that has the package installed:
 
 ```bash

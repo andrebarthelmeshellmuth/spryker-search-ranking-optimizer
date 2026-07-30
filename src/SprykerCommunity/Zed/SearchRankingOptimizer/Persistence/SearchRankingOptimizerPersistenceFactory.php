@@ -14,6 +14,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearch
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use Spryker\Zed\Kernel\Persistence\AbstractPersistenceFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
@@ -57,6 +58,14 @@ class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactor
     public function createSearchRankingEvaluationQuery(): SpySearchRankingEvaluationQuery
     {
         return SpySearchRankingEvaluationQuery::create();
+    }
+
+    /**
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery
+     */
+    public function createSearchRankingWeightCheckpointQuery(): SpySearchRankingWeightCheckpointQuery
+    {
+        return SpySearchRankingWeightCheckpointQuery::create();
     }
 
     /**

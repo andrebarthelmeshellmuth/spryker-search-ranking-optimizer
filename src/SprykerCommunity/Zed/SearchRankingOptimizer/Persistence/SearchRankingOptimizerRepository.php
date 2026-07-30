@@ -14,6 +14,7 @@ use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Propel\Runtime\ActiveQuery\Criteria;
 use Spryker\Zed\Kernel\Persistence\AbstractRepository;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -301,5 +302,45 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         }
 
         return $evaluationTransfers;
+    }
+
+    /**
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
+     */
+    public function findWeightCheckpointHistory(): array
+    {
+        $weightCheckpointEntities = $this->getFactory()
+            ->createSearchRankingWeightCheckpointQuery()
+            ->orderByCreatedAt(Criteria::DESC)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $weightCheckpointTransfers = [];
+
+        foreach ($weightCheckpointEntities as $weightCheckpointEntity) {
+            $weightCheckpointTransfers[] = $mapper->mapWeightCheckpointEntityToTransfer($weightCheckpointEntity, new SearchRankingWeightCheckpointTransfer());
+        }
+
+        return $weightCheckpointTransfers;
+    }
+
+    /**
+     * @param int $idSearchRankingWeightCheckpoint
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
+     */
+    public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
+    {
+        $weightCheckpointEntity = $this->getFactory()
+            ->createSearchRankingWeightCheckpointQuery()
+            ->findOneByIdSearchRankingWeightCheckpoint($idSearchRankingWeightCheckpoint);
+
+        if ($weightCheckpointEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapWeightCheckpointEntityToTransfer($weightCheckpointEntity, new SearchRankingWeightCheckpointTransfer());
     }
 }

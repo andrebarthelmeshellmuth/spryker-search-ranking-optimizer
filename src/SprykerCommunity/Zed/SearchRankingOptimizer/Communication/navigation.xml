@@ -38,6 +38,13 @@
                 <action>edit</action>
                 <visible>0</visible>
             </search-ranking-optimizer-query-edit>
+            <search-ranking-optimizer-checkpoint>
+                <label>Weight Checkpoints</label>
+                <title>Weight Checkpoints</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>checkpoint</controller>
+                <action>index</action>
+            </search-ranking-optimizer-checkpoint>
         </pages>
     </search-ranking-optimizer-gui>
 </config>
