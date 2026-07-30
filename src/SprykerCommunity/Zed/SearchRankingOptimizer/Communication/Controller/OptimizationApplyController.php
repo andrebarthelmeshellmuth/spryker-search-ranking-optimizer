@@ -44,7 +44,10 @@ class OptimizationApplyController extends AbstractController
         $optimizerRunTransfer = $this->getFacade()->applyOptimizationRun($idSearchRankingOptimizerRun);
 
         if ($optimizerRunTransfer === null) {
-            $this->addErrorMessage(sprintf('Run #%d no longer exists, or isn\'t finished yet.', $idSearchRankingOptimizerRun));
+            $this->addErrorMessage(sprintf(
+                'Could not apply run #%d — it no longer exists, isn\'t finished yet, or references a metric that has since been deleted (nothing was changed).',
+                $idSearchRankingOptimizerRun,
+            ));
 
             return $this->redirectResponse(static::URL_OPTIMIZATION);
         }

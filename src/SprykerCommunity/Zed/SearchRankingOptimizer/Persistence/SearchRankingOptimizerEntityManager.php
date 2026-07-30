@@ -26,6 +26,8 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionTrait;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 /**
@@ -33,6 +35,18 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  */
 class SearchRankingOptimizerEntityManager extends AbstractEntityManager implements SearchRankingOptimizerEntityManagerInterface
 {
+    use TransactionTrait;
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
+     */
+    public function getTransactionHandler(): TransactionHandlerInterface
+    {
+        return $this->createTransactionHandlerFactory()->createHandler();
+    }
+
     /**
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
      *

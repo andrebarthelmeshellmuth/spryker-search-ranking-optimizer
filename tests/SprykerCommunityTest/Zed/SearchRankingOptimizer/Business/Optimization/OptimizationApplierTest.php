@@ -9,10 +9,12 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 
+use Closure;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
@@ -136,6 +138,7 @@ class OptimizationApplierTest extends Unit
 
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->once())->method('markOptimizerRunApplied')->with(1);
+        $entityManagerMock->method('getTransactionHandler')->willReturn($this->createPassThroughTransactionHandler());
 
         $applier = $this->createApplier($repositoryMock, $searchRankingFacadeMock, $recorderMock, $entityManagerMock);
 
@@ -144,6 +147,104 @@ class OptimizationApplierTest extends Unit
 
         // Assert
         $this->assertSame($appliedRunTransfer, $result);
+    }
+
+    /**
+     * A metric a winning candidate wants to write can be deleted between when its optimization run
+     * finished and when an admin clicks Apply. Proves the whole apply rolls back rather than leaving
+     * relevanceWeight/entropy settings live with only some metric weights applied (which would silently
+     * leave the live metric weights summing to less than 1, with the run still marked applied).
+     *
+     * @return void
+     */
+    public function testApplyRollsBackEverythingAndReturnsNullWhenAMetricNoLongerExists(): void
+    {
+        // Arrange
+        $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
+            ->setIdSearchRankingOptimizerRun(1)
+            ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
+            ->setBestRelevanceWeight(0.85)
+            ->setBestEntropyWeightExponent(1.2)
+            ->setBestEntropyWeightShiftMagnitude(0.25)
+            ->setBestEntropyProbeResultSize(12)
+            ->addBestMetricWeight(
+                (new SearchRankingWeightCheckpointMetricWeightTransfer())
+                    ->setIdSearchRankingMetric(404)
+                    ->setName('deleted_metric')
+                    ->setWeight(1.0),
+            );
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->expects($this->once())
+            ->method('findOptimizerRunById')
+            ->with(1)
+            ->willReturn($doneRunTransfer);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 1.0)->willReturn(false);
+
+        $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
+        $recorderMock->method('record')->willReturn(new SearchRankingWeightCheckpointTransfer());
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('markOptimizerRunApplied');
+        $entityManagerMock->method('getTransactionHandler')->willReturn($this->createPassThroughTransactionHandler());
+
+        $applier = $this->createApplier($repositoryMock, $searchRankingFacadeMock, $recorderMock, $entityManagerMock);
+
+        // Act
+        $result = $applier->apply(1);
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    /**
+     * The checkpoint must snapshot the state BEFORE this run's values are written — recording it after
+     * would checkpoint the just-applied state itself, useless as a way back.
+     *
+     * @return void
+     */
+    public function testApplyRecordsTheCheckpointBeforeWritingAnyWeights(): void
+    {
+        // Arrange
+        $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
+            ->setIdSearchRankingOptimizerRun(1)
+            ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
+            ->setBestRelevanceWeight(0.85)
+            ->setBestEntropyWeightExponent(1.2)
+            ->setBestEntropyWeightShiftMagnitude(0.25)
+            ->setBestEntropyProbeResultSize(12);
+
+        $appliedRunTransfer = (new SearchRankingOptimizerRunTransfer())->setIdSearchRankingOptimizerRun(1);
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOptimizerRunById')->willReturnOnConsecutiveCalls($doneRunTransfer, $appliedRunTransfer);
+
+        $callOrder = [];
+
+        $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
+        $recorderMock->method('record')->willReturnCallback(function () use (&$callOrder): SearchRankingWeightCheckpointTransfer {
+            $callOrder[] = 'checkpoint';
+
+            return new SearchRankingWeightCheckpointTransfer();
+        });
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('saveRelevanceWeight')->willReturnCallback(function () use (&$callOrder): void {
+            $callOrder[] = 'saveRelevanceWeight';
+        });
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->method('getTransactionHandler')->willReturn($this->createPassThroughTransactionHandler());
+
+        $applier = $this->createApplier($repositoryMock, $searchRankingFacadeMock, $recorderMock, $entityManagerMock);
+
+        // Act
+        $applier->apply(1);
+
+        // Assert
+        $this->assertSame(['checkpoint', 'saveRelevanceWeight'], $callOrder);
     }
 
     /**
@@ -160,11 +261,39 @@ class OptimizationApplierTest extends Unit
         ?WeightCheckpointRecorderInterface $recorder = null,
         ?SearchRankingOptimizerEntityManagerInterface $entityManager = null,
     ): OptimizationApplier {
+        if ($entityManager === null) {
+            $entityManager = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+            $entityManager->method('getTransactionHandler')->willReturn($this->createPassThroughTransactionHandler());
+        }
+
         return new OptimizationApplier(
             $repository,
             $searchRankingFacade,
             $recorder ?? $this->createMock(WeightCheckpointRecorderInterface::class),
-            $entityManager ?? $this->createMock(SearchRankingOptimizerEntityManagerInterface::class),
+            $entityManager,
         );
+    }
+
+    /**
+     * A real transaction handler needs a live Propel connection this unit test has none of — this fake
+     * just invokes the callback directly (no real transaction), which is all `OptimizationApplier` needs
+     * from it: the callback runs, and any exception it throws propagates same as the real handler would
+     * after its own rollback.
+     *
+     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
+     */
+    protected function createPassThroughTransactionHandler(): TransactionHandlerInterface
+    {
+        return new class implements TransactionHandlerInterface {
+            /**
+             * @param \Closure $callback
+             *
+             * @return mixed
+             */
+            public function handleTransaction(Closure $callback): mixed
+            {
+                return $callback();
+            }
+        };
     }
 }
