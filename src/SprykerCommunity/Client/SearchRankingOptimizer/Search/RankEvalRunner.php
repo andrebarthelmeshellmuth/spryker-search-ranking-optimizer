@@ -85,18 +85,30 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
 
     /**
-     * Process-scoped cache of raw `_score` values per `"<indexName>:<searchTerm>"` — deliberately
-     * `static`, not an instance property: {@see \SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory::createRankEvalRunner()}
+     * @var int
+     */
+    protected const PROBE_SCORES_CACHE_TTL_SECONDS = 60;
+
+    /**
+     * Process-scoped cache of raw `_score` values per `"<indexName>:<localeName>:<searchTerm>"` —
+     * deliberately `static`, not an instance property: {@see \SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory::createRankEvalRunner()}
      * constructs a FRESH instance on every single call, but one automated optimization run fires this
      * class's `evaluate()` potentially thousands of times within ONE continuous console-command process —
      * and the raw probe scores for a given search term don't depend on anything the optimizer actually
      * searches over (relevanceWeight/metric weights/entropy exponent/shift), only on
      * `entropyProbeResultSize`'s configured UPPER bound, fetched once here regardless of what any single
-     * candidate proposes. Safe specifically because this class is only ever driven from a short-lived
-     * console-command process, never a long-lived web worker that would leak this across unrelated
-     * requests.
+     * candidate proposes.
      *
-     * @var array<string, array<float>>
+     * NOT actually console-only, though: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\EvaluationController::indexAction()}
+     * calls straight into `evaluate()` from a normal Zed HTTP request, which under PHP-FPM reuses worker
+     * processes across many unrelated requests — this `static` property does NOT reset between them like
+     * an older revision of this docblock assumed. `PROBE_SCORES_CACHE_TTL_SECONDS` bounds the resulting
+     * staleness to a short window (still long enough for one optimization run's thousands of calls to
+     * benefit from a single fetch) instead of caching forever, and the key now includes `localeName` —
+     * this shop's `page` index is one-per-store-multiple-locales, so two locales sharing a literal
+     * search-term string used to silently share one locale's scores.
+     *
+     * @var array<string, array{0: array<float>, 1: float}>
      */
     protected static array $probeScoresCache = [];
 
@@ -212,7 +224,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName);
             $baseQuery = $elasticaQuery->getQuery();
 
-            $perQueryConfigurationTransfer = $this->applyEntropyWeighting($baseQuery, $indexName, $searchTerm, $configurationTransfer);
+            $perQueryConfigurationTransfer = $this->applyEntropyWeighting($baseQuery, $indexName, $localeName, $searchTerm, $configurationTransfer);
             $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer);
 
             $rankEvalRequests[] = [
@@ -266,6 +278,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      *
      * @param \Elastica\Query\AbstractQuery $baseQuery
      * @param string $indexName
+     * @param string $localeName
      * @param string $searchTerm
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
      *
@@ -274,6 +287,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected function applyEntropyWeighting(
         AbstractQuery $baseQuery,
         string $indexName,
+        string $localeName,
         string $searchTerm,
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
     ): ?SearchRankingConfigurationStorageTransfer {
@@ -287,7 +301,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             return $configurationTransfer;
         }
 
-        $scores = array_slice($this->fetchProbeScores($baseQuery, $indexName, $searchTerm), 0, $probeResultSize);
+        $scores = array_slice($this->fetchProbeScores($baseQuery, $indexName, $localeName, $searchTerm), 0, $probeResultSize);
 
         if (count($scores) < 2) {
             return $configurationTransfer;
@@ -316,16 +330,17 @@ class RankEvalRunner implements RankEvalRunnerInterface
      *
      * @param \Elastica\Query\AbstractQuery $baseQuery
      * @param string $indexName
+     * @param string $localeName
      * @param string $searchTerm
      *
      * @return array<float>
      */
-    protected function fetchProbeScores(AbstractQuery $baseQuery, string $indexName, string $searchTerm): array
+    protected function fetchProbeScores(AbstractQuery $baseQuery, string $indexName, string $localeName, string $searchTerm): array
     {
-        $cacheKey = $indexName . ':' . $searchTerm;
+        $cacheKey = $indexName . ':' . $localeName . ':' . $searchTerm;
 
-        if (isset(static::$probeScoresCache[$cacheKey])) {
-            return static::$probeScoresCache[$cacheKey];
+        if (isset(static::$probeScoresCache[$cacheKey]) && static::$probeScoresCache[$cacheKey][1] > microtime(true)) {
+            return static::$probeScoresCache[$cacheKey][0];
         }
 
         try {
@@ -339,7 +354,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             $scores = [];
         }
 
-        static::$probeScoresCache[$cacheKey] = $scores;
+        static::$probeScoresCache[$cacheKey] = [$scores, microtime(true) + static::PROBE_SCORES_CACHE_TTL_SECONDS];
 
         return $scores;
     }

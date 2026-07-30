@@ -15,6 +15,7 @@ use Generated\Shared\Transfer\SearchRankingEvaluationProductGainTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use ReflectionMethod;
+use ReflectionProperty;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
@@ -200,7 +201,7 @@ class RankEvalRunnerTest extends Unit
         $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
 
         // Act
-        $adjustedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'chair', $configurationTransfer);
+        $adjustedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
 
         // Assert
         $this->assertNotSame(
@@ -210,6 +211,43 @@ class RankEvalRunnerTest extends Unit
         );
         $this->assertGreaterThanOrEqual(0.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
         $this->assertLessThanOrEqual(1.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
+    }
+
+    /**
+     * The `page` index this shop uses is one-per-store-multiple-locales — two locales sharing the same
+     * literal search-term text used to collapse onto the SAME probe-score cache entry (the key was
+     * `"<indexName>:<searchTerm>"`, no locale), silently handing one locale's entropy probe scores to the
+     * other. Asserts the cache now holds two DISTINCT entries for the same index+term under two different
+     * locales, via the real cache key format rather than the probe scores themselves (which, for the same
+     * store/term, may legitimately be identical across locales — the key's distinctness is what this bug
+     * was actually about).
+     *
+     * @return void
+     */
+    public function testFetchProbeScoresCachesSeparatelyPerLocale(): void
+    {
+        // Arrange
+        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedEnabled();
+        $queryBuilder = new LiveCatalogSearchQueryBuilder();
+        $baseQueryEnUs = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
+        $baseQueryDeDe = $queryBuilder->build('chair', 'DE', 'de_DE')->getQuery();
+
+        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
+        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
+
+        $fetchProbeScores = new ReflectionMethod($runner, 'fetchProbeScores');
+
+        // Act
+        $fetchProbeScores->invoke($runner, $baseQueryEnUs, $indexName, 'en_US', 'chair');
+        $fetchProbeScores->invoke($runner, $baseQueryDeDe, $indexName, 'de_DE', 'chair');
+
+        $cacheProperty = new ReflectionProperty(RankEvalRunner::class, 'probeScoresCache');
+        $cacheProperty->setAccessible(true);
+        $cache = $cacheProperty->getValue();
+
+        // Assert
+        $this->assertArrayHasKey($indexName . ':en_US:chair', $cache);
+        $this->assertArrayHasKey($indexName . ':de_DE:chair', $cache);
     }
 
     /**
@@ -234,7 +272,7 @@ class RankEvalRunnerTest extends Unit
         $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
 
         // Act
-        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'chair', $configurationTransfer);
+        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
 
         // Assert
         $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
@@ -273,7 +311,7 @@ class RankEvalRunnerTest extends Unit
         $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
 
         // Act
-        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'chair', $configurationTransfer);
+        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
 
         // Assert
         $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
