@@ -190,6 +190,13 @@ gets built, one click at a time, directly on the storefront search results page 
   (`ProductSearchMatchVerifier`, narrowed to the one candidate document) and confirms the product is
   actually among the *current* real search results for that term — a request claiming an unrelated product
   matched some search term is rejected outright, never silently trusted from the client.
+- **CSRF-protected.** The widget's submit/clear endpoints are plain POST controllers, not bound to a
+  Symfony Form, so they'd otherwise carry none of the CSRF protection every Form-backed POST in this
+  project gets automatically. A token is generated per page render via
+  `searchRankingOptimizerRatingCsrfToken()` (`SearchRankingOptimizerWidgetTwigPlugin`, the same
+  `CsrfTokenManagerInterface` mechanism `spryker/multi-factor-auth`'s own Yves module uses for its own
+  non-Form AJAX actions), rendered onto the widget as a data attribute, and sent back with every submit/
+  clear request — re-validated server-side before anything else runs.
 
 This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
 the next calibration run with no export/import step. The ratings are also the direct input to rank_eval

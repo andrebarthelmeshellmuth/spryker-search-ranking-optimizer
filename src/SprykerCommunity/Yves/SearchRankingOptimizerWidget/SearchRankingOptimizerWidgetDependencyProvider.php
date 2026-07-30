@@ -33,6 +33,11 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
     public const CLIENT_STORE = 'CLIENT_STORE';
 
     /**
+     * @var string
+     */
+    public const SERVICE_FORM_CSRF_PROVIDER = 'form.csrf_provider';
+
+    /**
      * @param \Spryker\Yves\Kernel\Container $container
      *
      * @return \Spryker\Yves\Kernel\Container
@@ -43,6 +48,7 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
         $container = $this->addSearchRankingOptimizerClient($container);
         $container = $this->addCustomerClient($container);
         $container = $this->addStoreClient($container);
+        $container = $this->addCsrfTokenManager($container);
 
         return $container;
     }
@@ -90,6 +96,24 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
             return new SearchRankingOptimizerWidgetToStoreClientBridge(
                 $container->getLocator()->store()->client(),
             );
+        });
+
+        return $container;
+    }
+
+    /**
+     * Same `form.csrf_provider` application service `spryker/multi-factor-auth`'s own Yves module uses for
+     * its own non-Form AJAX endpoints — requires `Spryker\Yves\Form\Plugin\Application\FormApplicationPlugin`
+     * registered in the project's `ShopApplicationDependencyProvider` (already true in this shop).
+     *
+     * @param \Spryker\Yves\Kernel\Container $container
+     *
+     * @return \Spryker\Yves\Kernel\Container
+     */
+    protected function addCsrfTokenManager(Container $container): Container
+    {
+        $container->set(static::SERVICE_FORM_CSRF_PROVIDER, function (Container $container) {
+            return $container->getApplicationService(static::SERVICE_FORM_CSRF_PROVIDER);
         });
 
         return $container;

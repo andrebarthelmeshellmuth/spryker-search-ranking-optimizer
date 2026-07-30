@@ -20,10 +20,18 @@ export default class SearchRankingOptimizerProductRating extends Component {
      */
     idProductAbstract: string;
 
+    /**
+     * CSRF token for the submit/clear endpoints — neither is bound to a Symfony Form, so this is generated
+     * via `searchRankingOptimizerRatingCsrfToken()` (SearchRankingOptimizerWidgetTwigPlugin) instead and
+     * sent as a plain POST field, validated server-side against the same token id.
+     */
+    csrfToken: string;
+
     protected readyCallback(): void {
         this.buttons = <HTMLButtonElement[]>Array.from(this.querySelectorAll(`.${this.jsName}__button`));
         this.searchTerm = this.dataset.searchTerm ?? '';
         this.idProductAbstract = this.dataset.idProductAbstract ?? '';
+        this.csrfToken = this.dataset.csrfToken ?? '';
 
         if (this.buttons.length === 0) {
             return;
@@ -88,6 +96,7 @@ export default class SearchRankingOptimizerProductRating extends Component {
             searchTerm: this.searchTerm,
             idProductAbstract: this.idProductAbstract,
             ratingType,
+            _csrf_token: this.csrfToken,
         });
 
         fetch(SUBMIT_URL, {
@@ -114,6 +123,7 @@ export default class SearchRankingOptimizerProductRating extends Component {
         const body = new URLSearchParams({
             searchTerm: this.searchTerm,
             idProductAbstract: this.idProductAbstract,
+            _csrf_token: this.csrfToken,
         });
 
         fetch(CLEAR_URL, {

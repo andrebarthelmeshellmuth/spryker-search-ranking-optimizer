@@ -12,6 +12,7 @@
     canRate: required,
     searchTerm: required,
     idProductAbstract: required,
+    csrfToken: required,
 } %}
 
 {# component.twig (the base every molecule extends) only ever puts `config.name` on the outer tag's own
@@ -29,6 +30,7 @@
 {% define attributes = {
     'data-search-term': data.searchTerm,
     'data-id-product-abstract': data.idProductAbstract,
+    'data-csrf-token': data.csrfToken,
 } %}
 
 {% block body %}
