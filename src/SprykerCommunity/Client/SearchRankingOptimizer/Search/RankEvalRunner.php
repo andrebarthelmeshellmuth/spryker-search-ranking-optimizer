@@ -21,6 +21,7 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
 use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator;
 use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculatorInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -38,6 +39,13 @@ use Throwable;
  * `Spryker\Shared\Kernel\Store::getInstance()`, unavailable in this package's Zed/console execution context
  * (the same reason this class already builds its own raw-Elastica queries with an explicit index name
  * instead of the higher-level Store-dependent Client abstractions).
+ *
+ * `isEntropyWeightingEnabled()`'s project-override resolution is NOT similarly reimplemented, though: it
+ * asks {@see \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface::isEntropyWeightingEnabled()}
+ * (a thin bridge to search-ranking's own Client), which is the correctly Locator-resolved, genuinely
+ * project-override-aware path -- unlike `Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
+ * (a hardcoded `return false;` this class used to call directly), that Client method has no
+ * Store-singleton/execution-context concern to route around.
  */
 class RankEvalRunner implements RankEvalRunnerInterface
 {
@@ -72,6 +80,11 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected ShannonEntropyCalculatorInterface $entropyCalculator;
 
     /**
+     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null
+     */
+    protected ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
+
+    /**
      * Process-scoped cache of raw `_score` values per `"<indexName>:<searchTerm>"` — deliberately
      * `static`, not an instance property: {@see \SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory::createRankEvalRunner()}
      * constructs a FRESH instance on every single call, but one automated optimization run fires this
@@ -94,6 +107,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface $functionScoreBuilder
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
      * @param \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculatorInterface|null $entropyCalculator
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
      */
     public function __construct(
         Client $elasticaClient,
@@ -102,6 +116,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         FunctionScoreBuilderInterface $functionScoreBuilder,
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
         ?ShannonEntropyCalculatorInterface $entropyCalculator = null,
+        ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
     ) {
         $this->elasticaClient = $elasticaClient;
         $this->indexNameResolver = $indexNameResolver;
@@ -109,6 +124,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $this->functionScoreBuilder = $functionScoreBuilder;
         $this->searchRankingStorageClient = $searchRankingStorageClient;
         $this->entropyCalculator = $entropyCalculator ?? new ShannonEntropyCalculator();
+        $this->searchRankingClient = $searchRankingClient;
     }
 
     /**
@@ -351,16 +367,22 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * Wraps the static call behind an overridable instance method purely for testability (the flag itself
-     * has no runtime override mechanism in `search-ranking` — it's a hardcoded `return false;`, project
-     * overrides are claimed in that class's own docblock but nothing anywhere actually resolves through
-     * one) — a test subclass can override this one method to exercise the enabled branch without needing
-     * to fake a project-level config class.
+     * Delegates to search-ranking's own Client (via the injected bridge) whenever one was provided — the
+     * correctly Locator-resolved, genuinely project-override-aware answer, matching exactly what
+     * `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before firing the live probe query.
+     * Falls back to `Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()` — a hardcoded
+     * `return false;` with no project-override path of its own — only when no bridge was given at all
+     * (a caller constructing this class directly with the older 5/6-argument signature), so this method
+     * never hard-fails; it just can't honor a project override without the bridge.
      *
      * @return bool
      */
     protected function isEntropyWeightingEnabled(): bool
     {
+        if ($this->searchRankingClient !== null) {
+            return $this->searchRankingClient->isEntropyWeightingEnabled();
+        }
+
         return SearchRankingConfig::isEntropyWeightingEnabled();
     }
 

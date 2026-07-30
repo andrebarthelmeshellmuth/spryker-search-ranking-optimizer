@@ -17,6 +17,7 @@ use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
@@ -73,6 +74,8 @@ class SearchRankingOptimizerFactory extends AbstractFactory
             $this->createLiveCatalogSearchQueryBuilder(),
             $this->createFunctionScoreBuilder(),
             $this->getSearchRankingStorageClient(),
+            null,
+            $this->getSearchRankingClient(),
         );
     }
 
@@ -97,6 +100,14 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function getSearchRankingStorageClient(): SearchRankingOptimizerToSearchRankingStorageClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_STORAGE);
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface
+     */
+    public function getSearchRankingClient(): SearchRankingOptimizerToSearchRankingClientInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING);
     }
 
     /**
