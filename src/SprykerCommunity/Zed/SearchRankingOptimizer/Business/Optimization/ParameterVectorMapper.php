@@ -347,7 +347,23 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     protected function buildMetricWeightsByName(array $freeZ): array
     {
         $metricWeightsByName = $this->fixedMetricWeights;
-        $availableBudget = max(0.0, 1.0 - $this->fixedWeightBudget);
+
+        if ($this->fixedWeightBudget > 1.0) {
+            // The caller's own fixed weights already exceed the full [0;1] budget on their own (live
+            // weights that were never renormalized, floating-point drift across many small weights) --
+            // every optimizable metric correctly gets zero either way, but simply flooring available
+            // budget at 0 without ALSO rescaling the fixed weights themselves would leave them summing to
+            // MORE than 1, silently violating the one invariant this whole mapper exists to guarantee.
+            $scale = 1.0 / $this->fixedWeightBudget;
+
+            foreach ($metricWeightsByName as $name => $weight) {
+                $metricWeightsByName[$name] = $weight * $scale;
+            }
+
+            $availableBudget = 0.0;
+        } else {
+            $availableBudget = 1.0 - $this->fixedWeightBudget;
+        }
 
         if (count($this->metrics) === 0) {
             return $metricWeightsByName;

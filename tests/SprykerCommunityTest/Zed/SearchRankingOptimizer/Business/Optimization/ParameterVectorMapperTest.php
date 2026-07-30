@@ -395,6 +395,33 @@ class ParameterVectorMapperTest extends Unit
     }
 
     /**
+     * Guards against the fixed metrics' OWN weights alone already exceeding the full [0;1] budget (live
+     * weights that were never renormalized, or floating-point drift across many small weights) -- every
+     * optimizable metric correctly gets zero either way, but the fixed weights themselves must be
+     * rescaled down to sum to exactly 1, not left silently summing to more than that.
+     *
+     * @return void
+     */
+    public function testMapVectorToConfigurationRescalesFixedWeightsDownWhenTheyAloneExceedTheFullBudget(): void
+    {
+        // Arrange -- two fixed metrics summing to 1.2 on their own, well over the [0;1] budget.
+        $optimizableMetrics = [
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller'],
+        ];
+        $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.7, 'other_random' => 0.5]);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+
+        // Assert
+        $metricWeights = $configurationTransfer->getMetricWeights();
+        $this->assertEqualsWithDelta(1.0, array_sum($metricWeights), 1e-9, 'The full set must still sum to exactly 1, even when the fixed weights alone exceeded it.');
+        $this->assertSame(0.0, $metricWeights['top_seller'], 'The optimizable metric gets zero -- no budget is left for it.');
+        $this->assertEqualsWithDelta(0.7 / 1.2, $metricWeights['random'], 1e-9, 'Rescaled proportionally, not left at its raw 0.7.');
+        $this->assertEqualsWithDelta(0.5 / 1.2, $metricWeights['other_random'], 1e-9);
+    }
+
+    /**
      * @return void
      */
     public function testMapVectorToConfigurationGivesTheSingleOptimizableMetricTheFullRemainingBudget(): void
