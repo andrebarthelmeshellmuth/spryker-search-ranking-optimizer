@@ -12,6 +12,8 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -47,36 +49,7 @@ class EvaluationController extends AbstractController
         }
 
         if ($evaluationForm->isSubmitted() && $evaluationForm->isValid()) {
-            $formData = $evaluationForm->getData();
-            $storeName = (string)$formData[EvaluationForm::FIELD_STORE_NAME];
-            $localeName = (string)$formData[EvaluationForm::FIELD_LOCALE_NAME];
-
-            $evaluationTransfer = $this->getFacade()->runRankEvaluation($storeName, $localeName);
-
-            if ($evaluationTransfer === null) {
-                $this->addErrorMessage(sprintf(
-                    'Nothing to evaluate for %s / %s yet — no query has a rated product.',
-                    $storeName,
-                    $localeName,
-                ));
-            } else {
-                $this->addSuccessMessage(sprintf(
-                    'Evaluated %d rated quer%s: weighted nDCG@%d = %.4f.',
-                    $evaluationTransfer->getQueryCountOrFail(),
-                    $evaluationTransfer->getQueryCountOrFail() === 1 ? 'y' : 'ies',
-                    SearchRankingOptimizerConfig::getRankEvalCutoff(),
-                    $evaluationTransfer->getMetricScoreOrFail(),
-                ));
-            }
-
-            return $this->redirectResponse(sprintf(
-                '%s?%s=%s&%s=%s',
-                static::URL_EVALUATION,
-                EvaluationForm::FIELD_STORE_NAME,
-                $storeName,
-                EvaluationForm::FIELD_LOCALE_NAME,
-                $localeName,
-            ));
+            return $this->processSubmission($evaluationForm);
         }
 
         $storeName = (string)$request->query->get(EvaluationForm::FIELD_STORE_NAME, '');
@@ -93,6 +66,45 @@ class EvaluationController extends AbstractController
                 ? $this->getFacade()->findEvaluationHistory($storeName, $localeName)
                 : [],
         ]);
+    }
+
+    /**
+     * @param \Symfony\Component\Form\FormInterface $evaluationForm
+     *
+     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     */
+    protected function processSubmission(FormInterface $evaluationForm): RedirectResponse
+    {
+        $formData = $evaluationForm->getData();
+        $storeName = (string)$formData[EvaluationForm::FIELD_STORE_NAME];
+        $localeName = (string)$formData[EvaluationForm::FIELD_LOCALE_NAME];
+
+        $evaluationTransfer = $this->getFacade()->runRankEvaluation($storeName, $localeName);
+
+        if ($evaluationTransfer === null) {
+            $this->addErrorMessage(sprintf(
+                'Nothing to evaluate for %s / %s yet — no query has a rated product.',
+                $storeName,
+                $localeName,
+            ));
+        } else {
+            $this->addSuccessMessage(sprintf(
+                'Evaluated %d rated quer%s: weighted nDCG@%d = %.4f.',
+                $evaluationTransfer->getQueryCountOrFail(),
+                $evaluationTransfer->getQueryCountOrFail() === 1 ? 'y' : 'ies',
+                SearchRankingOptimizerConfig::getRankEvalCutoff(),
+                $evaluationTransfer->getMetricScoreOrFail(),
+            ));
+        }
+
+        return $this->redirectResponse(sprintf(
+            '%s?%s=%s&%s=%s',
+            static::URL_EVALUATION,
+            EvaluationForm::FIELD_STORE_NAME,
+            $storeName,
+            EvaluationForm::FIELD_LOCALE_NAME,
+            $localeName,
+        ));
     }
 
     /**
