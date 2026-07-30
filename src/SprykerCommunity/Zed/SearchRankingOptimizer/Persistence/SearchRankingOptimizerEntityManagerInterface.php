@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
@@ -148,4 +149,15 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer;
+
+    /**
+     * Upserts by `idSearchRankingMetric` — at most one config row per metric.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
+     */
+    public function saveAutoTuneMetricConfig(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+    ): SearchRankingAutoTuneMetricConfigTransfer;
 }

@@ -131,4 +131,20 @@
         </index>
     </table>
 
+    <table name="spy_search_ranking_auto_tune_metric_config" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_auto_tune_metric_config" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="fk_search_ranking_metric" type="INTEGER" required="true" description="Soft reference to search-ranking's own metric id — no hard foreign key, same discipline as spy_search_ranking_weight_checkpoint.metric_weights: the metric could be deleted between config edits and a later run, handled as a safe skip."/>
+        <column name="auto_tune_threshold" type="DOUBLE" required="false" description="R² floor below which the metric is flagged as needing attention. NULL opts the metric out of auto-tune entirely — the default for every metric until an admin explicitly sets one."/>
+        <column name="is_auto_update_enabled" type="BOOLEAN" required="true" defaultValue="false" description="Whether crossing the threshold triggers an automatic refit, or only a proposal/notification."/>
+        <column name="auto_update_scope" type="VARCHAR" size="32" required="true" defaultValue="program_choice" description="SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_* — only consulted when is_auto_update_enabled is true."/>
+        <column name="is_notify_enabled" type="BOOLEAN" required="true" defaultValue="false" description="Whether crossing the threshold sends the before/after summary email, independently of is_auto_update_enabled."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_ranking_auto_tune_metric_config_pk_seq"/>
+
+        <unique name="spy_srtmc-fk_search_ranking_metric">
+            <unique-column name="fk_search_ranking_metric"/>
+        </unique>
+    </table>
+
 </database>

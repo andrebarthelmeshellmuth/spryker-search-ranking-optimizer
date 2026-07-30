@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
@@ -342,5 +343,50 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         return $this->getFactory()
             ->createSearchRankingOptimizerMapper()
             ->mapWeightCheckpointEntityToTransfer($weightCheckpointEntity, new SearchRankingWeightCheckpointTransfer());
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
+     */
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
+    {
+        $autoTuneMetricConfigEntity = $this->getFactory()
+            ->createSearchRankingAutoTuneMetricConfigQuery()
+            ->filterByFkSearchRankingMetric($idSearchRankingMetric)
+            ->findOne();
+
+        if ($autoTuneMetricConfigEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapAutoTuneMetricConfigEntityToTransfer($autoTuneMetricConfigEntity, new SearchRankingAutoTuneMetricConfigTransfer());
+    }
+
+    /**
+     * Only configs with a real threshold set — a metric with no config row, or an explicit NULL
+     * threshold, has opted out of auto-tune entirely and is simply absent here, per this feature's own
+     * design (see the package README).
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
+     */
+    public function findAutoTuneMetricConfigsWithThresholdSet(): array
+    {
+        $autoTuneMetricConfigEntities = $this->getFactory()
+            ->createSearchRankingAutoTuneMetricConfigQuery()
+            ->filterByAutoTuneThreshold(null, Criteria::ISNOTNULL)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $autoTuneMetricConfigTransfers = [];
+
+        foreach ($autoTuneMetricConfigEntities as $autoTuneMetricConfigEntity) {
+            $autoTuneMetricConfigTransfers[] = $mapper->mapAutoTuneMetricConfigEntityToTransfer($autoTuneMetricConfigEntity, new SearchRankingAutoTuneMetricConfigTransfer());
+        }
+
+        return $autoTuneMetricConfigTransfers;
     }
 }

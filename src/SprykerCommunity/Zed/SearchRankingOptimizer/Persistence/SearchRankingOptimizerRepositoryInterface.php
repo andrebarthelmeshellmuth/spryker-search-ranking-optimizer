@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -145,4 +146,22 @@ interface SearchRankingOptimizerRepositoryInterface
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
+
+    /**
+     * Returns null when the metric has no auto-tune config yet (has never had a threshold set) — a
+     * safe, expected state for most metrics, not an error.
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
+     */
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
+
+    /**
+     * Only configs with a real threshold set — a metric with no config row, or an explicit NULL
+     * threshold, has opted out of auto-tune entirely and is simply absent here.
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
+     */
+    public function findAutoTuneMetricConfigsWithThresholdSet(): array;
 }

@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
@@ -20,6 +22,7 @@ use Spryker\Zed\Kernel\Business\AbstractFacade;
 /**
  * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerBusinessFactory getFactory()
  * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface getRepository()
+ * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface getEntityManager()
  */
 class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRankingOptimizerFacadeInterface
 {
@@ -234,5 +237,58 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function findWeightCheckpointHistory(): array
     {
         return $this->getRepository()->findWeightCheckpointHistory();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
+     */
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
+    {
+        return $this->getRepository()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
+     */
+    public function findAutoTuneMetricConfigsWithThresholdSet(): array
+    {
+        return $this->getRepository()->findAutoTuneMetricConfigsWithThresholdSet();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
+     */
+    public function saveAutoTuneMetricConfig(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+    ): SearchRankingAutoTuneMetricConfigTransfer {
+        return $this->getEntityManager()->saveAutoTuneMetricConfig($autoTuneMetricConfigTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
+     */
+    public function runAutoTune(): SearchRankingAutoTuneResultTransfer
+    {
+        return $this->getFactory()->createAutoTuneRunner()->run();
     }
 }

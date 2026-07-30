@@ -104,4 +104,68 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * no-op — a checkpoint restore may reference a metric deleted since the checkpoint was taken).
      */
     public function saveMetricWeight(int $idSearchRankingMetric, float $weight): bool;
+
+    /**
+     * Deliberately returns a plain array, not `search-ranking`'s own
+     * `SearchRankingMetricTransfer`/`SearchRankingMetricCollectionTransfer` — same discipline as
+     * {@see getMetricWeights()}, keeps this interface free of any compile-time reference to a class that
+     * only exists when `search-ranking` is actually installed.
+     *
+     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     */
+    public function getActiveMetrics(): array;
+
+    /**
+     * Evaluates how well $idSearchRankingMetric's OWN CONFIGURED formula fits its digest RIGHT NOW — a
+     * fresh, side-effect-free read. Returns null when the metric doesn't exist, or has no digest yet.
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return float|null
+     */
+    public function evaluateCurrentMetricFit(int $idSearchRankingMetric): ?float;
+
+    /**
+     * Deliberately returns a plain array, not `search-ranking`'s own `SearchRankingMetricTransfer` — same
+     * discipline as {@see getMetricWeights()}. Returns null when the metric no longer exists.
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     */
+    public function findMetricDetail(int $idSearchRankingMetric): ?array;
+
+    /**
+     * Fresh closed-form curve-fit candidates for $idSearchRankingMetric's own digest, ranked and flagged
+     * the same way `search-ranking`'s own normalization-authoring GUI preview is — deliberately a plain
+     * array, not `SearchRankingCurveFitCandidateTransfer`, same discipline as every other method here.
+     * Empty when the metric doesn't exist or has no digest yet.
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return array<int, array{shape: string, formula: string, rSquared: float, isWinner: bool}>
+     */
+    public function getFitCandidates(int $idSearchRankingMetric): array;
+
+    /**
+     * Writes a single metric's formula through `search-ranking`'s own facade, preserving every other
+     * field (name/weight/isActive/isHigherBetter) — same shape as {@see saveMetricWeight()}.
+     *
+     * @param int $idSearchRankingMetric
+     * @param string $formula
+     *
+     * @return bool True if the metric still existed and was updated; false if it no longer exists.
+     */
+    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool;
+
+    /**
+     * Appends an `isChange=false` audit row for $idSearchRankingMetric's CURRENT (unmodified) config and
+     * digest — see `search-ranking`'s own `recordCheckOnly()` for the full specification. A safe no-op
+     * (returns false) if the metric no longer exists.
+     *
+     * @param int $idSearchRankingMetric
+     *
+     * @return bool
+     */
+    public function recordMetricCheckOnly(int $idSearchRankingMetric): bool;
 }

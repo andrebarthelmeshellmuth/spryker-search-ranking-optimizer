@@ -13,6 +13,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
@@ -183,6 +184,31 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     {
         return $this->getFormFactory()->create(RestoreWeightCheckpointForm::class, [
             RestoreWeightCheckpointForm::FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT => $idSearchRankingWeightCheckpoint,
+        ]);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param float|null $autoTuneThreshold
+     * @param bool $isAutoUpdateEnabled
+     * @param string $autoUpdateScope
+     * @param bool $isNotifyEnabled
+     *
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createAutoTuneMetricConfigForm(
+        int $idSearchRankingMetric,
+        ?float $autoTuneThreshold,
+        bool $isAutoUpdateEnabled,
+        string $autoUpdateScope,
+        bool $isNotifyEnabled,
+    ): FormInterface {
+        return $this->getFormFactory()->create(AutoTuneMetricConfigForm::class, [
+            AutoTuneMetricConfigForm::FIELD_ID_SEARCH_RANKING_METRIC => $idSearchRankingMetric,
+            AutoTuneMetricConfigForm::FIELD_AUTO_TUNE_THRESHOLD => $autoTuneThreshold,
+            AutoTuneMetricConfigForm::FIELD_IS_AUTO_UPDATE_ENABLED => $isAutoUpdateEnabled,
+            AutoTuneMetricConfigForm::FIELD_AUTO_UPDATE_SCOPE => $autoUpdateScope,
+            AutoTuneMetricConfigForm::FIELD_IS_NOTIFY_ENABLED => $isNotifyEnabled,
         ]);
     }
 }

@@ -158,4 +158,44 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const CHECKPOINT_SOURCE_MANUAL = 'manual';
+
+    /**
+     * Specification:
+     * - Auto-tune refits a metric's formula while deliberately keeping its CURRENT curve family — only
+     *   the shape's own free parameter is re-searched (e.g. keep `atan` and just recompute its `k`).
+     * - Only meaningful for a metric whose `shape` is set (see spryker-community/search-ranking's own
+     *   `SearchRankingMetric.shape`); falls back to {@see AUTO_UPDATE_SCOPE_PROGRAM_CHOICE} otherwise,
+     *   since there is no known shape to stay within.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const AUTO_UPDATE_SCOPE_PARAMETERS_ONLY = 'parameters_only';
+
+    /**
+     * Specification:
+     * - Auto-tune may switch a metric's formula to a DIFFERENT curve family entirely if that fits
+     *   materially better (e.g. `atan` -> `x / (x + k)`) — the data picks, not the current shape.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const AUTO_UPDATE_SCOPE_PROGRAM_CHOICE = 'program_choice';
+
+    /**
+     * Specification:
+     * - Name of the ACL role whose group members receive the auto-tune job's before/after summary email.
+     *   Every member of every ACL group holding this role is notified — no per-metric or per-run
+     *   subscriber list, deliberately the simplest option of those considered.
+     * - Must exist as a real ACL role in the host shop (e.g. via `data:import acl-role`/the Zed ACL Gui)
+     *   before the auto-tune job can resolve any recipient; a run that needs to notify but finds no
+     *   admin holding this role simply sends to nobody, logged rather than treated as an error.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const AUTO_TUNE_NOTIFICATION_ROLE_NAME = 'search-score-admin';
 }

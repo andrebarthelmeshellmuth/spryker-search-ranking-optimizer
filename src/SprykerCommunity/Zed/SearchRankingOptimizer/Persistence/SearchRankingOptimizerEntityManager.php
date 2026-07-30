@@ -10,11 +10,13 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use DateTime;
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
@@ -337,5 +339,33 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         // APPENDS decoded metric weights via addMetricWeight(), which would duplicate the ones already on
         // the transfer passed in above.
         return $mapper->mapWeightCheckpointEntityToTransfer($weightCheckpointEntity, new SearchRankingWeightCheckpointTransfer());
+    }
+
+    /**
+     * Upserts by `idSearchRankingMetric` — at most one config row per metric, same "find existing or
+     * create new, then overwrite the editable fields" shape as {@see upsertRating()}.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
+     */
+    public function saveAutoTuneMetricConfig(SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer): SearchRankingAutoTuneMetricConfigTransfer
+    {
+        $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
+
+        $autoTuneMetricConfigEntity = $this->getFactory()
+            ->createSearchRankingAutoTuneMetricConfigQuery()
+            ->filterByFkSearchRankingMetric($idSearchRankingMetric)
+            ->findOne();
+
+        if ($autoTuneMetricConfigEntity === null) {
+            $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
+        }
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $mapper->mapAutoTuneMetricConfigTransferToEntity($autoTuneMetricConfigTransfer, $autoTuneMetricConfigEntity);
+        $autoTuneMetricConfigEntity->save();
+
+        return $mapper->mapAutoTuneMetricConfigEntityToTransfer($autoTuneMetricConfigEntity, $autoTuneMetricConfigTransfer);
     }
 }

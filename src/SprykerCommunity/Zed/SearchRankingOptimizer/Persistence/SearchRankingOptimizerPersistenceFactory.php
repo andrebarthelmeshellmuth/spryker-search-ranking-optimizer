@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
@@ -66,6 +67,14 @@ class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactor
     public function createSearchRankingWeightCheckpointQuery(): SpySearchRankingWeightCheckpointQuery
     {
         return SpySearchRankingWeightCheckpointQuery::create();
+    }
+
+    /**
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery
+     */
+    public function createSearchRankingAutoTuneMetricConfigQuery(): SpySearchRankingAutoTuneMetricConfigQuery
+    {
+        return SpySearchRankingAutoTuneMetricConfigQuery::create();
     }
 
     /**

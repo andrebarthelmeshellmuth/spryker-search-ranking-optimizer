@@ -45,6 +45,13 @@
                 <controller>checkpoint</controller>
                 <action>index</action>
             </search-ranking-optimizer-checkpoint>
+            <search-ranking-optimizer-auto-tune>
+                <label>Auto-Tune Settings</label>
+                <title>Auto-Tune Settings</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>auto-tune</controller>
+                <action>index</action>
+            </search-ranking-optimizer-auto-tune>
         </pages>
     </search-ranking-optimizer-gui>
 </config>

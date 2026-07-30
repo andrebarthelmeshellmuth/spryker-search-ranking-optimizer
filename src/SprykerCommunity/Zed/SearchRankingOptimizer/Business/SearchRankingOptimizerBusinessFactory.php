@@ -10,6 +10,10 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolver;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandler;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParser;
@@ -33,7 +37,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWe
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 
 /**
@@ -170,5 +177,53 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface
+     */
+    public function getAclFacade(): SearchRankingOptimizerToAclFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_ACL);
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerInterface
+     */
+    public function getAclQueryContainer(): SearchRankingOptimizerToAclQueryContainerInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::QUERY_CONTAINER_ACL);
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface
+     */
+    public function getSymfonyMailerFacade(): SearchRankingOptimizerToSymfonyMailerFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SYMFONY_MAILER);
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface
+     */
+    public function createAutoTuneNotificationRecipientResolver(): AutoTuneNotificationRecipientResolverInterface
+    {
+        return new AutoTuneNotificationRecipientResolver(
+            $this->getAclFacade(),
+            $this->getAclQueryContainer(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface
+     */
+    public function createAutoTuneRunner(): AutoTuneRunnerInterface
+    {
+        return new AutoTuneRunner(
+            $this->getRepository(),
+            $this->getSearchRankingFacade(),
+            $this->createAutoTuneNotificationRecipientResolver(),
+            $this->getSymfonyMailerFacade(),
+        );
     }
 }

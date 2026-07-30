@@ -12,12 +12,15 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer;
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerBridge;
 
 /**
  * @method \SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerConfig getConfig()
@@ -75,6 +78,27 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     public const FACADE_PERMISSION = 'FACADE_PERMISSION';
 
     /**
+     * Resolves which ACL groups hold the notification role, and which admin users belong to those groups
+     * — the auto-tune job's "who gets the before/after summary email" lookup.
+     *
+     * @var string
+     */
+    public const FACADE_ACL = 'FACADE_ACL';
+
+    /**
+     * @var string
+     */
+    public const QUERY_CONTAINER_ACL = 'QUERY_CONTAINER_ACL';
+
+    /**
+     * Sends the auto-tune job's before/after summary email directly, bypassing `spryker/mail`'s
+     * per-event template system for this one-off self-contained notification.
+     *
+     * @var string
+     */
+    public const FACADE_SYMFONY_MAILER = 'FACADE_SYMFONY_MAILER';
+
+    /**
      * @param \Spryker\Zed\Kernel\Container $container
      *
      * @return \Spryker\Zed\Kernel\Container
@@ -84,6 +108,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = parent::provideBusinessLayerDependencies($container);
         $container = $this->addSearchRankingClient($container);
         $container = $this->addSearchRankingFacade($container);
+        $container = $this->addAclFacade($container);
+        $container = $this->addAclQueryContainer($container);
+        $container = $this->addSymfonyMailerFacade($container);
 
         return $container;
     }
@@ -219,6 +246,54 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container->set(static::FACADE_PERMISSION, function (Container $container) {
             return new SearchRankingOptimizerToPermissionFacadeBridge(
                 $container->getLocator()->permission()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addAclFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_ACL, function (Container $container) {
+            return new SearchRankingOptimizerToAclFacadeBridge(
+                $container->getLocator()->acl()->facade(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addAclQueryContainer(Container $container): Container
+    {
+        $container->set(static::QUERY_CONTAINER_ACL, function (Container $container) {
+            return new SearchRankingOptimizerToAclQueryContainerBridge(
+                $container->getLocator()->acl()->queryContainer(),
+            );
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
+    protected function addSymfonyMailerFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_SYMFONY_MAILER, function (Container $container) {
+            return new SearchRankingOptimizerToSymfonyMailerFacadeBridge(
+                $container->getLocator()->symfonyMailer()->facade(),
             );
         });
 

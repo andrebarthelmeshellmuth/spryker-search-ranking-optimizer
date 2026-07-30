@@ -1,0 +1,50 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Auto-Tune Settings' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Metrics' } %}
+        {% block widget_content %}
+            <p>
+                Per-metric monthly fit-quality monitoring. A blank threshold opts a metric out entirely —
+                nothing runs against it until one is set. Auto-update and notify are independent toggles:
+                you can get a proposal email without anything changing automatically, or the reverse.
+            </p>
+            {% if rows %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Current fit (R²)</th>
+                            <th>Settings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr>
+                                <td>{{ row.metricName }}</td>
+                                <td>{{ row.currentFitRSquared is not null ? row.currentFitRSquared : '—' }}</td>
+                                <td>
+                                    {# A whole per-metric form must live inside ONE <td> - a <form> spanning
+                                       multiple <td> siblings inside a <tr> is invalid HTML and gets silently
+                                       relocated/dropped by browsers, breaking submission. #}
+                                    {{ form_start(row.form, { action: url('/search-ranking-optimizer/auto-tune/save'), method: 'POST', attr: { class: 'search-ranking-optimizer-auto-tune-row-form' } }) }}
+                                    {{ form_row(row.form.autoTuneThreshold) }}
+                                    {{ form_row(row.form.isAutoUpdateEnabled) }}
+                                    {{ form_row(row.form.autoUpdateScope) }}
+                                    {{ form_row(row.form.isNotifyEnabled) }}
+                                    {{ form_widget(row.form.idSearchRankingMetric) }}
+                                    <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Save' | trans }}</button>
+                                    {{ form_end(row.form) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No active metrics configured yet.</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}
