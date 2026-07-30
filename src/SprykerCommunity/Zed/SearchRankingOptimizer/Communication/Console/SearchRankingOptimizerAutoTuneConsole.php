@@ -60,6 +60,16 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
         }
 
         foreach ($autoTuneResultTransfer->getMetricResults() as $metricResultTransfer) {
+            if ($metricResultTransfer->getErrorMessage() !== null) {
+                $output->writeln(sprintf(
+                    '%s: FAILED to check — %s',
+                    $metricResultTransfer->getMetricNameOrFail(),
+                    $metricResultTransfer->getErrorMessage(),
+                ));
+
+                continue;
+            }
+
             if ($metricResultTransfer->getWasThresholdMetOrFail()) {
                 $output->writeln(sprintf(
                     '%s: fit still adequate (R² = %.4f), no change.',

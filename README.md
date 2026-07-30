@@ -306,6 +306,17 @@ to whatever randomness happened to be in that one digest snapshot, then silently
 history/the summary email with its real fit — that observation is legitimate, only auto-*applying* a refit
 for one isn't.
 
+An unexpected failure while checking one metric (a transient Elasticsearch/database error, say) never
+aborts the rest of the run — every other metric with a threshold set still gets checked in the same pass.
+The failed metric shows up instead with its error, both in the console output and, if notify is on for it,
+in the summary email, rather than silently vanishing or taking every other metric's check down with it:
+
+```
+pdp_impressions: fit still adequate (R² = 0.9883), no change.
+top_seller: FAILED to check — Elasticsearch unreachable.
+Notified 1 admin(s) by email.
+```
+
 Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
 every metric that crossed its threshold with notify on, to every admin holding an ACL role named
 `search-score-admin` (every member of every ACL group holding that role; see [Requirements](#requirements)).
