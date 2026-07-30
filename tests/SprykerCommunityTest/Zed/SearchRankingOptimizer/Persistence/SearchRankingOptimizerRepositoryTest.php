@@ -14,8 +14,10 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricCon
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
 
@@ -61,6 +63,16 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     protected array $autoTuneMetricConfigEntities = [];
 
     /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun>
+     */
+    protected array $optimizerRunEntities = [];
+
+    /**
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint>
+     */
+    protected array $weightCheckpointEntities = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
@@ -83,6 +95,14 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         foreach ($this->autoTuneMetricConfigEntities as $autoTuneMetricConfigEntity) {
             $autoTuneMetricConfigEntity->delete();
+        }
+
+        foreach ($this->optimizerRunEntities as $optimizerRunEntity) {
+            $optimizerRunEntity->delete();
+        }
+
+        foreach ($this->weightCheckpointEntities as $weightCheckpointEntity) {
+            $weightCheckpointEntity->delete();
         }
 
         parent::_after();
@@ -502,5 +522,320 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->evaluationEntities[] = $evaluationEntity;
 
         return $evaluationEntity;
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOptimizerRunByIdReturnsTheMatchingRow(): void
+    {
+        // Arrange
+        $entity = $this->createTestOptimizerRun('DE', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunById($entity->getIdSearchRankingOptimizerRun());
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOptimizerRunByIdReturnsNullForANonExistentId(): void
+    {
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunById(999999999);
+
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOldestQueuedOptimizerRunReturnsTheOldestOneFirst(): void
+    {
+        // Arrange -- a done run must never be picked up, only queued ones, and the OLDEST of those.
+        $this->createTestOptimizerRun('DE-TEST-OLDEST-QUEUED', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
+        $older = $this->createTestOptimizerRun('DE-TEST-OLDEST-QUEUED', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+        $this->createTestOptimizerRun('DE-TEST-OLDEST-QUEUED', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOldestQueuedOptimizerRun();
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($older->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOptimizerRunInProgressReturnsTheRunningRow(): void
+    {
+        // Arrange
+        $entity = $this->createTestOptimizerRun('DE', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_RUNNING);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunInProgress();
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOldestQueuedOptimizerRunReturnsNullWhenNothingIsQueued(): void
+    {
+        // Arrange
+        $this->createTestOptimizerRun('DE-TEST-NO-QUEUED-RUN', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOldestQueuedOptimizerRun();
+
+        // Assert -- same "this shared demo database never has a leftover row in this transient status"
+        // assumption testFindCalibrationInProgressReturnsNullWhenNothingIsCalculating already relies on.
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindOptimizerRunInProgressReturnsNullWhenNothingIsRunning(): void
+    {
+        // Arrange
+        $this->createTestOptimizerRun('DE-TEST-NO-RUN-IN-PROGRESS', 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunInProgress();
+
+        // Assert -- same "this shared demo database never has a leftover row in this transient status"
+        // assumption testFindCalibrationInProgressReturnsNullWhenNothingIsCalculating already relies on.
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindLatestOptimizerRunByStoreLocaleReturnsNullWhenNoneExistsForThatStoreLocale(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestOptimizerRunByStoreLocale('DE-TEST-NO-RUN-AT-ALL', 'en_US');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindLatestOptimizerRunByStoreLocaleReturnsTheMostRecentRegardlessOfStatus(): void
+    {
+        // Arrange
+        $storeName = 'DE-TEST-LATEST-RUN';
+        $older = $this->createTestOptimizerRun($storeName, 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
+        $older->setCreatedAt('2026-01-01 00:00:00');
+        $older->save();
+
+        $newer = $this->createTestOptimizerRun($storeName, 'en_US', SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+        $newer->setCreatedAt('2099-01-01 00:00:00');
+        $newer->save();
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestOptimizerRunByStoreLocale($storeName, 'en_US');
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($newer->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $status
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun
+     */
+    protected function createTestOptimizerRun(string $storeName, string $localeName, string $status): SpySearchRankingOptimizerRun
+    {
+        $optimizerRunEntity = new SpySearchRankingOptimizerRun();
+        $optimizerRunEntity->setStoreName($storeName);
+        $optimizerRunEntity->setLocaleName($localeName);
+        $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
+        $optimizerRunEntity->setStatus($status);
+        $optimizerRunEntity->save();
+
+        $this->optimizerRunEntities[] = $optimizerRunEntity;
+
+        return $optimizerRunEntity;
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindQueryByTermStoreLocaleReturnsTheMatchingQuery(): void
+    {
+        // Arrange
+        $storeName = 'DE-TEST-FIND-QUERY-BY-TERM';
+        $matching = $this->createTestQuery('chair', $storeName, 'en_US');
+        $this->createTestQuery('chair', $storeName, 'de_DE');
+        $this->createTestQuery('desk', $storeName, 'en_US');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findQueryByTermStoreLocale('chair', $storeName, 'en_US');
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($matching->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindQueryByTermStoreLocaleReturnsNullWhenNoQueryMatches(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findQueryByTermStoreLocale('nonexistent-term', 'DE-TEST-NO-SUCH-QUERY', 'en_US');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindQueryByIdReturnsTheMatchingQuery(): void
+    {
+        // Arrange
+        $queryEntity = $this->createTestQuery('chair', 'DE-TEST-FIND-QUERY-BY-ID', 'en_US');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findQueryById($queryEntity->getIdSearchRankingQuery());
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($queryEntity->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindQueryByIdReturnsNullForANonExistentId(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findQueryById(999999999);
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindAllQueriesOrderedByUpdatedAtReturnsNewestFirst(): void
+    {
+        // Arrange
+        $older = $this->createTestQuery('chair', 'DE-TEST-ALL-QUERIES-1', 'en_US');
+        $older->setUpdatedAt('2026-01-01 00:00:00');
+        $older->save();
+
+        $newer = $this->createTestQuery('desk', 'DE-TEST-ALL-QUERIES-2', 'en_US');
+        $newer->setUpdatedAt('2099-01-01 00:00:00');
+        $newer->save();
+
+        // Act
+        $queryTransfers = (new SearchRankingOptimizerRepository())->findAllQueriesOrderedByUpdatedAt();
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingQuery(), $queryTransfers);
+
+        // Assert -- both present, newer strictly before older
+        $newerPosition = array_search($newer->getIdSearchRankingQuery(), $returnedIds, true);
+        $olderPosition = array_search($older->getIdSearchRankingQuery(), $returnedIds, true);
+
+        $this->assertNotFalse($newerPosition);
+        $this->assertNotFalse($olderPosition);
+        $this->assertLessThan($olderPosition, $newerPosition);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindWeightCheckpointHistoryReturnsNewestFirst(): void
+    {
+        // Arrange
+        $older = $this->createTestWeightCheckpoint(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL, 0.7);
+        $older->setCreatedAt('2026-01-01 00:00:00');
+        $older->save();
+
+        $newer = $this->createTestWeightCheckpoint(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL, 0.9);
+        $newer->setCreatedAt('2099-01-01 00:00:00');
+        $newer->save();
+
+        // Act
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findWeightCheckpointHistory();
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingWeightCheckpoint(), $historyTransfers);
+
+        // Assert -- both present, newer strictly before older (the shared demo database may hold other
+        // real checkpoints too, so this only asserts relative order between these two).
+        $newerPosition = array_search($newer->getIdSearchRankingWeightCheckpoint(), $returnedIds, true);
+        $olderPosition = array_search($older->getIdSearchRankingWeightCheckpoint(), $returnedIds, true);
+
+        $this->assertNotFalse($newerPosition);
+        $this->assertNotFalse($olderPosition);
+        $this->assertLessThan($olderPosition, $newerPosition);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindWeightCheckpointByIdReturnsTheMatchingCheckpoint(): void
+    {
+        // Arrange
+        $weightCheckpointEntity = $this->createTestWeightCheckpoint(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, 0.85);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findWeightCheckpointById($weightCheckpointEntity->getIdSearchRankingWeightCheckpoint());
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($weightCheckpointEntity->getIdSearchRankingWeightCheckpoint(), $resultTransfer->getIdSearchRankingWeightCheckpoint());
+        $this->assertSame(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, $resultTransfer->getSource());
+        $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFindWeightCheckpointByIdReturnsNullForANonExistentId(): void
+    {
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findWeightCheckpointById(999999999);
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * @param string $source
+     * @param float $relevanceWeight
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint
+     */
+    protected function createTestWeightCheckpoint(string $source, float $relevanceWeight): SpySearchRankingWeightCheckpoint
+    {
+        $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
+        $weightCheckpointEntity->setSource($source);
+        $weightCheckpointEntity->setRelevanceWeight($relevanceWeight);
+        $weightCheckpointEntity->setEntropyProbeResultSize(50);
+        $weightCheckpointEntity->setEntropyWeightExponent(1.5);
+        $weightCheckpointEntity->setEntropyWeightShiftMagnitude(0.1);
+        $weightCheckpointEntity->setIsEntropyWeightingEnabled(true);
+        $weightCheckpointEntity->setMetricWeights(json_encode([['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 1.0]]));
+        $weightCheckpointEntity->save();
+
+        $this->weightCheckpointEntities[] = $weightCheckpointEntity;
+
+        return $weightCheckpointEntity;
     }
 }

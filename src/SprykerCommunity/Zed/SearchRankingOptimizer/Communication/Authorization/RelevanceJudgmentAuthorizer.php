@@ -16,25 +16,13 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
 class RelevanceJudgmentAuthorizer implements RelevanceJudgmentAuthorizerInterface
 {
     /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface
-     */
-    protected SearchRankingOptimizerToCompanyUserFacadeInterface $companyUserFacade;
-
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface
-     */
-    protected SearchRankingOptimizerToPermissionFacadeInterface $permissionFacade;
-
-    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface $companyUserFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface $permissionFacade
      */
     public function __construct(
-        SearchRankingOptimizerToCompanyUserFacadeInterface $companyUserFacade,
-        SearchRankingOptimizerToPermissionFacadeInterface $permissionFacade,
+        protected SearchRankingOptimizerToCompanyUserFacadeInterface $companyUserFacade,
+        protected SearchRankingOptimizerToPermissionFacadeInterface $permissionFacade,
     ) {
-        $this->companyUserFacade = $companyUserFacade;
-        $this->permissionFacade = $permissionFacade;
     }
 
     /**

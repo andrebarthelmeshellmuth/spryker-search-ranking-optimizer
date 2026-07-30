@@ -161,6 +161,19 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - The checkpoint recorded automatically when a human clicks Apply on an automated optimization
+     *   run's (Phase O6) winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
+     *   history honestly shows which changes came from an optimizer run rather than a direct manual edit
+     *   or restore.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CHECKPOINT_SOURCE_OPTIMIZER = 'optimizer';
+
+    /**
+     * Specification:
      * - Auto-tune refits a metric's formula while deliberately keeping its CURRENT curve family — only
      *   the shape's own free parameter is re-searched (e.g. keep `atan` and just recompute its `k`).
      * - Only meaningful for a metric whose `shape` is set (see spryker-community/search-ranking's own
@@ -198,4 +211,283 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const AUTO_TUNE_NOTIFICATION_ROLE_NAME = 'search-score-admin';
+
+    /**
+     * Specification:
+     * - How far a single automated weight-optimization run (Phase O6) may push relevanceWeight away from
+     *   its OWN value at the moment the run started, in either direction, before clipping back to [0;1]
+     *   at either edge -- a trust-region safety limit, not a general-purpose bound on relevanceWeight
+     *   itself (which is always [0;1] regardless of this setting). Deliberately conservative by default:
+     *   a single run finding "relevanceWeight should apparently be 0.05" from a 0.75 starting point is a
+     *   signal worth a human's attention before being trusted outright, not something to let one run swing
+     *   all the way to on its own.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getRelevanceWeightTrustRegionMaxDistance(): float
+    {
+        return 0.15;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyWeightExponent` instead — how far a single run may push it away from its own value at the
+     *   moment the run started, before clipping to the absolute bounds
+     *   {@see getEntropyWeightExponentLowerBound()}/{@see getEntropyWeightExponentUpperBound()}.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentTrustRegionMaxDistance(): float
+    {
+        return 0.5;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `entropyWeightExponent` regardless of trust region — an exponent must stay
+     *   strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0` is
+     *   always 1 regardless of `x`, discarding the entropy signal entirely; a negative exponent inverts it
+     *   in an unintended way).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentLowerBound(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute upper bound on `entropyWeightExponent` — deliberately generous (an exponent this high
+     *   makes the shift's response to entropy extremely steep/near-binary, a real if aggressive choice a
+     *   run should be allowed to reach, not artificially capped tighter than that).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightExponentUpperBound(): float
+    {
+        return 5.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyWeightShiftMagnitude` instead.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeTrustRegionMaxDistance(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute bounds on `entropyWeightShiftMagnitude` regardless of trust region — a shift can never
+     *   usefully exceed the [0;1] range `relevanceWeight` itself lives in (the calculated relevanceWeight
+     *   is clamped to [0;1] regardless, so anything past 1.0 would only ever be reached by an
+     *   already-maximal entropy deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeLowerBound(): float
+    {
+        return 0.0;
+    }
+
+    /**
+     * @api
+     *
+     * @return float
+     */
+    public static function getEntropyWeightShiftMagnitudeUpperBound(): float
+    {
+        return 1.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `entropyProbeResultSize` instead (rounded to the nearest integer when read back off the optimizer's
+     *   own continuous vector — see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}).
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getEntropyProbeResultSizeTrustRegionMaxDistance(): int
+    {
+        return 10;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `entropyProbeResultSize` — {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
+     *   itself defines entropy as 0 for fewer than 2 scores, so anything below that has no real signal to
+     *   search over at all.
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getEntropyProbeResultSizeLowerBound(): int
+    {
+        return 2;
+    }
+
+    /**
+     * Specification:
+     * - Absolute upper bound on `entropyProbeResultSize`, and the actual number of raw `_score` values
+     *   fetched ONCE per query at the start of an optimization run (every candidate evaluation then
+     *   truncates that same cached list to its own proposed size instead of firing a fresh probe query per
+     *   candidate — the probe's raw scores don't depend on relevanceWeight/metric weights/exponent/shift at
+     *   all, only on which raw scores exist for that search term, so re-fetching per candidate would be
+     *   pure waste at the scale a real optimization run evaluates candidates).
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getMaxEntropyProbeResultSize(): int
+    {
+        return 50;
+    }
+
+    /**
+     * Specification:
+     * - Generation count both CmaEsAlgorithm and DifferentialEvolutionAlgorithm run for, when
+     *   OptimizationRunner drives an optimizer run — a fixed stopping criterion, not a fitness-plateau
+     *   detector (matches both algorithms' own kept-simple stopping rule). Also used, together with a
+     *   population size derived from the parameter vector's own dimensionality, to compute the progress
+     *   counter's denominator before a run actually starts.
+     *
+     * @api
+     *
+     * @return int
+     */
+    public static function getOptimizationMaxGenerations(): int
+    {
+        return 150;
+    }
+
+    /**
+     * Specification:
+     * - The bound (both directions) placed on each free z value {@see \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization}
+     *   works over — deliberately finite, NOT the mathematically-unconstrained +-INF that reparametrization
+     *   alone would allow. Both CmaEsAlgorithm (needs a finite midpoint to default its initial mean to) and
+     *   DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given bounds,
+     *   which is undefined arithmetic against an infinite range) need real, finite bounds to even start a
+     *   run — confirmed live, not a hypothetical. 10.0 is already an extreme corner of the simplex (a
+     *   softmax ratio of e^10 =~ 22000:1 against the other metrics), so this is not a meaningful
+     *   restriction on what the optimizer can actually reach in practice.
+     *
+     * @api
+     *
+     * @return float
+     */
+    public static function getMetricWeightZSpaceBound(): float
+    {
+        return 10.0;
+    }
+
+    /**
+     * Specification:
+     * - Function names, as they appear in a `search-ranking` metric's own formula DSL (see that package's
+     *   `MathFunctionProvider`), that make a formula's output non-deterministic across evaluations —
+     *   `random()` is the one such function that ships there today, deliberately returning a fresh
+     *   uniformly-distributed value on every call. A metric whose formula calls one of these is a
+     *   placeholder/noise signal, not a real business signal: automated weight optimization excludes it
+     *   from the searchable simplex (its weight is held fixed instead — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}),
+     *   and auto-tune never applies a refit to it (fitting a "better" curve to noise would just overfit to
+     *   whatever randomness happened to be in that digest snapshot, then silently swap in a formula that
+     *   *looks* like a real fit but carries no more signal than before) — though it's still checked and
+     *   logged normally, since observing a persistently bad fit is legitimate, only auto-*applying* a
+     *   refit for one isn't.
+     *
+     * @api
+     *
+     * @return array<int, string>
+     */
+    public static function getNonDeterministicFormulaFunctionNames(): array
+    {
+        return ['random'];
+    }
+
+    /**
+     * Specification:
+     * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
+     *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
+     *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_QUEUED = 'queued';
+
+    /**
+     * Specification:
+     * - The console command has picked this run up and is actively working through it — evolving
+     *   generations, evaluating candidates. Backs the Zed page's live progress counter.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_RUNNING = 'running';
+
+    /**
+     * Specification:
+     * - The run finished successfully — a winning candidate (best_relevance_weight/best_metric_weights/
+     *   best_score) is available for a human to review and, if they choose, Apply.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_DONE = 'done';
+
+    /**
+     * Specification:
+     * - The run stopped before producing a result — see the row's own error_message.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_RUN_STATUS_FAILED = 'failed';
+
+    /**
+     * Specification:
+     * - {@see \BlackboxOptimizer\Algorithm\CmaEsAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_CMA_ES = 'cma_es';
+
+    /**
+     * Specification:
+     * - {@see \BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION = 'differential_evolution';
 }

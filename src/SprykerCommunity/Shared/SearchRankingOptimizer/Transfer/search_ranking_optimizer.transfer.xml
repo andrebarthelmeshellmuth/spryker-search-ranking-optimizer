@@ -111,12 +111,18 @@
 
     <!-- Zed business layer -> Client bridge request: fire one _rank_eval call covering every rated query
          for a single (storeName, localeName) — mirrors Calibration's own store/locale scoping. cutoff is
-         the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). -->
+         the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). rankingConfiguration is
+         OPTIONAL: when null, RankEvalRunner fetches the LIVE synced search-ranking configuration (the
+         normal Evaluation-page path — "how good is our currently-configured ranking formula, really?").
+         When set, RankEvalRunner uses THIS configuration instead of the live one — never touching synced
+         storage — so a candidate weight vector can be scored without ever being applied. This is the exact
+         extension point Phase O6's optimizer needs to evaluate proposals it hasn't (and might never) apply. -->
     <transfer name="SearchRankingEvaluationRequest" strict="true">
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="cutoff" type="int"/>
         <property name="queries" type="SearchRankingEvaluationQuery[]" singular="query"/>
+        <property name="rankingConfiguration" type="SearchRankingConfigurationStorage"/>
     </transfer>
 
     <!-- One query's own nDCG@cutoff, read out of _rank_eval's response `details` map (NOT the response's
@@ -209,15 +215,20 @@
 
     <!-- One metric processed by a single auto-tune run. wasThresholdMet=true means the live formula's fit
          was already at or above autoTuneThreshold - nothing else on this transfer is meaningful (no refit
-         was computed, since none was needed). wasThresholdMet=false means a refit WAS computed
-         (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether it was
-         actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be persisted
-         through search-ranking's own facade, or it was only proposed (logged/emailed, formula left
-         untouched). -->
+         was computed, since none was needed). wasThresholdMet=false + wasSkippedNonDeterministic=true
+         means the fit dropped below threshold but the metric's own formula calls a non-deterministic
+         function (e.g. random()) - still checked and visible, but no refit was ever computed, since
+         fitting a "better" curve to noise would just overfit to whatever randomness happened to be in
+         that digest snapshot. wasThresholdMet=false + wasSkippedNonDeterministic=false means a refit WAS
+         computed (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether
+         it was actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be
+         persisted through search-ranking's own facade, or it was only proposed (logged/emailed, formula
+         left untouched). -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="metricName" type="string"/>
         <property name="wasThresholdMet" type="bool"/>
+        <property name="wasSkippedNonDeterministic" type="bool"/>
         <property name="beforeFormula" type="string"/>
         <property name="beforeFitRSquared" type="float"/>
         <property name="afterFormula" type="string"/>
@@ -245,6 +256,36 @@
     <transfer name="Mail">
         <property name="autoTuneMetricResults" type="SearchRankingAutoTuneMetricResult[]" singular="autoTuneMetricResult"/>
         <property name="autoTuneAnyApplied" type="bool"/>
+    </transfer>
+
+    <!-- Phase O6: one automated weight-optimization run, mirroring Calibration's own queue-then-process
+         lifecycle (status starts at 'queued', a console command picks up the oldest queued run and moves
+         it through 'running' to 'done'/'failed') and its progress-counter shape (totalCount/processedCount).
+         Reuses SearchRankingWeightCheckpointMetricWeight for bestMetricWeights, identical shape, no need
+         for a near-duplicate transfer. Always propose-only: a 'done' run's winning candidate is never
+         applied automatically, regardless of algorithm or score improvement — a human reviews it on the
+         Zed page and explicitly clicks Apply, which goes through the SAME write-through-facade +
+         checkpoint pipeline as any other weight change (see WeightCheckpointRestorer). -->
+    <transfer name="SearchRankingOptimizerRun" strict="true">
+        <property name="idSearchRankingOptimizerRun" type="int"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="algorithm" type="string"/>
+        <property name="status" type="string"/>
+        <property name="totalCount" type="int"/>
+        <property name="processedCount" type="int"/>
+        <property name="baselineScore" type="float"/>
+        <property name="bestRelevanceWeight" type="float"/>
+        <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>
+        <property name="bestScore" type="float"/>
+        <property name="bestEntropyWeightExponent" type="float"/>
+        <property name="bestEntropyWeightShiftMagnitude" type="float"/>
+        <property name="bestEntropyProbeResultSize" type="int"/>
+        <property name="completedAt" type="string"/>
+        <property name="errorMessage" type="string"/>
+        <property name="appliedAt" type="string"/>
+        <property name="createdAt" type="string"/>
+        <property name="updatedAt" type="string"/>
     </transfer>
 
 </transfers>

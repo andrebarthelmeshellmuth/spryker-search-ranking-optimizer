@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -284,4 +285,72 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
      */
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer;
+
+    /**
+     * Specification:
+     * - Queues a new optimization run in status=queued — nothing runs yet, that happens the next time
+     *   {@see runNextOptimization()} is called (a console command tick, in practice).
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     */
+    public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - Picks up and fully processes the oldest still-queued optimization run — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface::runNext()}
+     *   for the full specification. Returns null when nothing is queued.
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function runNextOptimization(): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - The run currently being worked, if any — backs a live Zed-page progress counter, safe to poll.
+     *
+     * @api
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - The most recently created optimization run for a given store/locale, regardless of status.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - Writes a done run's winning candidate through search-ranking's own facade and records a new
+     *   weight checkpoint (source = optimizer) — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface::apply()}
+     *   for the full specification. Returns null when the run doesn't exist or isn't status=done yet.
+     * - Callers MUST also republish (search-ranking-storage's own facade) afterward for this to actually
+     *   reach the live storefront — same discipline the Calibration apply action and the Checkpoint
+     *   restore action both already follow; this Facade method only writes Zed-side settings.
+     *
+     * @api
+     *
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function applyOptimizationRun(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 }

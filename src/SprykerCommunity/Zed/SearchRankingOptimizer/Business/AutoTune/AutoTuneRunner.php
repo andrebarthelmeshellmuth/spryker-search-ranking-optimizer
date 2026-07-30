@@ -17,6 +17,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -33,12 +34,14 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface $recipientResolver
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
      */
     public function __construct(
         protected SearchRankingOptimizerRepositoryInterface $repository,
         protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         protected AutoTuneNotificationRecipientResolverInterface $recipientResolver,
         protected SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade,
+        protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
     ) {
     }
 
@@ -61,9 +64,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
             $resultTransfer->addMetricResult($metricResultTransfer);
 
-            if (!$metricResultTransfer->getWasThresholdMet() && $autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
-                $metricResultsToNotify[] = $metricResultTransfer;
+            if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
+                continue;
             }
+
+            $metricResultsToNotify[] = $metricResultTransfer;
         }
 
         $notifiedEmailCount = $metricResultsToNotify === [] ? 0 : $this->sendSummaryEmail($metricResultsToNotify);
@@ -99,12 +104,24 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             ->setIdSearchRankingMetric($idSearchRankingMetric)
             ->setMetricName($metric['name'])
             ->setBeforeFormula($metric['formula'])
-            ->setBeforeFitRSquared($currentFitRSquared);
+            ->setBeforeFitRSquared($currentFitRSquared)
+            ->setWasSkippedNonDeterministic(false);
 
         if ($currentFitRSquared >= $autoTuneMetricConfigTransfer->getAutoTuneThresholdOrFail()) {
             $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric);
 
             return $metricResultTransfer->setWasThresholdMet(true)->setWasApplied(false);
+        }
+
+        // A non-deterministic formula (e.g. a placeholder/noise metric) still gets checked and shows up
+        // in history/the summary email with its real (likely persistently bad) fit -- that observation is
+        // legitimate. What it never gets is a refit: fitting a "better" curve to noise would just overfit
+        // to whatever randomness happened to be in THIS digest snapshot, then silently swap in a formula
+        // that looks like a real fit but carries no more signal than random() did.
+        if (!$this->formulaDeterminismChecker->isDeterministic($metric['formula'])) {
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric);
+
+            return $metricResultTransfer->setWasThresholdMet(false)->setWasSkippedNonDeterministic(true)->setWasApplied(false);
         }
 
         return $this->refit($metricResultTransfer, $metric, $autoTuneMetricConfigTransfer);
@@ -205,9 +222,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $anyApplied = false;
 
         foreach ($metricResultTransfers as $metricResultTransfer) {
-            if ($metricResultTransfer->getWasApplied()) {
-                $anyApplied = true;
+            if (!$metricResultTransfer->getWasApplied()) {
+                continue;
             }
+
+            $anyApplied = true;
         }
 
         $mailTransfer = (new MailTransfer())

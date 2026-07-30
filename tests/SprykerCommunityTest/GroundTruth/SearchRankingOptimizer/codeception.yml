@@ -1,0 +1,24 @@
+namespace: SprykerCommunityTest\GroundTruth\SearchRankingOptimizer
+
+paths:
+    tests: .
+    data: _data
+    support: _support
+    output: _output
+
+coverage:
+    enabled: false
+
+suites:
+    GroundTruth:
+        path: .
+        actor: SearchRankingOptimizerGroundTruthTester
+        modules:
+            enabled:
+                - \PyzTest\Shared\Testify\Helper\Environment
+                - \SprykerTest\Shared\Testify\Helper\ConfigHelper
+                - \SprykerTest\Shared\Testify\Helper\LocatorHelper:
+                    projectNamespaces: ['Pyz']
+                    coreNamespaces: ['SprykerShop', 'Spryker', 'SprykerEco', 'SprykerSdk', 'SprykerFeature', 'SprykerCommunity']
+                - \SprykerTest\Shared\Testify\Helper\DependencyHelper
+                - \SprykerTest\Shared\Propel\Helper\TransactionHelper

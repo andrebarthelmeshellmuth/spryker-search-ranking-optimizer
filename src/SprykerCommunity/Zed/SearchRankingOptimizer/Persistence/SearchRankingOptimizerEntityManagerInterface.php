@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
@@ -160,4 +161,86 @@ interface SearchRankingOptimizerEntityManagerInterface
     public function saveAutoTuneMetricConfig(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
     ): SearchRankingAutoTuneMetricConfigTransfer;
+
+    /**
+     * Queues a new optimization run — status=queued, store/locale/algorithm set, everything else at its
+     * column default until the console command actually picks this run up.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     */
+    public function createOptimizerRun(SearchRankingOptimizerRunTransfer $optimizerRunTransfer): SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Transitions queued -> running: sets totalCount (the planned evaluation budget, population size *
+     * generations) and baselineScore (the live configuration's own score at the moment this run starts,
+     * for later "improved from X to Y" comparison) — both known only once the console command actually
+     * starts working the run, never at queue time. A safe no-op if the id no longer exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     * @param int $totalCount
+     * @param float $baselineScore
+     *
+     * @return void
+     */
+    public function startOptimizerRun(int $idSearchRankingOptimizerRun, int $totalCount, float $baselineScore): void;
+
+    /**
+     * Sets processedCount to the given value (NOT an increment) — CMA-ES/DE naturally complete a whole
+     * generation's worth of evaluations at once, so the console command calls this with the cumulative
+     * total after each generation, not once per individual candidate. A safe no-op if the id no longer
+     * exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     * @param int $processedCount
+     *
+     * @return void
+     */
+    public function updateOptimizerRunProgress(int $idSearchRankingOptimizerRun, int $processedCount): void;
+
+    /**
+     * Transitions running -> done: persists the winning candidate and sets completedAt. A safe no-op if
+     * the id no longer exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     * @param float $bestRelevanceWeight
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
+     * @param float $bestScore
+     * @param float $bestEntropyWeightExponent
+     * @param float $bestEntropyWeightShiftMagnitude
+     * @param int $bestEntropyProbeResultSize
+     *
+     * @return void
+     */
+    public function completeOptimizerRun(
+        int $idSearchRankingOptimizerRun,
+        float $bestRelevanceWeight,
+        array $bestMetricWeightTransfers,
+        float $bestScore,
+        float $bestEntropyWeightExponent,
+        float $bestEntropyWeightShiftMagnitude,
+        int $bestEntropyProbeResultSize,
+    ): void;
+
+    /**
+     * Transitions to failed with an explanatory error message. A safe no-op if the id no longer exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     * @param string $errorMessage
+     *
+     * @return void
+     */
+    public function failOptimizerRun(int $idSearchRankingOptimizerRun, string $errorMessage): void;
+
+    /**
+     * Sets appliedAt to now — a run's winning candidate is applied at most meaningfully once (the Zed
+     * page hides/disables Apply once this is set), but calling this again is harmless (just bumps the
+     * timestamp). A safe no-op if the id no longer exists.
+     *
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return void
+     */
+    public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void;
 }

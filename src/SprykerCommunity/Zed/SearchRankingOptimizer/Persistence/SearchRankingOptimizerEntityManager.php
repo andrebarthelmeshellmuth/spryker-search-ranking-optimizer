@@ -13,6 +13,7 @@ use DateTime;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
@@ -20,6 +21,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricCon
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
@@ -367,5 +369,143 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $autoTuneMetricConfigEntity->save();
 
         return $mapper->mapAutoTuneMetricConfigEntityToTransfer($autoTuneMetricConfigEntity, $autoTuneMetricConfigTransfer);
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     */
+    public function createOptimizerRun(SearchRankingOptimizerRunTransfer $optimizerRunTransfer): SearchRankingOptimizerRunTransfer
+    {
+        $optimizerRunEntity = new SpySearchRankingOptimizerRun();
+        $optimizerRunEntity->setStoreName($optimizerRunTransfer->getStoreNameOrFail());
+        $optimizerRunEntity->setLocaleName($optimizerRunTransfer->getLocaleNameOrFail());
+        $optimizerRunEntity->setAlgorithm($optimizerRunTransfer->getAlgorithmOrFail());
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+        $optimizerRunEntity->save();
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, $optimizerRunTransfer);
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     * @param int $totalCount
+     * @param float $baselineScore
+     *
+     * @return void
+     */
+    public function startOptimizerRun(int $idSearchRankingOptimizerRun, int $totalCount, float $baselineScore): void
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_RUNNING);
+        $optimizerRunEntity->setTotalCount($totalCount);
+        $optimizerRunEntity->setBaselineScore($baselineScore);
+        $optimizerRunEntity->save();
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     * @param int $processedCount
+     *
+     * @return void
+     */
+    public function updateOptimizerRunProgress(int $idSearchRankingOptimizerRun, int $processedCount): void
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setProcessedCount($processedCount);
+        $optimizerRunEntity->save();
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     * @param float $bestRelevanceWeight
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
+     * @param float $bestScore
+     *
+     * @return void
+     */
+    public function completeOptimizerRun(
+        int $idSearchRankingOptimizerRun,
+        float $bestRelevanceWeight,
+        array $bestMetricWeightTransfers,
+        float $bestScore,
+        float $bestEntropyWeightExponent,
+        float $bestEntropyWeightShiftMagnitude,
+        int $bestEntropyProbeResultSize,
+    ): void {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
+        $optimizerRunEntity->setBestRelevanceWeight($bestRelevanceWeight);
+        $optimizerRunEntity->setBestMetricWeights($this->getFactory()->createSearchRankingOptimizerMapper()->encodeMetricWeights($bestMetricWeightTransfers));
+        $optimizerRunEntity->setBestScore($bestScore);
+        $optimizerRunEntity->setBestEntropyWeightExponent($bestEntropyWeightExponent);
+        $optimizerRunEntity->setBestEntropyWeightShiftMagnitude($bestEntropyWeightShiftMagnitude);
+        $optimizerRunEntity->setBestEntropyProbeResultSize($bestEntropyProbeResultSize);
+        $optimizerRunEntity->setCompletedAt(new DateTime());
+        $optimizerRunEntity->save();
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     * @param string $errorMessage
+     *
+     * @return void
+     */
+    public function failOptimizerRun(int $idSearchRankingOptimizerRun, string $errorMessage): void
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_FAILED);
+        $optimizerRunEntity->setErrorMessage($errorMessage);
+        $optimizerRunEntity->save();
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return void
+     */
+    public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return;
+        }
+
+        $optimizerRunEntity->setAppliedAt(new DateTime());
+        $optimizerRunEntity->save();
     }
 }

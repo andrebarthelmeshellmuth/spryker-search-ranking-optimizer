@@ -19,9 +19,13 @@
                     R² = {{ metricResult.beforeFitRSquared }}
                 </td>
                 <td>
-                    {{ metricResult.afterFormula }}<br />
-                    R² = {{ metricResult.afterFitRSquared }}
-                    {{ metricResult.wasApplied ? ' — applied' : ' — proposed, not applied' }}
+                    {% if metricResult.wasSkippedNonDeterministic %}
+                        (skipped — formula is non-deterministic, no refit possible)
+                    {% else %}
+                        {{ metricResult.afterFormula }}<br />
+                        R² = {{ metricResult.afterFitRSquared }}
+                        {{ metricResult.wasApplied ? ' — applied' : ' — proposed, not applied' }}
+                    {% endif %}
                 </td>
             </tr>
         {% endfor %}

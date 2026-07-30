@@ -16,16 +16,10 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRanki
 class ProductRelevanceJudgmentStub implements ProductRelevanceJudgmentStubInterface
 {
     /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface
-     */
-    protected SearchRankingOptimizerToZedRequestInterface $zedRequestClient;
-
-    /**
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface $zedRequestClient
      */
-    public function __construct(SearchRankingOptimizerToZedRequestInterface $zedRequestClient)
+    public function __construct(protected SearchRankingOptimizerToZedRequestInterface $zedRequestClient)
     {
-        $this->zedRequestClient = $zedRequestClient;
     }
 
     /**

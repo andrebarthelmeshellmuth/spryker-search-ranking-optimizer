@@ -14,12 +14,22 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager;
 
@@ -56,6 +66,21 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     protected array $autoTuneMetricConfigIds = [];
 
     /**
+     * @var array<int>
+     */
+    protected array $optimizerRunIds = [];
+
+    /**
+     * @var array<int>
+     */
+    protected array $queryIds = [];
+
+    /**
+     * @var array<int>
+     */
+    protected array $weightCheckpointIds = [];
+
+    /**
      * @return void
      */
     protected function _after(): void
@@ -70,6 +95,19 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         foreach ($this->autoTuneMetricConfigIds as $idSearchRankingAutoTuneMetricConfig) {
             SpySearchRankingAutoTuneMetricConfigQuery::create()->findOneByIdSearchRankingAutoTuneMetricConfig($idSearchRankingAutoTuneMetricConfig)?->delete();
+        }
+
+        foreach ($this->optimizerRunIds as $idSearchRankingOptimizerRun) {
+            SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun)?->delete();
+        }
+
+        foreach ($this->queryIds as $idSearchRankingQuery) {
+            SpySearchRankingQueryRatingQuery::create()->filterByFkSearchRankingQuery($idSearchRankingQuery)->find()->delete();
+            SpySearchRankingQueryQuery::create()->findOneByIdSearchRankingQuery($idSearchRankingQuery)?->delete();
+        }
+
+        foreach ($this->weightCheckpointIds as $idSearchRankingWeightCheckpoint) {
+            SpySearchRankingWeightCheckpointQuery::create()->findOneByIdSearchRankingWeightCheckpoint($idSearchRankingWeightCheckpoint)?->delete();
         }
 
         parent::_after();
@@ -388,5 +426,438 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         }
 
         $this->calibrationEntities[] = $calibrationEntity;
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateOptimizerRunPersistsAQueuedRun(): void
+    {
+        // Arrange
+        $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun($optimizerRunTransfer);
+        $this->optimizerRunIds[] = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingOptimizerRun());
+        $this->assertSame('DE', $resultTransfer->getStoreName());
+        $this->assertSame('en_US', $resultTransfer->getLocaleName());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, $resultTransfer->getAlgorithm());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED, $resultTransfer->getStatus());
+        $this->assertSame(0, $resultTransfer->getTotalCount());
+        $this->assertSame(0, $resultTransfer->getProcessedCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testStartOptimizerRunTransitionsToRunningAndSetsTotalCountAndBaselineScore(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->startOptimizerRun($idSearchRankingOptimizerRun, 400, 0.65);
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_RUNNING, $entity->getStatus());
+        $this->assertSame(400, $entity->getTotalCount());
+        $this->assertSame(0.65, $entity->getBaselineScore());
+    }
+
+    /**
+     * @return void
+     */
+    public function testStartOptimizerRunIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->startOptimizerRun(999999999, 400, 0.65);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpdateOptimizerRunProgressSetsProcessedCountToTheGivenValue(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->updateOptimizerRunProgress($idSearchRankingOptimizerRun, 240);
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertSame(240, $entity->getProcessedCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpdateOptimizerRunProgressIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->updateOptimizerRunProgress(999999999, 240);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testCompleteOptimizerRunPersistsTheWinningCandidateAndSetsStatusDone(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+        $bestMetricWeightTransfers = [
+            (new SearchRankingWeightCheckpointMetricWeightTransfer())->setIdSearchRankingMetric(1)->setName('top_seller')->setWeight(0.6),
+            (new SearchRankingWeightCheckpointMetricWeightTransfer())->setIdSearchRankingMetric(2)->setName('pdp_impressions')->setWeight(0.4),
+        ];
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 1.2, 0.25, 12);
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $entity->getStatus());
+        $this->assertSame(0.8, $entity->getBestRelevanceWeight());
+        $this->assertSame(0.91, $entity->getBestScore());
+        $this->assertSame(1.2, $entity->getBestEntropyWeightExponent());
+        $this->assertSame(0.25, $entity->getBestEntropyWeightShiftMagnitude());
+        $this->assertSame(12, $entity->getBestEntropyProbeResultSize());
+        $this->assertNotNull($entity->getCompletedAt());
+        $this->assertStringContainsString('top_seller', (string)$entity->getBestMetricWeights());
+    }
+
+    /**
+     * @return void
+     */
+    public function testCompleteOptimizerRunIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 1.2, 0.25, 12);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testFailOptimizerRunSetsStatusFailedAndTheErrorMessage(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->failOptimizerRun($idSearchRankingOptimizerRun, 'Elasticsearch timed out.');
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_FAILED, $entity->getStatus());
+        $this->assertSame('Elasticsearch timed out.', $entity->getErrorMessage());
+    }
+
+    /**
+     * @return void
+     */
+    public function testFailOptimizerRunIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->failOptimizerRun(999999999, 'irrelevant');
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testMarkOptimizerRunAppliedSetsAppliedAt(): void
+    {
+        // Arrange
+        $idSearchRankingOptimizerRun = $this->createTestOptimizerRun();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->markOptimizerRunApplied($idSearchRankingOptimizerRun);
+
+        // Assert
+        $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+        $this->assertNotNull($entity->getAppliedAt());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMarkOptimizerRunAppliedIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->markOptimizerRunApplied(999999999);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return int
+     */
+    protected function createTestOptimizerRun(): int
+    {
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun(
+            (new SearchRankingOptimizerRunTransfer())
+                ->setStoreName('DE')
+                ->setLocaleName('en_US')
+                ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES),
+        );
+
+        $idSearchRankingOptimizerRun = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
+        $this->optimizerRunIds[] = $idSearchRankingOptimizerRun;
+
+        return $idSearchRankingOptimizerRun;
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateQueryPersistsTheQuery(): void
+    {
+        // Arrange
+        $queryTransfer = (new SearchRankingQueryTransfer())
+            ->setSearchTerm('chair')
+            ->setStoreName('DE-TEST-CREATE-QUERY')
+            ->setLocaleName('en_US')
+            ->setImportanceWeight(2.5);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createQuery($queryTransfer);
+        $this->queryIds[] = $resultTransfer->getIdSearchRankingQueryOrFail();
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingQuery());
+        $this->assertSame('chair', $resultTransfer->getSearchTerm());
+        $this->assertSame('DE-TEST-CREATE-QUERY', $resultTransfer->getStoreName());
+        $this->assertSame('en_US', $resultTransfer->getLocaleName());
+        $this->assertSame(2.5, $resultTransfer->getImportanceWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateQueryDefaultsImportanceWeightWhenNoneGiven(): void
+    {
+        // Arrange
+        $queryTransfer = (new SearchRankingQueryTransfer())
+            ->setSearchTerm('desk')
+            ->setStoreName('DE-TEST-CREATE-QUERY-DEFAULT')
+            ->setLocaleName('en_US');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createQuery($queryTransfer);
+        $this->queryIds[] = $resultTransfer->getIdSearchRankingQueryOrFail();
+
+        // Assert -- the entity's own column default applies, this must not have thrown or forced null through.
+        $this->assertNotNull($resultTransfer->getImportanceWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpdateQueryImportanceWeightChangesTheWeightOfAnExistingQuery(): void
+    {
+        // Arrange
+        $queryEntity = $this->createTestQueryEntity('lamp', 'DE-TEST-UPDATE-IMPORTANCE', 'en_US');
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->updateQueryImportanceWeight($queryEntity->getIdSearchRankingQuery(), 4.0);
+
+        // Assert
+        $queryEntity->reload();
+        $this->assertSame(4.0, $queryEntity->getImportanceWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpdateQueryImportanceWeightIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->updateQueryImportanceWeight(999999999, 4.0);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testTouchQuerySetsUpdatedAtToNow(): void
+    {
+        // Arrange
+        $queryEntity = $this->createTestQueryEntity('sofa', 'DE-TEST-TOUCH-QUERY', 'en_US');
+        $queryEntity->setUpdatedAt('2026-01-01 00:00:00');
+        $queryEntity->save();
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->touchQuery($queryEntity->getIdSearchRankingQuery());
+
+        // Assert
+        $queryEntity->reload();
+        $this->assertGreaterThan(strtotime('2026-01-01 00:00:00'), (int)$queryEntity->getUpdatedAt('U'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testTouchQueryIsASafeNoOpForANonExistentId(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->touchQuery(999999999);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpsertRatingCreatesANewRatingAndTouchesTheQuery(): void
+    {
+        // Arrange -- id 9 is a real seeded product abstract (M1006811), needed to satisfy the rating
+        // table's real FK constraint to spy_product_abstract.
+        $queryEntity = $this->createTestQueryEntity('chair', 'DE-TEST-UPSERT-RATING-NEW', 'en_US');
+        $queryEntity->setUpdatedAt('2026-01-01 00:00:00');
+        $queryEntity->save();
+
+        $ratingTransfer = (new SearchRankingQueryRatingTransfer())
+            ->setFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+            ->setCustomerReference('CUST-UPSERT-1')
+            ->setFkProductAbstract(9)
+            ->setRatingType('heart');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->upsertRating($ratingTransfer);
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingQueryRating());
+        $this->assertSame('heart', $resultTransfer->getRatingType());
+
+        $queryEntity->reload();
+        $this->assertGreaterThan(strtotime('2026-01-01 00:00:00'), (int)$queryEntity->getUpdatedAt('U'), 'upsertRating() must touch the parent query.');
+    }
+
+    /**
+     * @return void
+     */
+    public function testUpsertRatingUpdatesTheExistingRatingInsteadOfCreatingASecondOneForTheSameTriple(): void
+    {
+        // Arrange
+        $queryEntity = $this->createTestQueryEntity('chair', 'DE-TEST-UPSERT-RATING-UPDATE', 'en_US');
+        $entityManager = new SearchRankingOptimizerEntityManager();
+
+        $firstRatingTransfer = (new SearchRankingQueryRatingTransfer())
+            ->setFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+            ->setCustomerReference('CUST-UPSERT-2')
+            ->setFkProductAbstract(9)
+            ->setRatingType('heart');
+        $entityManager->upsertRating($firstRatingTransfer);
+
+        // Act -- same identifying triple, different rating type
+        $secondRatingTransfer = (new SearchRankingQueryRatingTransfer())
+            ->setFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+            ->setCustomerReference('CUST-UPSERT-2')
+            ->setFkProductAbstract(9)
+            ->setRatingType('cross');
+        $entityManager->upsertRating($secondRatingTransfer);
+
+        // Assert
+        $ratingEntities = SpySearchRankingQueryRatingQuery::create()
+            ->filterByFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+            ->filterByCustomerReference('CUST-UPSERT-2')
+            ->filterByFkProductAbstract(9)
+            ->find();
+
+        $this->assertCount(1, $ratingEntities, 'the second upsert must update the existing row, not create a second one.');
+        $this->assertSame('cross', $ratingEntities->getFirst()->getRatingType());
+    }
+
+    /**
+     * @return void
+     */
+    public function testDeleteRatingRemovesTheMatchingRating(): void
+    {
+        // Arrange
+        $queryEntity = $this->createTestQueryEntity('chair', 'DE-TEST-DELETE-RATING', 'en_US');
+        (new SearchRankingOptimizerEntityManager())->upsertRating(
+            (new SearchRankingQueryRatingTransfer())
+                ->setFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+                ->setCustomerReference('CUST-DELETE-1')
+                ->setFkProductAbstract(9)
+                ->setRatingType('heart'),
+        );
+
+        // Act
+        (new SearchRankingOptimizerEntityManager())->deleteRating($queryEntity->getIdSearchRankingQuery(), 'CUST-DELETE-1', 9);
+
+        // Assert
+        $this->assertSame(
+            0,
+            SpySearchRankingQueryRatingQuery::create()
+                ->filterByFkSearchRankingQuery($queryEntity->getIdSearchRankingQuery())
+                ->filterByCustomerReference('CUST-DELETE-1')
+                ->filterByFkProductAbstract(9)
+                ->count(),
+        );
+    }
+
+    /**
+     * @return void
+     */
+    public function testDeleteRatingIsASafeNoOpWhenNoMatchingRatingExists(): void
+    {
+        (new SearchRankingOptimizerEntityManager())->deleteRating(999999999, 'CUST-NONE', 9);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateWeightCheckpointPersistsEveryFieldAndEncodesTheMetricWeights(): void
+    {
+        // Arrange
+        $weightCheckpointTransfer = (new SearchRankingWeightCheckpointTransfer())
+            ->setSource(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER)
+            ->setRelevanceWeight(0.85)
+            ->setEntropyProbeResultSize(50)
+            ->setEntropyWeightExponent(1.5)
+            ->setEntropyWeightShiftMagnitude(0.1)
+            ->setIsEntropyWeightingEnabled(true)
+            ->addMetricWeight(
+                (new SearchRankingWeightCheckpointMetricWeightTransfer())
+                    ->setIdSearchRankingMetric(1)
+                    ->setName('top_seller')
+                    ->setWeight(0.6),
+            );
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createWeightCheckpoint($weightCheckpointTransfer);
+        $this->weightCheckpointIds[] = $resultTransfer->getIdSearchRankingWeightCheckpointOrFail();
+
+        // Assert
+        $this->assertNotNull($resultTransfer->getIdSearchRankingWeightCheckpoint());
+        $this->assertSame(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, $resultTransfer->getSource());
+        $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
+        $this->assertTrue($resultTransfer->getIsEntropyWeightingEnabled());
+        $metricWeightTransfers = iterator_to_array($resultTransfer->getMetricWeights());
+        $this->assertCount(1, $metricWeightTransfers);
+        $this->assertSame('top_seller', $metricWeightTransfers[0]->getName());
+        $this->assertSame(0.6, $metricWeightTransfers[0]->getWeight());
+    }
+
+    /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery
+     */
+    protected function createTestQueryEntity(string $searchTerm, string $storeName, string $localeName): SpySearchRankingQuery
+    {
+        $queryEntity = new SpySearchRankingQuery();
+        $queryEntity->setSearchTerm($searchTerm);
+        $queryEntity->setStoreName($storeName);
+        $queryEntity->setLocaleName($localeName);
+        $queryEntity->save();
+
+        $this->queryIds[] = $queryEntity->getIdSearchRankingQuery();
+
+        return $queryEntity;
     }
 }

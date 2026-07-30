@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
@@ -21,6 +22,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricCon
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
@@ -87,7 +89,7 @@ class SearchRankingOptimizerMapper
             return [];
         }
 
-        return array_map('floatval', explode(',', $scores));
+        return array_map(static fn (string $value): float => (float)$value, explode(',', $scores));
     }
 
     /**
@@ -262,5 +264,46 @@ class SearchRankingOptimizerMapper
         $autoTuneMetricConfigEntity->setIsNotifyEnabled($autoTuneMetricConfigTransfer->getIsNotifyEnabled() ?? false);
 
         return $autoTuneMetricConfigEntity;
+    }
+
+    /**
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun $optimizerRunEntity
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     */
+    public function mapOptimizerRunEntityToTransfer(
+        SpySearchRankingOptimizerRun $optimizerRunEntity,
+        SearchRankingOptimizerRunTransfer $optimizerRunTransfer,
+    ): SearchRankingOptimizerRunTransfer {
+        $optimizerRunTransfer
+            ->setIdSearchRankingOptimizerRun($optimizerRunEntity->getIdSearchRankingOptimizerRun())
+            ->setStoreName($optimizerRunEntity->getStoreName())
+            ->setLocaleName($optimizerRunEntity->getLocaleName())
+            ->setAlgorithm($optimizerRunEntity->getAlgorithm())
+            ->setStatus($optimizerRunEntity->getStatus())
+            ->setTotalCount($optimizerRunEntity->getTotalCount())
+            ->setProcessedCount($optimizerRunEntity->getProcessedCount())
+            ->setBaselineScore($optimizerRunEntity->getBaselineScore())
+            ->setBestRelevanceWeight($optimizerRunEntity->getBestRelevanceWeight())
+            ->setBestScore($optimizerRunEntity->getBestScore())
+            ->setBestEntropyWeightExponent($optimizerRunEntity->getBestEntropyWeightExponent())
+            ->setBestEntropyWeightShiftMagnitude($optimizerRunEntity->getBestEntropyWeightShiftMagnitude())
+            ->setBestEntropyProbeResultSize($optimizerRunEntity->getBestEntropyProbeResultSize())
+            ->setCompletedAt($optimizerRunEntity->getCompletedAt()?->format(DATE_ATOM))
+            ->setErrorMessage($optimizerRunEntity->getErrorMessage())
+            ->setAppliedAt($optimizerRunEntity->getAppliedAt()?->format(DATE_ATOM))
+            ->setCreatedAt($optimizerRunEntity->getCreatedAt()?->format(DATE_ATOM))
+            ->setUpdatedAt($optimizerRunEntity->getUpdatedAt()?->format(DATE_ATOM));
+
+        $bestMetricWeightsJson = $optimizerRunEntity->getBestMetricWeights();
+
+        if ($bestMetricWeightsJson !== null) {
+            foreach ($this->decodeMetricWeights($bestMetricWeightsJson) as $metricWeightTransfer) {
+                $optimizerRunTransfer->addBestMetricWeight($metricWeightTransfer);
+            }
+        }
+
+        return $optimizerRunTransfer;
     }
 }

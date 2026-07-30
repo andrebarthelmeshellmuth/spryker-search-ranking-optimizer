@@ -17,6 +17,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetri
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\OptimizationApplyForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\OptimizeRunForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\QueryImportanceWeightForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RecordWeightCheckpointForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RestoreWeightCheckpointForm;
@@ -209,6 +211,39 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
             AutoTuneMetricConfigForm::FIELD_IS_AUTO_UPDATE_ENABLED => $isAutoUpdateEnabled,
             AutoTuneMetricConfigForm::FIELD_AUTO_UPDATE_SCOPE => $autoUpdateScope,
             AutoTuneMetricConfigForm::FIELD_IS_NOTIFY_ENABLED => $isNotifyEnabled,
+        ]);
+    }
+
+    /**
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createOptimizeRunForm(): FormInterface
+    {
+        $storeChoices = [];
+        foreach ($this->getStoreFacade()->getAllStores() as $storeTransfer) {
+            $storeChoices[$storeTransfer->getNameOrFail()] = $storeTransfer->getNameOrFail();
+        }
+
+        $localeChoices = [];
+        foreach ($this->getLocaleFacade()->getAvailableLocales() as $localeName) {
+            $localeChoices[$localeName] = $localeName;
+        }
+
+        return $this->getFormFactory()->create(OptimizeRunForm::class, null, [
+            OptimizeRunForm::OPTION_STORE_CHOICES => $storeChoices,
+            OptimizeRunForm::OPTION_LOCALE_CHOICES => $localeChoices,
+        ]);
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Symfony\Component\Form\FormInterface
+     */
+    public function createOptimizationApplyForm(int $idSearchRankingOptimizerRun): FormInterface
+    {
+        return $this->getFormFactory()->create(OptimizationApplyForm::class, [
+            OptimizationApplyForm::FIELD_ID_SEARCH_RANKING_OPTIMIZER_RUN => $idSearchRankingOptimizerRun,
         ]);
     }
 }

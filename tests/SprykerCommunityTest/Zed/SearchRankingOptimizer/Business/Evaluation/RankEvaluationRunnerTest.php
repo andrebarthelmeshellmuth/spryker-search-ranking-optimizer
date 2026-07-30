@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Evaluation;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryScoreTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
@@ -154,6 +155,101 @@ class RankEvaluationRunnerTest extends Unit
         // Assert
         $this->assertNotNull($result);
         $this->assertSame(2, $result->getQueryCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testEvaluateCandidateReturnsNullWhenNoQueriesExistForStoreLocale(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('createEvaluation');
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock);
+
+        // Act
+        $result = $runner->evaluateCandidate('DE', 'en_US', new SearchRankingConfigurationStorageTransfer());
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    /**
+     * The whole point of this method: it must NEVER call createEvaluation, no matter how many times it's
+     * called or how successful the evaluation is -- an optimizer loop calling this hundreds of times per
+     * run must not flood spy_search_ranking_evaluation with candidate-scoring noise.
+     *
+     * @return void
+     */
+    public function testEvaluateCandidateNeverPersistsAnEvaluation(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([$this->createQueryTransfer(1, 'chair', 1.0)]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->method('evaluateRankings')->willReturn(
+            (new SearchRankingEvaluationResponseTransfer())
+                ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.42)),
+        );
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('createEvaluation');
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingClientMock);
+
+        // Act
+        $result = $runner->evaluateCandidate('DE', 'en_US', new SearchRankingConfigurationStorageTransfer());
+
+        // Assert
+        $this->assertEqualsWithDelta(0.42, $result, 0.0001);
+    }
+
+    /**
+     * The other half of the point: the candidate configuration must actually reach the fired query, not
+     * be silently dropped -- otherwise every candidate an optimizer proposes would score identically,
+     * exactly the original bug this method exists to avoid re-introducing.
+     *
+     * @return void
+     */
+    public function testEvaluateCandidatePassesTheGivenConfigurationThroughToTheRequest(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([$this->createQueryTransfer(1, 'chair', 1.0)]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $candidateConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.42)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setMetricWeights(['top_seller' => 1.0]);
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->expects($this->once())
+            ->method('evaluateRankings')
+            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer) use ($candidateConfigurationTransfer): bool {
+                return $requestTransfer->getRankingConfiguration() === $candidateConfigurationTransfer;
+            }))
+            ->willReturn(
+                (new SearchRankingEvaluationResponseTransfer())
+                    ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.5)),
+            );
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingClientMock);
+
+        // Act
+        $result = $runner->evaluateCandidate('DE', 'en_US', $candidateConfigurationTransfer);
+
+        // Assert
+        $this->assertNotNull($result);
     }
 
     /**

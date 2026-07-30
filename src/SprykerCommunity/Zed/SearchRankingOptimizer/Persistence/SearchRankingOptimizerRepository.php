@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
@@ -388,5 +389,88 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         }
 
         return $autoTuneMetricConfigTransfers;
+    }
+
+    /**
+     * @param int $idSearchRankingOptimizerRun
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
+
+        if ($optimizerRunEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
+    }
+
+    /**
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOldestQueuedOptimizerRun(): ?SearchRankingOptimizerRunTransfer
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->filterByStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED)
+            ->orderByIdSearchRankingOptimizerRun(Criteria::ASC)
+            ->findOne();
+
+        if ($optimizerRunEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
+    }
+
+    /**
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->filterByStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_RUNNING)
+            ->findOne();
+
+        if ($optimizerRunEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
+     */
+    public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer
+    {
+        $optimizerRunEntity = $this->getFactory()
+            ->createSearchRankingOptimizerRunQuery()
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
+            ->orderByCreatedAt(Criteria::DESC)
+            ->findOne();
+
+        if ($optimizerRunEntity === null) {
+            return null;
+        }
+
+        return $this->getFactory()
+            ->createSearchRankingOptimizerMapper()
+            ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
     }
 }
