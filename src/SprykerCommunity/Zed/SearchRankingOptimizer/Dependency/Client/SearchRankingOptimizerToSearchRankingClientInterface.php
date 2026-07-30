@@ -30,4 +30,14 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
      * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
+
+    /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     * @param int $idProductAbstract
+     *
+     * @return bool
+     */
+    public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
 }

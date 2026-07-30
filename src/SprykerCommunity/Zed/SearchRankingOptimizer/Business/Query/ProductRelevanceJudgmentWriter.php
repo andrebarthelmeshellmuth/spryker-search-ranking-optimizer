@@ -14,6 +14,8 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -32,11 +34,13 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface $searchTermCanonicalizer
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient
      */
     public function __construct(
         protected SearchTermCanonicalizerInterface $searchTermCanonicalizer,
         protected SearchRankingOptimizerRepositoryInterface $repository,
         protected SearchRankingOptimizerEntityManagerInterface $entityManager,
+        protected SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient,
     ) {
     }
 
@@ -46,6 +50,7 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
      *
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
@@ -61,9 +66,23 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
             ));
         }
 
-        $canonicalSearchTerm = $this->searchTermCanonicalizer->canonicalize($requestTransfer->getSearchTermOrFail());
+        $rawSearchTerm = $requestTransfer->getSearchTermOrFail();
         $storeName = $requestTransfer->getStoreNameOrFail();
         $localeName = $requestTransfer->getLocaleNameOrFail();
+        $idProductAbstract = $requestTransfer->getIdProductAbstractOrFail();
+
+        // Checked against the RAW search term, not the canonicalized one below -- this must reflect
+        // whatever a customer's real search actually returned, and canonicalization is a storage-grouping
+        // concern with no bearing on what Elasticsearch would have matched for their real query.
+        if (!$this->searchRankingClient->productMatchesSearch($rawSearchTerm, $storeName, $localeName, $idProductAbstract)) {
+            throw new ProductNotInSearchResultsException(sprintf(
+                'Product #%d is not among the current search results for "%s" -- refusing to record a judgment for a pair that could not have come from a real search.',
+                $idProductAbstract,
+                $rawSearchTerm,
+            ));
+        }
+
+        $canonicalSearchTerm = $this->searchTermCanonicalizer->canonicalize($rawSearchTerm);
 
         $queryTransfer = $this->repository->findQueryByTermStoreLocale($canonicalSearchTerm, $storeName, $localeName);
 
@@ -79,7 +98,7 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
         $ratingTransfer = (new SearchRankingQueryRatingTransfer())
             ->setFkSearchRankingQuery($queryTransfer->getIdSearchRankingQueryOrFail())
             ->setCustomerReference($requestTransfer->getCustomerReferenceOrFail())
-            ->setFkProductAbstract($requestTransfer->getIdProductAbstractOrFail())
+            ->setFkProductAbstract($idProductAbstract)
             ->setRatingType($ratingType);
 
         return $this->entityManager->upsertRating($ratingTransfer);

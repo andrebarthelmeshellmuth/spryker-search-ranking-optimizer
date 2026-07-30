@@ -15,13 +15,17 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 interface ProductRelevanceJudgmentWriterInterface
 {
     /**
-     * Canonicalizes the request's raw search term, finds-or-creates the matching query row, then upserts
-     * the rater's judgment for that (query, product) pair. Idempotent per (query, customer, product) — see
+     * Canonicalizes the request's raw search term, verifies $idProductAbstract is actually among the real,
+     * current search results for the request's raw (uncanonicalized) search term -- rejecting the judgment
+     * outright if not, since that pair could never have come from a genuine SRP -- then finds-or-creates
+     * the matching query row and upserts the rater's judgment for that (query, product) pair. Idempotent
+     * per (query, customer, product) — see
      * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface::upsertRating()}.
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
      *
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */

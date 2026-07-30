@@ -82,4 +82,22 @@ interface SearchRankingOptimizerClientInterface
      * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
+
+    /**
+     * Specification:
+     * - Runs the same live catalog search {@see getCalibrationScores()} bypasses `Client\Catalog`/`Client\Search`
+     *   for, narrowed to one candidate document, and reports whether $idProductAbstract is actually among
+     *   the real, current results for $searchTerm -- used to reject a submitted relevance judgment whose
+     *   (searchTerm, idProductAbstract) pair was fabricated rather than genuinely observed on a real SRP.
+     *
+     * @api
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     * @param int $idProductAbstract
+     *
+     * @return bool
+     */
+    public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
 }

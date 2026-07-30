@@ -15,8 +15,10 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -54,7 +56,7 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $entityManagerMock->expects($this->never())->method('createQuery');
         $entityManagerMock->method('upsertRating')->willReturnArgument(0);
 
-        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
 
         // Act
         $writer->submitJudgment($requestTransfer);
@@ -86,7 +88,7 @@ class ProductRelevanceJudgmentWriterTest extends Unit
             ->with($this->callback(fn (SearchRankingQueryRatingTransfer $ratingTransfer): bool => $ratingTransfer->getFkSearchRankingQuery() === 9))
             ->willReturnArgument(0);
 
-        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
 
         // Act
         $writer->submitJudgment($requestTransfer);
@@ -107,10 +109,41 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $entityManagerMock->expects($this->never())->method('createQuery');
         $entityManagerMock->expects($this->never())->method('upsertRating');
 
-        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
 
         // Assert
         $this->expectException(InvalidRatingTypeException::class);
+
+        // Act
+        $writer->submitJudgment($requestTransfer);
+    }
+
+    /**
+     * @return void
+     */
+    public function testSubmitJudgmentRejectsAProductThatIsNotAmongTheRealCurrentSearchResultsWithoutTouchingPersistence(): void
+    {
+        // Arrange
+        $requestTransfer = $this->createRequestTransfer('chair', SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+
+        $canonicalizerMock = $this->createMock(SearchTermCanonicalizerInterface::class);
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->expects($this->never())->method('findQueryByTermStoreLocale');
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('createQuery');
+        $entityManagerMock->expects($this->never())->method('upsertRating');
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->expects($this->once())
+            ->method('productMatchesSearch')
+            ->with('chair', 'DE', 'en_US', 123)
+            ->willReturn(false);
+
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock, $searchRankingClientMock);
+
+        // Assert
+        $this->expectException(ProductNotInSearchResultsException::class);
 
         // Act
         $writer->submitJudgment($requestTransfer);
@@ -137,7 +170,7 @@ class ProductRelevanceJudgmentWriterTest extends Unit
             ->method('deleteRating')
             ->with(9, 'CUST-1', 123);
 
-        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
 
         // Act
         $writer->clearJudgment($requestTransfer);
@@ -160,7 +193,7 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->never())->method('deleteRating');
 
-        $writer = new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
+        $writer = $this->createWriter($canonicalizerMock, $repositoryMock, $entityManagerMock);
 
         // Act
         $writer->clearJudgment($requestTransfer);
@@ -181,5 +214,30 @@ class ProductRelevanceJudgmentWriterTest extends Unit
             ->setIdProductAbstract(123)
             ->setRatingType($ratingType)
             ->setCustomerReference('CUST-1');
+    }
+
+    /**
+     * Defaults `$searchRankingClientMock` to one where `productMatchesSearch()` always returns true --
+     * only the one test that specifically exercises the rejection path needs to override this.
+     *
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface $canonicalizerMock
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repositoryMock
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManagerMock
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClientMock
+     *
+     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter
+     */
+    protected function createWriter(
+        SearchTermCanonicalizerInterface $canonicalizerMock,
+        SearchRankingOptimizerRepositoryInterface $repositoryMock,
+        SearchRankingOptimizerEntityManagerInterface $entityManagerMock,
+        ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClientMock = null,
+    ): ProductRelevanceJudgmentWriter {
+        if ($searchRankingClientMock === null) {
+            $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+            $searchRankingClientMock->method('productMatchesSearch')->willReturn(true);
+        }
+
+        return new ProductRelevanceJudgmentWriter($canonicalizerMock, $repositoryMock, $entityManagerMock, $searchRankingClientMock);
     }
 }

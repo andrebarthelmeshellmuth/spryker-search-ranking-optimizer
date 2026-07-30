@@ -182,6 +182,11 @@ gets built, one click at a time, directly on the storefront search results page 
   customer, but the write itself goes through a Zed `GatewayController` that independently re-checks the
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
   persisting anything.
+- **Rejects fabricated (query, product) pairs.** Before persisting a submitted judgment,
+  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Calibration/rank_eval use
+  (`ProductSearchMatchVerifier`, narrowed to the one candidate document) and confirms the product is
+  actually among the *current* real search results for that term — a request claiming an unrelated product
+  matched some search term is rejected outright, never silently trusted from the client.
 
 This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
 the next calibration run with no export/import step. The ratings are also the direct input to rank_eval

@@ -95,6 +95,7 @@ interface SearchRankingOptimizerFacadeInterface
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
      *
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
