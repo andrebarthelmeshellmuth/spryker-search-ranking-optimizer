@@ -122,6 +122,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->createSearchTermCanonicalizer(),
             $this->getRepository(),
             $this->getEntityManager(),
+            $this->getSearchRankingClient(),
         );
     }
 

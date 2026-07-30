@@ -26,6 +26,8 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionTrait;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 /**
@@ -33,13 +35,44 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  */
 class SearchRankingOptimizerEntityManager extends AbstractEntityManager implements SearchRankingOptimizerEntityManagerInterface
 {
+    use TransactionTrait;
+
     /**
+     * {@inheritDoc}
+     *
+     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
+     */
+    public function getTransactionHandler(): TransactionHandlerInterface
+    {
+        return $this->createTransactionHandlerFactory()->createHandler();
+    }
+
+    /**
+     * A calibration upload can carry hundreds of search terms, each its own child row save -- wrapped in
+     * one transaction so a failure partway through (e.g. a dropped DB connection) rolls back the parent
+     * row too, rather than leaving a calibration whose `totalCount` (set up front, from the FULL search
+     * term list) can never match its real child row count, permanently stuck looking "in progress" with no
+     * way to ever finish or be flagged failed.
+     *
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
      *
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(SearchRankingCalibrationTransfer $calibrationTransfer): SearchRankingCalibrationTransfer
     {
+        return $this->getTransactionHandler()->handleTransaction(
+            fn () => $this->createCalibrationWithinTransaction($calibrationTransfer),
+        );
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
+     */
+    protected function createCalibrationWithinTransaction(
+        SearchRankingCalibrationTransfer $calibrationTransfer,
+    ): SearchRankingCalibrationTransfer {
         $calibrationEntity = new SpySearchRankingCalibration();
         $calibrationEntity->setRelevantProductCount($calibrationTransfer->getRelevantProductCountOrFail());
         $calibrationEntity->setStoreName($calibrationTransfer->getStoreNameOrFail());

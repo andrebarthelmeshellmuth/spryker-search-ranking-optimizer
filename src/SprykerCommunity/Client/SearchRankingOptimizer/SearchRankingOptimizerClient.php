@@ -88,4 +88,23 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
             ->createRankEvalRunner()
             ->evaluate($requestTransfer);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     * @param int $idProductAbstract
+     *
+     * @return bool
+     */
+    public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
+    {
+        return $this->getFactory()
+            ->createProductSearchMatchVerifier()
+            ->matches($searchTerm, $storeName, $localeName, $idProductAbstract);
+    }
 }

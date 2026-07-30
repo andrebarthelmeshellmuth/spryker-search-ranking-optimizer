@@ -12,7 +12,7 @@
                 query-importance-weighted nDCG@10 aggregate — a real objective score in place of averaged
                 admin opinion.
             </p>
-            {{ form_start(evaluationForm, { action: url('/search-ranking-optimizer/evaluation'), method: 'GET' }) }}
+            {{ form_start(evaluationForm, { action: url('/search-ranking-optimizer/evaluation'), method: 'POST' }) }}
             {{ form_widget(evaluationForm) }}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ 'Evaluate now' | trans }}</button>

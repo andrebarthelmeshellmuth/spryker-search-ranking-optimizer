@@ -223,7 +223,10 @@
          computed (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether
          it was actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be
          persisted through search-ranking's own facade, or it was only proposed (logged/emailed, formula
-         left untouched). -->
+         left untouched). errorMessage is set instead of everything above when processing this ONE metric
+         raised an unexpected exception (e.g. search-ranking's facade/ES call failed) — AutoTuneRunner
+         catches per-metric so one broken metric can never abort the whole run; every other metric with a
+         threshold set still gets checked, and this entry surfaces the failure rather than swallowing it. -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="metricName" type="string"/>
@@ -235,6 +238,7 @@
         <property name="afterShape" type="string"/>
         <property name="afterFitRSquared" type="float"/>
         <property name="wasApplied" type="bool"/>
+        <property name="errorMessage" type="string"/>
     </transfer>
 
     <!-- Full result of one auto-tune run, across every metric that has a SearchRankingAutoTuneMetricConfig

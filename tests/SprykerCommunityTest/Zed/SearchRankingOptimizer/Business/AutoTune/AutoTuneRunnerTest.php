@@ -11,6 +11,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\AutoTune;
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use RuntimeException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
@@ -345,6 +346,82 @@ class AutoTuneRunnerTest extends Unit
 
         // Assert
         $this->assertSame(2, $result->getNotifiedEmailCount());
+    }
+
+    /**
+     * @return void
+     */
+    public function testAnExceptionWhileProcessingOneMetricDoesNotAbortTheOthers(): void
+    {
+        // Arrange -- metric 7 blows up (e.g. a transient ES failure inside evaluateCurrentMetricFit()),
+        // metric 8 must still be checked normally in the same run.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8),
+            $this->createConfigTransfer(8, 0.8, true, true),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
+            [7, $this->createMetricDetail(7)],
+            [8, $this->createMetricDetail(8)],
+        ]);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturnCallback(
+            function (int $idSearchRankingMetric) {
+                if ($idSearchRankingMetric === 7) {
+                    throw new RuntimeException('Elasticsearch unreachable.');
+                }
+
+                return 0.9;
+            },
+        );
+        $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(8);
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock);
+
+        // Act
+        $result = $runner->run();
+
+        // Assert -- both metrics show up: 7 as a failure, 8 processed normally.
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(2, $metricResults);
+
+        $this->assertSame(7, $metricResults[0]->getIdSearchRankingMetric());
+        $this->assertSame('Elasticsearch unreachable.', $metricResults[0]->getErrorMessage());
+
+        $this->assertSame(8, $metricResults[1]->getIdSearchRankingMetric());
+        $this->assertNull($metricResults[1]->getErrorMessage());
+        $this->assertTrue($metricResults[1]->getWasThresholdMet());
+    }
+
+    /**
+     * @return void
+     */
+    public function testAFailedMetricIsIncludedInTheNotifyEmailWhenNotifyIsEnabled(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8, false, true),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willThrowException(new RuntimeException('DB connection lost.'));
+
+        $recipientResolverMock = $this->createMock(AutoTuneNotificationRecipientResolverInterface::class);
+        $recipientResolverMock->expects($this->once())->method('resolve')->willReturn(['alice@example.com']);
+
+        $mailerFacadeMock = $this->createMock(SearchRankingOptimizerToSymfonyMailerFacadeInterface::class);
+        $mailerFacadeMock->expects($this->once())->method('send');
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, $recipientResolverMock, $mailerFacadeMock);
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $this->assertSame(1, $result->getNotifiedEmailCount());
+        $this->assertSame('DB connection lost.', $result->getMetricResults()[0]->getErrorMessage());
     }
 
     /**

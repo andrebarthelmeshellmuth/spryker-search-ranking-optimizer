@@ -14,19 +14,23 @@
         {% for metricResult in mail.autoTuneMetricResults %}
             <tr>
                 <td>{{ metricResult.metricName }}</td>
-                <td>
-                    {{ metricResult.beforeFormula }}<br />
-                    R² = {{ metricResult.beforeFitRSquared }}
-                </td>
-                <td>
-                    {% if metricResult.wasSkippedNonDeterministic %}
-                        (skipped — formula is non-deterministic, no refit possible)
-                    {% else %}
-                        {{ metricResult.afterFormula }}<br />
-                        R² = {{ metricResult.afterFitRSquared }}
-                        {{ metricResult.wasApplied ? ' — applied' : ' — proposed, not applied' }}
-                    {% endif %}
-                </td>
+                {% if metricResult.errorMessage %}
+                    <td colspan="2">FAILED to check — {{ metricResult.errorMessage }}</td>
+                {% else %}
+                    <td>
+                        {{ metricResult.beforeFormula }}<br />
+                        R² = {{ metricResult.beforeFitRSquared }}
+                    </td>
+                    <td>
+                        {% if metricResult.wasSkippedNonDeterministic %}
+                            (skipped — formula is non-deterministic, no refit possible)
+                        {% else %}
+                            {{ metricResult.afterFormula }}<br />
+                            R² = {{ metricResult.afterFitRSquared }}
+                            {{ metricResult.wasApplied ? ' — applied' : ' — proposed, not applied' }}
+                        {% endif %}
+                    </td>
+                {% endif %}
             </tr>
         {% endfor %}
     </tbody>

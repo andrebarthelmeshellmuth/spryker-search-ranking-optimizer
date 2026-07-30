@@ -52,7 +52,7 @@
         <column name="search_term" type="VARCHAR" size="255" required="true" description="Canonical form: trimmed, lowercased, whitespace-collapsed — deliberately NOT tokenized, since real tokenization risks silently merging queries that are actually different asks."/>
         <column name="store_name" type="VARCHAR" size="64" required="true"/>
         <column name="locale_name" type="VARCHAR" size="16" required="true"/>
-        <column name="importance_weight" type="FLOAT" required="true" defaultValue="1" description="Query Curator-editable (SetSearchQueryImportancePermissionPlugin). Flat default of 1 for every query until a human assigns real importance — see README."/>
+        <column name="importance_weight" type="FLOAT" required="true" defaultValue="1" description="Query Curator-editable, gated by standard Zed ACL. Flat default of 1 for every query until a human assigns real importance — see README."/>
 
         <behavior name="timestampable"/>
         <id-method-parameter value="spy_search_ranking_query_pk_seq"/>

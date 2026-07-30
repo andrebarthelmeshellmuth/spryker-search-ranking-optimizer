@@ -77,7 +77,10 @@ class EvaluationForm extends AbstractType
         $resolver->setDefaults([
             static::OPTION_STORE_CHOICES => [],
             static::OPTION_LOCALE_CHOICES => [],
-            'method' => 'GET',
+            // POST, not GET: submitting this form has a real side effect (fires a rank_eval evaluation and
+            // persists its result), so it must not be a safe/idempotent request a browser refresh, back-
+            // button replay, or prefetcher could silently re-trigger.
+            'method' => 'POST',
         ]);
     }
 

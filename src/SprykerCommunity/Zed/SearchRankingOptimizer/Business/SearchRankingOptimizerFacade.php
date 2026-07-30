@@ -92,6 +92,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
      *
      * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */

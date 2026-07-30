@@ -14,6 +14,7 @@ use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTrans
 use Spryker\Zed\Kernel\Communication\Controller\AbstractGatewayController;
 use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\RateSearchRelevancePermissionPlugin;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException;
 
 /**
  * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacadeInterface getFacade()
@@ -50,10 +51,10 @@ class GatewayController extends AbstractGatewayController
             return (new SearchRankingProductRelevanceJudgmentResponseTransfer())
                 ->setIsSuccess(true)
                 ->setRating($ratingTransfer);
-        } catch (InvalidRatingTypeException $invalidRatingTypeException) {
+        } catch (InvalidRatingTypeException | ProductNotInSearchResultsException $exception) {
             return (new SearchRankingProductRelevanceJudgmentResponseTransfer())
                 ->setIsSuccess(false)
-                ->setErrorMessage($invalidRatingTypeException->getMessage());
+                ->setErrorMessage($exception->getMessage());
         }
     }
 

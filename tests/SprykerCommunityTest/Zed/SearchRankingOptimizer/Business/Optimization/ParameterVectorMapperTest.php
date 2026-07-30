@@ -238,6 +238,47 @@ class ParameterVectorMapperTest extends Unit
     /**
      * @return void
      */
+    public function testMapVectorToConfigurationClampsRelevanceWeightToItsOwnTrustRegionBounds(): void
+    {
+        // Arrange -- default relevanceWeightAtRunStart=0.75, trust region max distance 0.15 => [0.6, 0.9].
+        // Every shipped algorithm already clamps its own candidates to exactly this range before this
+        // method ever sees them (see AbstractOptimizerAlgorithm::clamp()), so this is a defensive second
+        // line, not the primary enforcement -- an out-of-range value here would otherwise flow straight
+        // into a persisted (and potentially live-applied) configuration unclamped.
+        $mapper = $this->buildMapper([]);
+
+        // Act
+        $clampedHigh = $mapper->mapVectorToConfiguration([5.0, 1.0, 0.2, 10.0], 12.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([-5.0, 1.0, 0.2, 10.0], 12.0);
+
+        // Assert
+        $this->assertSame(0.9, $clampedHigh->getRelevanceWeight());
+        $this->assertSame(0.6, $clampedLow->getRelevanceWeight());
+    }
+
+    /**
+     * @return void
+     */
+    public function testMapVectorToConfigurationClampsEntropyWeightExponentAndShiftMagnitudeToTheirOwnTrustRegionBounds(): void
+    {
+        // Arrange -- exponent trust region [0.5, 1.5], shift magnitude trust region [0.1, 0.3] (see
+        // testEntropyDimensionsAppearAsTheFinalThreeBoundsAfterTheMetricSimplexDimensions).
+        $mapper = $this->buildMapper([]);
+
+        // Act
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 99.0, 99.0, 10.0], 12.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, -99.0, -99.0, 10.0], 12.0);
+
+        // Assert
+        $this->assertEqualsWithDelta(1.5, $clampedHigh->getEntropyWeightExponent(), 1e-9);
+        $this->assertEqualsWithDelta(0.3, $clampedHigh->getEntropyWeightShiftMagnitude(), 1e-9);
+        $this->assertEqualsWithDelta(0.5, $clampedLow->getEntropyWeightExponent(), 1e-9);
+        $this->assertEqualsWithDelta(0.1, $clampedLow->getEntropyWeightShiftMagnitude(), 1e-9);
+    }
+
+    /**
+     * @return void
+     */
     public function testMapVectorToConfigurationGivesTheSingleMetricWeightOneExactly(): void
     {
         // Arrange
@@ -351,6 +392,33 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(0.4, $metricWeights['random'], "The fixed metric's weight must be exactly what was passed in, untouched.");
         $this->assertEqualsWithDelta(0.3, $metricWeights['top_seller'], 1e-9, 'Each optimizable metric gets half of the remaining 0.6 budget.');
         $this->assertEqualsWithDelta(0.3, $metricWeights['pdp_impressions'], 1e-9);
+    }
+
+    /**
+     * Guards against the fixed metrics' OWN weights alone already exceeding the full [0;1] budget (live
+     * weights that were never renormalized, or floating-point drift across many small weights) -- every
+     * optimizable metric correctly gets zero either way, but the fixed weights themselves must be
+     * rescaled down to sum to exactly 1, not left silently summing to more than that.
+     *
+     * @return void
+     */
+    public function testMapVectorToConfigurationRescalesFixedWeightsDownWhenTheyAloneExceedTheFullBudget(): void
+    {
+        // Arrange -- two fixed metrics summing to 1.2 on their own, well over the [0;1] budget.
+        $optimizableMetrics = [
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller'],
+        ];
+        $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.7, 'other_random' => 0.5]);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+
+        // Assert
+        $metricWeights = $configurationTransfer->getMetricWeights();
+        $this->assertEqualsWithDelta(1.0, array_sum($metricWeights), 1e-9, 'The full set must still sum to exactly 1, even when the fixed weights alone exceeded it.');
+        $this->assertSame(0.0, $metricWeights['top_seller'], 'The optimizable metric gets zero -- no budget is left for it.');
+        $this->assertEqualsWithDelta(0.7 / 1.2, $metricWeights['random'], 1e-9, 'Rescaled proportionally, not left at its raw 0.7.');
+        $this->assertEqualsWithDelta(0.5 / 1.2, $metricWeights['other_random'], 1e-9);
     }
 
     /**

@@ -25,6 +25,8 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInt
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifier;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifierInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
@@ -61,6 +63,18 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function createLiveCatalogSearchQueryBuilder(): LiveCatalogSearchQueryBuilderInterface
     {
         return new LiveCatalogSearchQueryBuilder();
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifierInterface
+     */
+    public function createProductSearchMatchVerifier(): ProductSearchMatchVerifierInterface
+    {
+        return new ProductSearchMatchVerifier(
+            $this->getElasticaClient(),
+            $this->createIndexNameResolver(),
+            $this->createLiveCatalogSearchQueryBuilder(),
+        );
     }
 
     /**

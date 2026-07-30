@@ -18,12 +18,20 @@ use Twig\Environment;
 use Twig\TwigFunction;
 
 /**
+ * @method \SprykerCommunity\Yves\SearchRankingOptimizerWidget\SearchRankingOptimizerWidgetFactory getFactory()
+ *
  * Registers `canRateSearchRelevance()` for the storefront templates — lets the product-rating widget's
  * own include gate itself on the Relevance Rater permission without needing a project-level controller
  * edit to pre-compute and inject that boolean (the same reasoning
  * `SprykerCommunity\Yves\SearchDebug\Plugin\Twig\SearchDebugTwigPlugin` already established for a
  * presentation-only helper — this one happens to check a permission instead of computing colors, but
  * doesn't need a controller for the same reason: it derives entirely from the current session).
+ *
+ * Also registers `searchRankingOptimizerRatingCsrfToken()` for the same reason: the widget's submit/clear
+ * AJAX endpoints are plain POST controllers, not bound to a Symfony Form, so they'd otherwise carry none of
+ * the CSRF protection every Form-backed POST in this project gets automatically — same
+ * `Symfony\Component\Security\Csrf\CsrfTokenManagerInterface` mechanism `spryker/multi-factor-auth`'s own
+ * Yves module uses for its own non-Form AJAX actions.
  */
 class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements TwigPluginInterface
 {
@@ -33,6 +41,19 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
      * @var string
      */
     public const FUNCTION_NAME_CAN_RATE_SEARCH_RELEVANCE = 'canRateSearchRelevance';
+
+    /**
+     * @var string
+     */
+    public const FUNCTION_NAME_RATING_CSRF_TOKEN = 'searchRankingOptimizerRatingCsrfToken';
+
+    /**
+     * Shared by both submit and clear — re-checked in {@see \SprykerCommunity\Yves\SearchRankingOptimizerWidget\Controller\SubmitRelevanceJudgmentController},
+     * not tied to either action individually, so one token per page render covers both.
+     *
+     * @var string
+     */
+    public const CSRF_TOKEN_ID = 'search-ranking-optimizer-widget-rate';
 
     /**
      * {@inheritDoc}
@@ -51,6 +72,11 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
         $twig->addFunction(new TwigFunction(
             static::FUNCTION_NAME_CAN_RATE_SEARCH_RELEVANCE,
             fn (): bool => $this->can(RateSearchRelevancePermissionPlugin::KEY),
+        ));
+
+        $twig->addFunction(new TwigFunction(
+            static::FUNCTION_NAME_RATING_CSRF_TOKEN,
+            fn (): string => $this->getFactory()->getCsrfTokenManager()->getToken(static::CSRF_TOKEN_ID)->getValue(),
         ));
 
         return $twig;

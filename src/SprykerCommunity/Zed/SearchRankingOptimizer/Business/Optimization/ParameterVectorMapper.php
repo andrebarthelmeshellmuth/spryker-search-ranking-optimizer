@@ -265,15 +265,27 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer
     {
         $vector = array_values($vector);
-        $relevanceWeight = $vector[0];
+        // Clamped to this run's own trust-region bounds -- the SAME bounds getLowerBounds()/
+        // getUpperBounds() declared as this dimension's box constraint. Every shipped algorithm already
+        // clamps its own candidates there before this method ever sees them, so this is a defensive second
+        // line, not the primary enforcement -- but this mapper has no way to verify that guarantee holds
+        // for every current AND future caller/algorithm, and a raw out-of-range value here would otherwise
+        // flow straight into a persisted (and potentially live-applied) configuration unclamped.
+        $relevanceWeight = min($this->relevanceWeightUpperBound, max($this->relevanceWeightLowerBound, $vector[0]));
         $freeDimensionCount = $this->getFreeMetricWeightDimensionCount();
         $freeZ = array_slice($vector, 1, $freeDimensionCount);
 
         $metricWeights = $this->buildMetricWeightsByName($freeZ);
 
         if ($this->entropyWeightingEnabled) {
-            $entropyWeightExponent = $vector[1 + $freeDimensionCount];
-            $entropyWeightShiftMagnitude = $vector[1 + $freeDimensionCount + 1];
+            $entropyWeightExponent = min(
+                $this->entropyWeightExponentUpperBound,
+                max($this->entropyWeightExponentLowerBound, $vector[1 + $freeDimensionCount]),
+            );
+            $entropyWeightShiftMagnitude = min(
+                $this->entropyWeightShiftMagnitudeUpperBound,
+                max($this->entropyWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 1]),
+            );
             $entropyProbeResultSize = (int)min(
                 SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize(),
                 max(
@@ -335,7 +347,23 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     protected function buildMetricWeightsByName(array $freeZ): array
     {
         $metricWeightsByName = $this->fixedMetricWeights;
-        $availableBudget = max(0.0, 1.0 - $this->fixedWeightBudget);
+
+        if ($this->fixedWeightBudget > 1.0) {
+            // The caller's own fixed weights already exceed the full [0;1] budget on their own (live
+            // weights that were never renormalized, floating-point drift across many small weights) --
+            // every optimizable metric correctly gets zero either way, but simply flooring available
+            // budget at 0 without ALSO rescaling the fixed weights themselves would leave them summing to
+            // MORE than 1, silently violating the one invariant this whole mapper exists to guarantee.
+            $scale = 1.0 / $this->fixedWeightBudget;
+
+            foreach ($metricWeightsByName as $name => $weight) {
+                $metricWeightsByName[$name] = $weight * $scale;
+            }
+
+            $availableBudget = 0.0;
+        } else {
+            $availableBudget = 1.0 - $this->fixedWeightBudget;
+        }
 
         if (count($this->metrics) === 0) {
             return $metricWeightsByName;

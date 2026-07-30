@@ -169,17 +169,34 @@ gets built, one click at a time, directly on the storefront search results page 
   `spy_search_ranking_query_rating`, unique on `(query, customer_reference, product_abstract)`. The same
   customer re-rating the same pair upserts in place; **different customers rating the same (query, product)
   each keep their own row** — disagreement between raters is a signal to preserve, not average away at
-  write time.
-- **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a separate **Query Curator**
-  permission (`SetSearchQueryImportancePermissionPlugin`) mark some queries as mattering more than others
-  once they've accumulated ratings — a deliberately separate skill/permission from rating relevance itself.
-  Edited from the **Search Ranking Optimizer → Queries** Zed page: every rated query, newest-activity-first,
-  with an "Edit importance" action per row (a plain, paginated/sortable/searchable `Gui` table — the same
-  component `spryker-community/search-ranking`'s own Metrics page uses).
+  write time. A brand-new search term is a genuine find-or-create race the moment two raters rate it within
+  the same instant: the DB's own unique `(search_term, store_name, locale_name)` constraint lets exactly one
+  insert win, and the loser recovers by re-fetching the winner's row rather than losing that rater's
+  judgment entirely.
+- **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a **Query Curator** mark some
+  queries as mattering more than others once they've accumulated ratings — a deliberately separate skill
+  from rating relevance itself. Edited from the **Search Ranking Optimizer → Queries** Zed page: every
+  rated query, newest-activity-first, with an "Edit importance" action per row (a plain,
+  paginated/sortable/searchable `Gui` table — the same component `spryker-community/search-ranking`'s own
+  Metrics page uses). Gated by standard Zed ACL only — a Zed backoffice action, not the customer-facing
+  Permission system the widget below uses, so there's no separate fine-grained permission to register for
+  it, just the usual ACL group access every other Zed page in this package needs.
 - **Server-side authorization, not just a hidden button.** The Yves widget only *renders* for a permitted
   customer, but the write itself goes through a Zed `GatewayController` that independently re-checks the
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
   persisting anything.
+- **Rejects fabricated (query, product) pairs.** Before persisting a submitted judgment,
+  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Calibration/rank_eval use
+  (`ProductSearchMatchVerifier`, narrowed to the one candidate document) and confirms the product is
+  actually among the *current* real search results for that term — a request claiming an unrelated product
+  matched some search term is rejected outright, never silently trusted from the client.
+- **CSRF-protected.** The widget's submit/clear endpoints are plain POST controllers, not bound to a
+  Symfony Form, so they'd otherwise carry none of the CSRF protection every Form-backed POST in this
+  project gets automatically. A token is generated per page render via
+  `searchRankingOptimizerRatingCsrfToken()` (`SearchRankingOptimizerWidgetTwigPlugin`, the same
+  `CsrfTokenManagerInterface` mechanism `spryker/multi-factor-auth`'s own Yves module uses for its own
+  non-Form AJAX actions), rendered onto the widget as a data attribute, and sent back with every submit/
+  clear request — re-validated server-side before anything else runs.
 
 This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
 the next calibration run with no export/import step. The ratings are also the direct input to rank_eval
@@ -298,6 +315,17 @@ to whatever randomness happened to be in that one digest snapshot, then silently
 *looks* like a real fit but carries no more signal than `random()` did. It's still checked and shows up in
 history/the summary email with its real fit — that observation is legitimate, only auto-*applying* a refit
 for one isn't.
+
+An unexpected failure while checking one metric (a transient Elasticsearch/database error, say) never
+aborts the rest of the run — every other metric with a threshold set still gets checked in the same pass.
+The failed metric shows up instead with its error, both in the console output and, if notify is on for it,
+in the summary email, rather than silently vanishing or taking every other metric's check down with it:
+
+```
+pdp_impressions: fit still adequate (R² = 0.9883), no change.
+top_seller: FAILED to check — Elasticsearch unreachable.
+Notified 1 admin(s) by email.
+```
 
 Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
 every metric that crossed its threshold with notify on, to every admin holding an ACL role named
@@ -475,18 +503,19 @@ new SearchRankingOptimizerAutoTuneConsole(),
 new SearchRankingOptimizerOptimizeConsole(),
 ```
 
-### 3a. Register the permission plugins (required for the SRP rating widget)
+### 3a. Register the permission plugin (required for the SRP rating widget)
 
 In **both** `Pyz\Zed\Permission\PermissionDependencyProvider::getPermissionPlugins()` and
 `Pyz\Client\Permission\PermissionDependencyProvider::getPermissionPlugins()`:
 
 ```php
 use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\RateSearchRelevancePermissionPlugin;
-use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\SetSearchQueryImportancePermissionPlugin;
 
 new RateSearchRelevancePermissionPlugin(),
-new SetSearchQueryImportancePermissionPlugin(),
 ```
+
+The Query Curator page (editing a query's importance weight) needs no separate registration here — it's
+a Zed backoffice action gated by standard Zed ACL, not the customer-facing Permission system.
 
 Registering the plugin only makes the permission *grantable* — the widget stays invisible until a
 customer's company role is actually given `RateSearchRelevancePermissionPlugin` (via your project's own
@@ -671,6 +700,16 @@ Designed, not yet built:
   production-scale one. A shop with hundreds or thousands of rated queries would need to retune
   `SearchRankingOptimizerConfig::getOptimizationMaxGenerations()` and each algorithm's own population size
   — and, given the previous point, budget proportionally more wall-clock time per run.
+- **Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
+  `LiveCatalogSearchQueryBuilder` reproduces the CORE catalog search-string query shape (base full-text
+  query + store/locale/is_active/is_active_in_date_range filters) — real customer-facing search may layer
+  further scope narrowing on top of that (customer-group visibility, price-list scoping, pinned category/
+  facet filters, any other project-registered query expander), none of which is reproduced here. This is
+  an accepted tradeoff, not an oversight: both features exist to approximate *relative* relevance ordering
+  for tuning purposes, and closer parity would mean executing the real query expander stack from a Zed/
+  console process, which — like `Client\Catalog`/`Client\Search` themselves — isn't reliably possible
+  outside a real Yves request context in this shop (see the raw-Elastica-bypass reasoning documented on
+  `CalibrationSearcher`/`RankEvalRunner`).
 
 ## Testing and CI
 

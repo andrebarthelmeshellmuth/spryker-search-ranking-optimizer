@@ -21,6 +21,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDetermini
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
+use Throwable;
 
 class AutoTuneRunner implements AutoTuneRunnerInterface
 {
@@ -56,7 +57,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $metricResultsToNotify = [];
 
         foreach ($this->repository->findAutoTuneMetricConfigsWithThresholdSet() as $autoTuneMetricConfigTransfer) {
-            $metricResultTransfer = $this->processMetric($autoTuneMetricConfigTransfer);
+            $metricResultTransfer = $this->processMetricSafely($autoTuneMetricConfigTransfer);
 
             if ($metricResultTransfer === null) {
                 continue;
@@ -74,6 +75,31 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $notifiedEmailCount = $metricResultsToNotify === [] ? 0 : $this->sendSummaryEmail($metricResultsToNotify);
 
         return $resultTransfer->setNotifiedEmailCount($notifiedEmailCount);
+    }
+
+    /**
+     * One metric's `evaluateCurrentMetricFit()`/`getFitCandidates()`/`saveMetricFormula()` calls all reach
+     * out to search-ranking's own facade (ultimately Elasticsearch/Propel) -- an unexpected failure there
+     * (e.g. ES temporarily unreachable) must never abort the whole run: every OTHER metric with a
+     * threshold set still deserves its check this month. Caught here, at the single call site, rather than
+     * inside {@see processMetric()} itself, so that method's own early-return control flow stays a plain
+     * "safe, silent skip vs. real result" shape, uncomplicated by exception handling.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     *
+     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer|null
+     */
+    protected function processMetricSafely(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+    ): ?SearchRankingAutoTuneMetricResultTransfer {
+        try {
+            return $this->processMetric($autoTuneMetricConfigTransfer);
+        } catch (Throwable $throwable) {
+            return (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setIdSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail())
+                ->setMetricName(sprintf('metric #%d', $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()))
+                ->setErrorMessage($throwable->getMessage());
+        }
     }
 
     /**

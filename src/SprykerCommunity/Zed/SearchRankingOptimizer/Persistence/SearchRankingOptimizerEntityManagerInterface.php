@@ -16,9 +16,20 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 
 interface SearchRankingOptimizerEntityManagerInterface
 {
+    /**
+     * Exposes the standard Spryker Propel transaction handler so multi-step business writes spanning
+     * this entity manager and a cross-package facade (e.g. {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier})
+     * can be wrapped in one atomic transaction — both ultimately share the same underlying Propel
+     * connection, so a transaction opened here also covers facade calls made inside the same callback.
+     *
+     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
+     */
+    public function getTransactionHandler(): TransactionHandlerInterface;
+
     /**
      * Creates a calibration run in status=uploaded together with one child row per
      * `$calibrationTransfer->getSearchTerms()` entry (search term text only, no scores yet).
