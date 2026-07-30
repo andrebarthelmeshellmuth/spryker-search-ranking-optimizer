@@ -700,6 +700,16 @@ Designed, not yet built:
   production-scale one. A shop with hundreds or thousands of rated queries would need to retune
   `SearchRankingOptimizerConfig::getOptimizationMaxGenerations()` and each algorithm's own population size
   — and, given the previous point, budget proportionally more wall-clock time per run.
+- **Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
+  `LiveCatalogSearchQueryBuilder` reproduces the CORE catalog search-string query shape (base full-text
+  query + store/locale/is_active/is_active_in_date_range filters) — real customer-facing search may layer
+  further scope narrowing on top of that (customer-group visibility, price-list scoping, pinned category/
+  facet filters, any other project-registered query expander), none of which is reproduced here. This is
+  an accepted tradeoff, not an oversight: both features exist to approximate *relative* relevance ordering
+  for tuning purposes, and closer parity would mean executing the real query expander stack from a Zed/
+  console process, which — like `Client\Catalog`/`Client\Search` themselves — isn't reliably possible
+  outside a real Yves request context in this shop (see the raw-Elastica-bypass reasoning documented on
+  `CalibrationSearcher`/`RankEvalRunner`).
 
 ## Testing and CI
 
