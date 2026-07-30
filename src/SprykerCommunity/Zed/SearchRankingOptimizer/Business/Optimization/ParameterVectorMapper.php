@@ -265,15 +265,27 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer
     {
         $vector = array_values($vector);
-        $relevanceWeight = $vector[0];
+        // Clamped to this run's own trust-region bounds -- the SAME bounds getLowerBounds()/
+        // getUpperBounds() declared as this dimension's box constraint. Every shipped algorithm already
+        // clamps its own candidates there before this method ever sees them, so this is a defensive second
+        // line, not the primary enforcement -- but this mapper has no way to verify that guarantee holds
+        // for every current AND future caller/algorithm, and a raw out-of-range value here would otherwise
+        // flow straight into a persisted (and potentially live-applied) configuration unclamped.
+        $relevanceWeight = min($this->relevanceWeightUpperBound, max($this->relevanceWeightLowerBound, $vector[0]));
         $freeDimensionCount = $this->getFreeMetricWeightDimensionCount();
         $freeZ = array_slice($vector, 1, $freeDimensionCount);
 
         $metricWeights = $this->buildMetricWeightsByName($freeZ);
 
         if ($this->entropyWeightingEnabled) {
-            $entropyWeightExponent = $vector[1 + $freeDimensionCount];
-            $entropyWeightShiftMagnitude = $vector[1 + $freeDimensionCount + 1];
+            $entropyWeightExponent = min(
+                $this->entropyWeightExponentUpperBound,
+                max($this->entropyWeightExponentLowerBound, $vector[1 + $freeDimensionCount]),
+            );
+            $entropyWeightShiftMagnitude = min(
+                $this->entropyWeightShiftMagnitudeUpperBound,
+                max($this->entropyWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 1]),
+            );
             $entropyProbeResultSize = (int)min(
                 SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize(),
                 max(
