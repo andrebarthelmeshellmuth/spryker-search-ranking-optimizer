@@ -51,6 +51,11 @@ class QueryController extends AbstractController
     }
 
     /**
+     * Gated by standard Zed ACL only (like every other controller in this package) — the "Query Curator"
+     * role is an ACL group grant, not a separate Permission-system check. A `SetSearchQueryImportancePermissionPlugin`
+     * used to exist alongside this action but was never actually checked anywhere; removed rather than
+     * left as dead code implying protection that wasn't there.
+     *
      * @param \Symfony\Component\HttpFoundation\Request $request
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse|array<string, mixed>

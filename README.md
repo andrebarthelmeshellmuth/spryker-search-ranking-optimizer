@@ -170,12 +170,14 @@ gets built, one click at a time, directly on the storefront search results page 
   customer re-rating the same pair upserts in place; **different customers rating the same (query, product)
   each keep their own row** — disagreement between raters is a signal to preserve, not average away at
   write time.
-- **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a separate **Query Curator**
-  permission (`SetSearchQueryImportancePermissionPlugin`) mark some queries as mattering more than others
-  once they've accumulated ratings — a deliberately separate skill/permission from rating relevance itself.
-  Edited from the **Search Ranking Optimizer → Queries** Zed page: every rated query, newest-activity-first,
-  with an "Edit importance" action per row (a plain, paginated/sortable/searchable `Gui` table — the same
-  component `spryker-community/search-ranking`'s own Metrics page uses).
+- **`importance_weight`** on `spy_search_ranking_query` (default `1`) lets a **Query Curator** mark some
+  queries as mattering more than others once they've accumulated ratings — a deliberately separate skill
+  from rating relevance itself. Edited from the **Search Ranking Optimizer → Queries** Zed page: every
+  rated query, newest-activity-first, with an "Edit importance" action per row (a plain,
+  paginated/sortable/searchable `Gui` table — the same component `spryker-community/search-ranking`'s own
+  Metrics page uses). Gated by standard Zed ACL only — a Zed backoffice action, not the customer-facing
+  Permission system the widget below uses, so there's no separate fine-grained permission to register for
+  it, just the usual ACL group access every other Zed page in this package needs.
 - **Server-side authorization, not just a hidden button.** The Yves widget only *renders* for a permitted
   customer, but the write itself goes through a Zed `GatewayController` that independently re-checks the
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
@@ -475,18 +477,19 @@ new SearchRankingOptimizerAutoTuneConsole(),
 new SearchRankingOptimizerOptimizeConsole(),
 ```
 
-### 3a. Register the permission plugins (required for the SRP rating widget)
+### 3a. Register the permission plugin (required for the SRP rating widget)
 
 In **both** `Pyz\Zed\Permission\PermissionDependencyProvider::getPermissionPlugins()` and
 `Pyz\Client\Permission\PermissionDependencyProvider::getPermissionPlugins()`:
 
 ```php
 use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\RateSearchRelevancePermissionPlugin;
-use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\SetSearchQueryImportancePermissionPlugin;
 
 new RateSearchRelevancePermissionPlugin(),
-new SetSearchQueryImportancePermissionPlugin(),
 ```
+
+The Query Curator page (editing a query's importance weight) needs no separate registration here — it's
+a Zed backoffice action gated by standard Zed ACL, not the customer-facing Permission system.
 
 Registering the plugin only makes the permission *grantable* — the widget stays invisible until a
 customer's company role is actually given `RateSearchRelevancePermissionPlugin` (via your project's own
