@@ -9,6 +9,8 @@ This package is a real, one-directional dependent of `search-ranking`: it reads 
 tuning parameters through that package's own facade. `search-ranking` has no knowledge of this package and
 installs and runs completely standalone without it (see [Relationship to search-ranking](#relationship-to-search-ranking)).
 
+*Part of the [Search Relevance](https://search-relevance.dev/) project — explore the interactive ranking-formula walkthrough there.*
+
 ## Contents
 
 - [Terminology](#terminology)
