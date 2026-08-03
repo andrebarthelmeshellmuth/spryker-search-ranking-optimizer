@@ -5,3 +5,5 @@ search_ranking_optimizer.rate.check,Rate this product as acceptably relevant,en_
 search_ranking_optimizer.rate.check,Als akzeptabel relevant bewerten,de_DE
 search_ranking_optimizer.rate.x,Rate this product as not relevant,en_US
 search_ranking_optimizer.rate.x,Als nicht relevant bewerten,de_DE
+permission.name.RateSearchRelevancePermissionPlugin,Rate search relevance,en_US
+permission.name.RateSearchRelevancePermissionPlugin,Suchrelevanz bewerten,de_DE
