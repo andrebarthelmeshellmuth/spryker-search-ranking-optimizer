@@ -30,9 +30,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  */
 class RelevanceJudgmentAuthorizerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testIsAuthorizedNeverTrustsAnIdentifierFromTheRequestItselfAndAlwaysResolvesViaCompanyUserFacade(): void
     {
         // Arrange
@@ -56,9 +53,6 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $this->assertTrue($result);
     }
 
-    /**
-     * @return void
-     */
     public function testIsAuthorizedGrantsAccessWhenAnyOfMultipleActiveCompanyUsersHoldsThePermission(): void
     {
         // Arrange
@@ -84,9 +78,6 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $this->assertTrue($result);
     }
 
-    /**
-     * @return void
-     */
     public function testIsAuthorizedReturnsFalseWhenTheCustomerHasNoActiveCompanyUserAtAll(): void
     {
         // Arrange
@@ -105,9 +96,6 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $this->assertFalse($result);
     }
 
-    /**
-     * @return void
-     */
     public function testIsAuthorizedReturnsFalseWhenNoActiveCompanyUserHoldsThePermission(): void
     {
         // Arrange

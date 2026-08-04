@@ -41,9 +41,6 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtra
  */
 class CalibrationSearcherTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testSearchScoresReturnsRealNonZeroRelevanceScoresForATermWithRealCatalogMatches(): void
     {
         // Act
@@ -59,9 +56,6 @@ class CalibrationSearcherTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
     public function testSearchScoresReturnsAnEmptyArrayForATermWithNoRealCatalogMatches(): void
     {
         // Act
@@ -74,8 +68,6 @@ class CalibrationSearcherTest extends Unit
     /**
      * Same composition `SearchRankingOptimizerFactory::createCalibrationSearcher()` uses in production —
      * directly-instantiable value objects, no Locator/container needed.
-     *
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher
      */
     protected function createCalibrationSearcher(): CalibrationSearcher
     {

@@ -48,8 +48,6 @@ class SpecificitySearcher implements SpecificitySearcherInterface
      * @param string $searchTerm
      * @param string $storeName
      * @param float $blendWeight
-     *
-     * @return float
      */
     public function calculateRawSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
     {

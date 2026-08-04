@@ -47,8 +47,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @param string $searchTerm
      * @param string $storeName
      * @param float $blendWeight
-     *
-     * @return float
      */
     public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
     {
@@ -63,8 +61,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -80,8 +76,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -97,8 +91,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
     {
@@ -116,8 +108,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
     {

@@ -33,8 +33,6 @@ class RawRelevanceScoreExtractor implements RawRelevanceScoreExtractorInterface
      * {@inheritDoc}
      *
      * @param array<string, mixed> $explanation
-     *
-     * @return float
      */
     public function extract(array $explanation): float
     {
@@ -48,8 +46,6 @@ class RawRelevanceScoreExtractor implements RawRelevanceScoreExtractorInterface
      * tree shapes that class was already confirmed live against.
      *
      * @param array<string, mixed> $node
-     *
-     * @return float|null
      */
     protected function findQueryScore(array $node): ?float
     {

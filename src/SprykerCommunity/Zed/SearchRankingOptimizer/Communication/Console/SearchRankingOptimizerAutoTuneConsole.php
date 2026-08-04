@@ -29,9 +29,6 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
      */
     public const COMMAND_DESCRIPTION = 'Monthly fit-quality check: for every metric with an auto-tune threshold set, checks its live formula\'s current fit and refits (proposing or applying, per that metric\'s own settings) when it has dropped below threshold. Intended to run on a monthly cron.';
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME);
@@ -41,12 +38,9 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
     }
 
     // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
-
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

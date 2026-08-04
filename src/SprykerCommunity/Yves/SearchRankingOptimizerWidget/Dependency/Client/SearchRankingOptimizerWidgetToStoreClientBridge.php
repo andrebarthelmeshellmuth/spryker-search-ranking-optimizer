@@ -26,9 +26,6 @@ class SearchRankingOptimizerWidgetToStoreClientBridge implements SearchRankingOp
         $this->storeClient = $storeClient;
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\StoreTransfer
-     */
     public function getCurrentStore(): StoreTransfer
     {
         return $this->storeClient->getCurrentStore();

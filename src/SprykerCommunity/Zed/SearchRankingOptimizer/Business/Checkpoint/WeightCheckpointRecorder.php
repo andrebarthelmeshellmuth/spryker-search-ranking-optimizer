@@ -16,14 +16,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
     /**
@@ -44,8 +38,6 @@ class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
      * @param string $source
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function record(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {

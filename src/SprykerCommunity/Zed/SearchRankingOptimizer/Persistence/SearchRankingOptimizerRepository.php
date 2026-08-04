@@ -49,8 +49,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingCalibration
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationWithSearchTerms(int $idSearchRankingCalibration): ?SearchRankingCalibrationTransfer
     {
@@ -80,9 +78,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         return $calibrationTransfer;
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
-     */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer
     {
         $calibrationEntity = $this->getFactory()
@@ -105,8 +100,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
      * time by design (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibrator::runNextCalibration()}'s
      * own skip-older-uploads step). Backs the Calibration page's live progress counter; polled, so
      * deliberately cheap — no search terms loaded.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
     {
@@ -128,8 +121,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryByTermStoreLocale(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryTransfer
     {
@@ -151,8 +142,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingQuery
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer
     {
@@ -260,8 +249,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
@@ -328,8 +315,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingWeightCheckpoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
     {
@@ -348,8 +333,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingMetric
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
      */
     public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
     {
@@ -393,8 +376,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
     {
@@ -411,9 +392,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
             ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
-     */
     public function findOldestQueuedOptimizerRun(): ?SearchRankingOptimizerRunTransfer
     {
         $optimizerRunEntity = $this->getFactory()
@@ -431,9 +409,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
             ->mapOptimizerRunEntityToTransfer($optimizerRunEntity, new SearchRankingOptimizerRunTransfer());
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
-     */
     public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer
     {
         $optimizerRunEntity = $this->getFactory()
@@ -453,8 +428,6 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer
     {

@@ -31,9 +31,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class OptimizationRunnerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testRunNextReturnsNullWhenNothingIsQueued(): void
     {
         // Arrange
@@ -49,9 +46,6 @@ class OptimizationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextFailsTheRunWhenNoActiveMetricsExist(): void
     {
         // Arrange
@@ -74,9 +68,6 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextFailsTheRunWhenNoBaselineScoreCanBeComputed(): void
     {
         // Arrange
@@ -101,9 +92,6 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextFailsTheRunOnAnUnexpectedException(): void
     {
         // Arrange
@@ -123,9 +111,6 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextCompletesSuccessfullyAndPersistsAWinningCandidate(): void
     {
         // Arrange
@@ -167,9 +152,6 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextHoldsANonDeterministicMetricsWeightFixedAndNeverIncludesItInTheSearch(): void
     {
         // Arrange -- "random" (formula calls random()) sits alongside two real metrics. It must keep
@@ -228,9 +210,6 @@ class OptimizationRunnerTest extends Unit
         $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
     }
 
-    /**
-     * @return void
-     */
     public function testRunNextSeedsTheBaselineWithTheLiveSpecificitySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
     {
         // Arrange -- the live facade reports specificityWeightExponent=1.5, specificityWeightShiftMagnitude=0.25,
@@ -287,8 +266,6 @@ class OptimizationRunnerTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface|null $rankEvaluationRunner
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -337,9 +314,6 @@ class OptimizationRunnerTest extends Unit
         return $searchRankingFacadeMock;
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
-     */
     protected function createQueuedRunTransfer(): SearchRankingOptimizerRunTransfer
     {
         return (new SearchRankingOptimizerRunTransfer())
@@ -350,9 +324,6 @@ class OptimizationRunnerTest extends Unit
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
     }
 
-    /**
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
-     */
     protected function createDoneRunTransfer(): SearchRankingOptimizerRunTransfer
     {
         return (new SearchRankingOptimizerRunTransfer())

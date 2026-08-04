@@ -30,9 +30,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class CalibrationUploadHandlerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testCreateCalibrationBuildsOneSearchTermTransferPerParsedTermInOrderWhenCsvContentIsGiven(): void
     {
         // Arrange
@@ -65,9 +62,6 @@ class CalibrationUploadHandlerTest extends Unit
         $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', 'chair,desk');
     }
 
-    /**
-     * @return void
-     */
     public function testCreateCalibrationPersistsAnEmptySearchTermListWhenParsingYieldsNoTerms(): void
     {
         // Arrange
@@ -88,9 +82,6 @@ class CalibrationUploadHandlerTest extends Unit
         $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', '');
     }
 
-    /**
-     * @return void
-     */
     public function testCreateCalibrationSourcesTermsFromTheRepositoryWhenNoCsvContentIsGiven(): void
     {
         // Arrange
@@ -122,9 +113,6 @@ class CalibrationUploadHandlerTest extends Unit
         $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US');
     }
 
-    /**
-     * @return void
-     */
     public function testCreateCalibrationReturnsWhateverTheEntityManagerHandsBack(): void
     {
         // Arrange

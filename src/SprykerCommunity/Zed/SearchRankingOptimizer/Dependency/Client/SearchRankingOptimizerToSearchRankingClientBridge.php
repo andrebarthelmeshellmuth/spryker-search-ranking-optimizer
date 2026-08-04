@@ -44,8 +44,6 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
      * @param string $searchTerm
      * @param string $storeName
      * @param float $blendWeight
-     *
-     * @return float
      */
     public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
     {
@@ -54,8 +52,6 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
     {
@@ -67,8 +63,6 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
     {

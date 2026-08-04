@@ -25,41 +25,26 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonic
  */
 class SearchTermCanonicalizerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testTrimsLeadingAndTrailingWhitespace(): void
     {
         $this->assertSame('office chair', (new SearchTermCanonicalizer())->canonicalize('  office chair  '));
     }
 
-    /**
-     * @return void
-     */
     public function testLowercases(): void
     {
         $this->assertSame('office chair', (new SearchTermCanonicalizer())->canonicalize('Office Chair'));
     }
 
-    /**
-     * @return void
-     */
     public function testCollapsesInternalWhitespace(): void
     {
         $this->assertSame('office chair', (new SearchTermCanonicalizer())->canonicalize('office    chair'));
     }
 
-    /**
-     * @return void
-     */
     public function testCollapsesInternalTabsAndNewlines(): void
     {
         $this->assertSame('office chair', (new SearchTermCanonicalizer())->canonicalize("office\t\nchair"));
     }
 
-    /**
-     * @return void
-     */
     public function testLowercasesMultibyteCharactersCorrectly(): void
     {
         $this->assertSame('bürostuhl', (new SearchTermCanonicalizer())->canonicalize('BÜROSTUHL'));
@@ -68,8 +53,6 @@ class SearchTermCanonicalizerTest extends Unit
     /**
      * Deliberately NOT tokenized: a genuinely different query stays different, even a near-miss like a
      * plural — merging these would be a false-positive query match, not a feature.
-     *
-     * @return void
      */
     public function testDoesNotMergeADifferentSearchTermIntoTheSameCanonicalForm(): void
     {

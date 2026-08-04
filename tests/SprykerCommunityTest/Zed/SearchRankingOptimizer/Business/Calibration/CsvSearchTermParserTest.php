@@ -25,9 +25,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTe
  */
 class CsvSearchTermParserTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testParsesOneSearchTermPerLine(): void
     {
         // Arrange
@@ -40,9 +37,6 @@ class CsvSearchTermParserTest extends Unit
         $this->assertSame(['chair', 'desk', 'lamp'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testDropsBlankLines(): void
     {
         // Arrange
@@ -55,9 +49,6 @@ class CsvSearchTermParserTest extends Unit
         $this->assertSame(['chair', 'desk'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testTrimsWhitespaceAroundEachTerm(): void
     {
         // Arrange
@@ -73,8 +64,6 @@ class CsvSearchTermParserTest extends Unit
     /**
      * Uploading the same search term twice must not fire the same query twice — dedup preserves the
      * first-seen order.
-     *
-     * @return void
      */
     public function testDeduplicatesSearchTermsPreservingFirstSeenOrder(): void
     {
@@ -88,9 +77,6 @@ class CsvSearchTermParserTest extends Unit
         $this->assertSame(['chair', 'desk', 'lamp'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testHandlesWindowsStyleLineEndings(): void
     {
         // Arrange
@@ -103,9 +89,6 @@ class CsvSearchTermParserTest extends Unit
         $this->assertSame(['chair', 'desk', 'lamp'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testReturnsAnEmptyArrayForBlankContent(): void
     {
         // Arrange

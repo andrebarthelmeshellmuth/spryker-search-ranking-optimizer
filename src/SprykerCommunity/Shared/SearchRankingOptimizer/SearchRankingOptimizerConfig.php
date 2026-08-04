@@ -161,8 +161,6 @@ class SearchRankingOptimizerConfig
      *   of cutoff (also used by spryker-community/search-ranking's own rank_eval capability probe).
      *
      * @api
-     *
-     * @return int
      */
     public static function getRankEvalCutoff(): int
     {
@@ -247,8 +245,6 @@ class SearchRankingOptimizerConfig
      *   all the way to on its own.
      *
      * @api
-     *
-     * @return float
      */
     public static function getRelevanceWeightTrustRegionMaxDistance(): float
     {
@@ -263,8 +259,6 @@ class SearchRankingOptimizerConfig
      *   {@see getSpecificityWeightExponentLowerBound()}/{@see getSpecificityWeightExponentUpperBound()}.
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightExponentTrustRegionMaxDistance(): float
     {
@@ -279,8 +273,6 @@ class SearchRankingOptimizerConfig
      *   inverts it in an unintended way).
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightExponentLowerBound(): float
     {
@@ -294,8 +286,6 @@ class SearchRankingOptimizerConfig
      *   a run should be allowed to reach, not artificially capped tighter than that).
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightExponentUpperBound(): float
     {
@@ -308,8 +298,6 @@ class SearchRankingOptimizerConfig
      *   `specificityWeightShiftMagnitude` instead.
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightShiftMagnitudeTrustRegionMaxDistance(): float
     {
@@ -324,8 +312,6 @@ class SearchRankingOptimizerConfig
      *   already-maximal specificity deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightShiftMagnitudeLowerBound(): float
     {
@@ -334,8 +320,6 @@ class SearchRankingOptimizerConfig
 
     /**
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityWeightShiftMagnitudeUpperBound(): float
     {
@@ -348,8 +332,6 @@ class SearchRankingOptimizerConfig
      *   `specificityBlendWeight` instead.
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityBlendWeightTrustRegionMaxDistance(): float
     {
@@ -363,8 +345,6 @@ class SearchRankingOptimizerConfig
      *   pure harmonic mean, 1 = pure max).
      *
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityBlendWeightLowerBound(): float
     {
@@ -373,8 +353,6 @@ class SearchRankingOptimizerConfig
 
     /**
      * @api
-     *
-     * @return float
      */
     public static function getSpecificityBlendWeightUpperBound(): float
     {
@@ -390,8 +368,6 @@ class SearchRankingOptimizerConfig
      *   counter's denominator before a run actually starts.
      *
      * @api
-     *
-     * @return int
      */
     public static function getOptimizationMaxGenerations(): int
     {
@@ -410,8 +386,6 @@ class SearchRankingOptimizerConfig
      *   restriction on what the optimizer can actually reach in practice.
      *
      * @api
-     *
-     * @return float
      */
     public static function getMetricWeightZSpaceBound(): float
     {

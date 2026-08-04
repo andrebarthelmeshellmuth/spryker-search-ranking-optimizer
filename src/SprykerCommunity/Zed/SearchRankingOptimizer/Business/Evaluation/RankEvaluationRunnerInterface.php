@@ -30,8 +30,6 @@ interface RankEvaluationRunnerInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function evaluate(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 

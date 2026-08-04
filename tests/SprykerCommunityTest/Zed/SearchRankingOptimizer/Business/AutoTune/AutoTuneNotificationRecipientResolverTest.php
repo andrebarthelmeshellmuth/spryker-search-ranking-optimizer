@@ -29,9 +29,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\Search
  */
 class AutoTuneNotificationRecipientResolverTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testReturnsEmptyArrayWhenTheNotificationRoleDoesNotExistYet(): void
     {
         // Arrange
@@ -51,9 +48,6 @@ class AutoTuneNotificationRecipientResolverTest extends Unit
         $this->assertSame([], $result);
     }
 
-    /**
-     * @return void
-     */
     public function testResolvesEveryUsernameAcrossEveryGroupHoldingTheRoleWithoutDuplicates(): void
     {
         // Arrange

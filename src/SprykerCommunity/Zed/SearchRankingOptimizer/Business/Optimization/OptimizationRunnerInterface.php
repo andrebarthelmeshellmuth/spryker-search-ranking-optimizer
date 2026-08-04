@@ -30,8 +30,6 @@ interface OptimizationRunnerInterface
      *   to evaluate against, no active metrics to optimize, or any exception raised mid-run (e.g. an
      *   Elasticsearch error) — a queued run always ends in either done or failed, never queued/running
      *   forever.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function runNext(): ?SearchRankingOptimizerRunTransfer;
 }

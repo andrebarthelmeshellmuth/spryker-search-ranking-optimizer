@@ -30,9 +30,6 @@ class SearchRankingOptimizerCalibrateConsole extends Console
      */
     public const COMMAND_DESCRIPTION = 'Picks up the newest uploaded calibration run (skipping any older uploads) and, depending on its calibrationType, either fires the live catalog search-string query for each of its search terms (relevance_score) or a lightweight per-term probe with no catalog query at all (specificity), pooling the resulting raw values into a suggested relevanceSaturationPoint/specificitySaturationPoint (k) value for spryker-community/search-ranking.';
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME);
@@ -42,12 +39,9 @@ class SearchRankingOptimizerCalibrateConsole extends Console
     }
 
     // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
-
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

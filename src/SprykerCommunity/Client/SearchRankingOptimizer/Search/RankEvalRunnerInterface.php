@@ -28,8 +28,6 @@ interface RankEvalRunnerInterface
      *   sent to rank_eval with an empty `ratings` array, which the API itself rejects.
      *
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluate(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
 }

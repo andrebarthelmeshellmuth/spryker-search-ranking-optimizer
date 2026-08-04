@@ -96,8 +96,6 @@ class CalibrationController extends AbstractController
      * Polled by the Calibration page's own JS while a run is in status=calculating — deliberately tiny
      * (id/status/counts only, no search terms) since this fires roughly once a second for however long
      * the run takes.
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function progressAction(): JsonResponse
     {
@@ -118,8 +116,6 @@ class CalibrationController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\File\UploadedFile $uploadedFile
-     *
-     * @return string
      */
     protected function readUploadedFileContent(UploadedFile $uploadedFile): string
     {

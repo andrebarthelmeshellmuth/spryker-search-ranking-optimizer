@@ -27,8 +27,6 @@ interface OptimizationApplierInterface
      * - Returns null when the run doesn't exist, or exists but isn't status=done (nothing to apply yet).
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function apply(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 }

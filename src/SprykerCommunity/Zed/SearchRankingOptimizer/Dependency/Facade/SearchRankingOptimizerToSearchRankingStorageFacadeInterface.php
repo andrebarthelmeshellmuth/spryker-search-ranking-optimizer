@@ -11,8 +11,5 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
 interface SearchRankingOptimizerToSearchRankingStorageFacadeInterface
 {
-    /**
-     * @return void
-     */
     public function publishRankingConfiguration(): void;
 }

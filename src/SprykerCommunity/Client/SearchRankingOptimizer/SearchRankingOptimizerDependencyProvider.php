@@ -34,8 +34,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
 
     /**
      * @param \Spryker\Client\Kernel\Container $container
-     *
-     * @return \Spryker\Client\Kernel\Container
      */
     #[\Override]
     public function provideServiceLayerDependencies(Container $container): Container
@@ -50,8 +48,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
 
     /**
      * @param \Spryker\Client\Kernel\Container $container
-     *
-     * @return \Spryker\Client\Kernel\Container
      */
     protected function addZedRequestClient(Container $container): Container
     {
@@ -62,8 +58,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
 
     /**
      * @param \Spryker\Client\Kernel\Container $container
-     *
-     * @return \Spryker\Client\Kernel\Container
      */
     protected function addSearchRankingStorageClient(Container $container): Container
     {
@@ -74,8 +68,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
 
     /**
      * @param \Spryker\Client\Kernel\Container $container
-     *
-     * @return \Spryker\Client\Kernel\Container
      */
     protected function addSearchRankingClient(Container $container): Container
     {

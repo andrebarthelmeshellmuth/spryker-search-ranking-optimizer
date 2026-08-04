@@ -23,9 +23,6 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  */
 class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthTest
 {
-    /**
-     * @return void
-     */
     public function testMetricWeightConvergesTowardWhicheverMetricTheGroundTruthFavors(): void
     {
         [$searchTerm] = $this->discoverTwoRatedProductIdsAndSearchTerm();
@@ -94,9 +91,6 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
         }
     }
 
-    /**
-     * @return void
-     */
     public function testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors(): void
     {
         [$searchTerm] = $this->discoverTwoRatedProductIdsAndSearchTerm();
@@ -162,8 +156,6 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
     /**
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $runTransfer
      * @param string $metricName
-     *
-     * @return float
      */
     protected function extractMetricWeight(SearchRankingOptimizerRunTransfer $runTransfer, string $metricName): float
     {

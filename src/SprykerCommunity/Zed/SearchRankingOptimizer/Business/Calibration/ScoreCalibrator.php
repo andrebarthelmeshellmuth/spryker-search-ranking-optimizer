@@ -29,29 +29,14 @@ use Throwable;
  */
 class ScoreCalibrator implements ScoreCalibratorInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface
-     */
     protected SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface
-     */
     protected StatisticsCalculatorInterface $statisticsCalculator;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
     /**
@@ -77,8 +62,6 @@ class ScoreCalibrator implements ScoreCalibratorInterface
 
     /**
      * {@inheritDoc}
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function runNextCalibration(): ?SearchRankingCalibrationTransfer
     {
@@ -102,8 +85,6 @@ class ScoreCalibrator implements ScoreCalibratorInterface
 
     /**
      * @param int $idSearchRankingCalibration
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     protected function calculate(int $idSearchRankingCalibration): SearchRankingCalibrationTransfer
     {
@@ -151,8 +132,6 @@ class ScoreCalibrator implements ScoreCalibratorInterface
      * @param int $idSearchRankingCalibration
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\SearchRankingCalibrationNotFoundException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     protected function requireCalibration(int $idSearchRankingCalibration): SearchRankingCalibrationTransfer
     {

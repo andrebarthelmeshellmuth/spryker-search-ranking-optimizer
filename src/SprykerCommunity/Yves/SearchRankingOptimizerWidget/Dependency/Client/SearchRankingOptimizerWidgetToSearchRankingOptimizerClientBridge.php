@@ -29,8 +29,6 @@ class SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge implement
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -40,8 +38,6 @@ class SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge implement
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,

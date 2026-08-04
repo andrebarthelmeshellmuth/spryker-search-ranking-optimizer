@@ -29,8 +29,6 @@ class QueryImportanceWeightForm extends AbstractType
     /**
      * @param \Symfony\Component\Form\FormBuilderInterface $builder
      * @param array<string, mixed> $options
-     *
-     * @return void
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -47,9 +45,6 @@ class QueryImportanceWeightForm extends AbstractType
         ]);
     }
 
-    /**
-     * @return string
-     */
     #[\Override]
     public function getBlockPrefix(): string
     {

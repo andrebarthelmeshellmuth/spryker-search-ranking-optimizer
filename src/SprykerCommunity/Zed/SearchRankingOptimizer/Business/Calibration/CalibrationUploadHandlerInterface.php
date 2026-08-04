@@ -31,8 +31,6 @@ interface CalibrationUploadHandlerInterface
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
         string $calibrationType,

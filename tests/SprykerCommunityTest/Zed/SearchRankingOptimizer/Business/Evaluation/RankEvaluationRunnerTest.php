@@ -36,9 +36,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class RankEvaluationRunnerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenNoQueriesExistForStoreLocale(): void
     {
         // Arrange
@@ -58,9 +55,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenNoRatingsExistForStoreLocale(): void
     {
         // Arrange
@@ -80,9 +74,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenTheBridgeReturnsNoScores(): void
     {
         // Arrange
@@ -105,9 +96,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluatePersistsAQueryImportanceWeightedAggregateAcrossMultipleQueries(): void
     {
         // Arrange — query 1 (weight 2) scores 0.8, query 2 (weight 1) scores 0.2:
@@ -153,9 +141,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertSame(2, $result->getQueryCount());
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateCandidateReturnsNullWhenNoQueriesExistForStoreLocale(): void
     {
         // Arrange
@@ -179,8 +164,6 @@ class RankEvaluationRunnerTest extends Unit
      * The whole point of this method: it must NEVER call createEvaluation, no matter how many times it's
      * called or how successful the evaluation is -- an optimizer loop calling this hundreds of times per
      * run must not flood spy_search_ranking_evaluation with candidate-scoring noise.
-     *
-     * @return void
      */
     public function testEvaluateCandidateNeverPersistsAnEvaluation(): void
     {
@@ -211,8 +194,6 @@ class RankEvaluationRunnerTest extends Unit
      * The other half of the point: the candidate configuration must actually reach the fired query, not
      * be silently dropped -- otherwise every candidate an optimizer proposes would score identically,
      * exactly the original bug this method exists to avoid re-introducing.
-     *
-     * @return void
      */
     public function testEvaluateCandidatePassesTheGivenConfigurationThroughToTheRequest(): void
     {
@@ -250,8 +231,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -277,8 +256,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param int $idSearchRankingQuery
      * @param string $searchTerm
      * @param float $importanceWeight
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     protected function createQueryTransfer(int $idSearchRankingQuery, string $searchTerm, float $importanceWeight): SearchRankingQueryTransfer
     {
@@ -294,8 +271,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param int $fkSearchRankingQuery
      * @param int $fkProductAbstract
      * @param string $ratingType
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     protected function createRatingTransfer(int $fkSearchRankingQuery, int $fkProductAbstract, string $ratingType): SearchRankingQueryRatingTransfer
     {

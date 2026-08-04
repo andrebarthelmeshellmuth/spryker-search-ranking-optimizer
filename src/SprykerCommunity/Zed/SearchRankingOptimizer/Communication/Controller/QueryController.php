@@ -40,8 +40,6 @@ class QueryController extends AbstractController
      * AJAX data source the rendered table's own JS polls against (DataTables-style server-side
      * processing) — same convention `spryker-community/search-ranking`'s own MetricTable/IndexController
      * pairing uses.
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function tableAction(): JsonResponse
     {

@@ -29,8 +29,6 @@ class GatewayController extends AbstractGatewayController
      * actually hold this permission", Yves only has its own session-bound, same-layer belief about it).
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function submitProductRelevanceJudgmentAction(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -64,8 +62,6 @@ class GatewayController extends AbstractGatewayController
      * same permission submitting one does, re-checked here rather than trusted from Yves.
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgmentAction(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,

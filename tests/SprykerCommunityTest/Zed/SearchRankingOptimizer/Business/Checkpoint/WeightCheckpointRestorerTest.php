@@ -30,9 +30,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class WeightCheckpointRestorerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testRestoreReturnsNullWhenCheckpointDoesNotExist(): void
     {
         // Arrange
@@ -54,9 +51,6 @@ class WeightCheckpointRestorerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testRestoreWritesRelevanceWeightSpecificityKnobsAndMetricWeightsBackThroughTheBridgeThenRecordsANewCheckpoint(): void
     {
         // Arrange
@@ -110,9 +104,6 @@ class WeightCheckpointRestorerTest extends Unit
         $this->assertSame($newCheckpointTransfer, $result);
     }
 
-    /**
-     * @return void
-     */
     public function testRestoreSkipsAMetricWeightThatNoLongerExistsWithoutFailing(): void
     {
         // Arrange

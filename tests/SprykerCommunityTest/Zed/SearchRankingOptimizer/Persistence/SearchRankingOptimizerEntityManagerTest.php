@@ -80,9 +80,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
      */
     protected array $weightCheckpointIds = [];
 
-    /**
-     * @return void
-     */
     protected function _after(): void
     {
         foreach ($this->calibrationEntities as $calibrationEntity) {
@@ -113,9 +110,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         parent::_after();
     }
 
-    /**
-     * @return void
-     */
     public function testCreateCalibrationPersistsTheCalibrationAndItsSearchTermsWithCorrectForeignKeys(): void
     {
         // Arrange
@@ -147,9 +141,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         );
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateCalibrationStatusChangesTheStatusOfAnExistingCalibration(): void
     {
         // Arrange
@@ -166,18 +157,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED, $calibrationEntity->getStatus());
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateCalibrationStatusIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->updateCalibrationStatus(-1, SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED);
     }
 
-    /**
-     * @return void
-     */
     public function testIncrementCalibrationProcessedCountAddsOneEachCall(): void
     {
         // Arrange
@@ -193,18 +178,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(2, $calibrationEntity->getProcessedCount());
     }
 
-    /**
-     * @return void
-     */
     public function testIncrementCalibrationProcessedCountIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->incrementCalibrationProcessedCount(-1);
     }
 
-    /**
-     * @return void
-     */
     public function testSaveCalibrationSearchTermResultPersistsProductsFoundAndImplodedValues(): void
     {
         // Arrange
@@ -227,18 +206,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame('12.5,13.5', $searchTermEntity->getValues());
     }
 
-    /**
-     * @return void
-     */
     public function testSaveCalibrationSearchTermResultIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->saveCalibrationSearchTermResult(-1, 3, [12.5, 13.5]);
     }
 
-    /**
-     * @return void
-     */
     public function testSaveCalibrationStatisticsPersistsEveryStatisticAndFlipsStatusToCalculated(): void
     {
         // Arrange
@@ -269,18 +242,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, $calibrationEntity->getStatus());
     }
 
-    /**
-     * @return void
-     */
     public function testSaveCalibrationStatisticsIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->saveCalibrationStatistics(-1, new SearchRankingCalibrationTransfer());
     }
 
-    /**
-     * @return void
-     */
     public function testMarkCalibrationFailedPersistsTheErrorMessageAndFlipsStatusToFailed(): void
     {
         // Arrange
@@ -298,18 +265,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame('No search term produced any score.', $calibrationEntity->getErrorMessage());
     }
 
-    /**
-     * @return void
-     */
     public function testMarkCalibrationFailedIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
         (new SearchRankingOptimizerEntityManager())->markCalibrationFailed(-1, 'irrelevant');
     }
 
-    /**
-     * @return void
-     */
     public function testCreateEvaluationPersistsTheEvaluation(): void
     {
         // Arrange
@@ -332,9 +293,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertNotNull($resultTransfer->getCreatedAt());
     }
 
-    /**
-     * @return void
-     */
     public function testSaveAutoTuneMetricConfigCreatesANewRowWhenNoneExistsYetForTheMetric(): void
     {
         // Arrange
@@ -358,9 +316,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertTrue($resultTransfer->getIsNotifyEnabled());
     }
 
-    /**
-     * @return void
-     */
     public function testSaveAutoTuneMetricConfigUpdatesTheExistingRowForThatMetricInsteadOfCreatingASecondOne(): void
     {
         // Arrange
@@ -395,8 +350,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
     /**
      * @param string $status
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration
      */
     protected function createTestCalibration(string $status): SpySearchRankingCalibration
     {
@@ -414,8 +367,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
     /**
      * @param int $idSearchRankingCalibration
-     *
-     * @return void
      */
     protected function trackForCleanup(int $idSearchRankingCalibration): void
     {
@@ -428,9 +379,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->calibrationEntities[] = $calibrationEntity;
     }
 
-    /**
-     * @return void
-     */
     public function testCreateOptimizerRunPersistsAQueuedRun(): void
     {
         // Arrange
@@ -453,9 +401,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(0, $resultTransfer->getProcessedCount());
     }
 
-    /**
-     * @return void
-     */
     public function testStartOptimizerRunTransitionsToRunningAndSetsTotalCountAndBaselineScore(): void
     {
         // Arrange
@@ -471,18 +416,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(0.65, $entity->getBaselineScore());
     }
 
-    /**
-     * @return void
-     */
     public function testStartOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->startOptimizerRun(999999999, 400, 0.65);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateOptimizerRunProgressSetsProcessedCountToTheGivenValue(): void
     {
         // Arrange
@@ -496,18 +435,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(240, $entity->getProcessedCount());
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateOptimizerRunProgressIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->updateOptimizerRunProgress(999999999, 240);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testCompleteOptimizerRunPersistsTheWinningCandidateAndSetsStatusDone(): void
     {
         // Arrange
@@ -532,18 +465,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertStringContainsString('top_seller', (string)$entity->getBestMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testCompleteOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.2, 0.25);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testFailOptimizerRunSetsStatusFailedAndTheErrorMessage(): void
     {
         // Arrange
@@ -558,18 +485,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame('Elasticsearch timed out.', $entity->getErrorMessage());
     }
 
-    /**
-     * @return void
-     */
     public function testFailOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->failOptimizerRun(999999999, 'irrelevant');
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testMarkOptimizerRunAppliedSetsAppliedAt(): void
     {
         // Arrange
@@ -583,18 +504,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertNotNull($entity->getAppliedAt());
     }
 
-    /**
-     * @return void
-     */
     public function testMarkOptimizerRunAppliedIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->markOptimizerRunApplied(999999999);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return int
-     */
     protected function createTestOptimizerRun(): int
     {
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun(
@@ -610,9 +525,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         return $idSearchRankingOptimizerRun;
     }
 
-    /**
-     * @return void
-     */
     public function testCreateQueryPersistsTheQuery(): void
     {
         // Arrange
@@ -634,9 +546,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(2.5, $resultTransfer->getImportanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testCreateQueryDefaultsImportanceWeightWhenNoneGiven(): void
     {
         // Arrange
@@ -653,9 +562,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertNotNull($resultTransfer->getImportanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateQueryImportanceWeightChangesTheWeightOfAnExistingQuery(): void
     {
         // Arrange
@@ -669,18 +575,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(4.0, $queryEntity->getImportanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateQueryImportanceWeightIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->updateQueryImportanceWeight(999999999, 4.0);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testTouchQuerySetsUpdatedAtToNow(): void
     {
         // Arrange
@@ -696,18 +596,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertGreaterThan(strtotime('2026-01-01 00:00:00'), (int)$queryEntity->getUpdatedAt('U'));
     }
 
-    /**
-     * @return void
-     */
     public function testTouchQueryIsASafeNoOpForANonExistentId(): void
     {
         (new SearchRankingOptimizerEntityManager())->touchQuery(999999999);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testUpsertRatingCreatesANewRatingAndTouchesTheQuery(): void
     {
         // Arrange -- id 9 is a real seeded product abstract (M1006811), needed to satisfy the rating
@@ -733,9 +627,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertGreaterThan(strtotime('2026-01-01 00:00:00'), (int)$queryEntity->getUpdatedAt('U'), 'upsertRating() must touch the parent query.');
     }
 
-    /**
-     * @return void
-     */
     public function testUpsertRatingUpdatesTheExistingRatingInsteadOfCreatingASecondOneForTheSameTriple(): void
     {
         // Arrange
@@ -768,9 +659,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame('cross', $ratingEntities->getFirst()->getRatingType());
     }
 
-    /**
-     * @return void
-     */
     public function testDeleteRatingRemovesTheMatchingRating(): void
     {
         // Arrange
@@ -797,18 +685,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         );
     }
 
-    /**
-     * @return void
-     */
     public function testDeleteRatingIsASafeNoOpWhenNoMatchingRatingExists(): void
     {
         (new SearchRankingOptimizerEntityManager())->deleteRating(999999999, 'CUST-NONE', 9);
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * @return void
-     */
     public function testCreateWeightCheckpointPersistsEveryFieldAndEncodesTheMetricWeights(): void
     {
         // Arrange
@@ -849,8 +731,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery
      */
     protected function createTestQueryEntity(string $searchTerm, string $storeName, string $localeName): SpySearchRankingQuery
     {

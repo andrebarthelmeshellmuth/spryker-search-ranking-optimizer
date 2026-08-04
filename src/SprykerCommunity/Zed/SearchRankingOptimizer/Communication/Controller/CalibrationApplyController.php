@@ -28,8 +28,6 @@ class CalibrationApplyController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function indexAction(Request $request): RedirectResponse
     {

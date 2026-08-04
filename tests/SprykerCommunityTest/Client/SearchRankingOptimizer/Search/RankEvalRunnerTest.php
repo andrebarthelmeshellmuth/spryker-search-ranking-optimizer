@@ -54,9 +54,6 @@ class RankEvalRunnerTest extends Unit
      */
     protected const ID_PRODUCT_ABSTRACT_KONFERENZSTUHL = 62;
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsAScoreForARealRatedQueryWithRealCatalogMatches(): void
     {
         // Arrange
@@ -109,8 +106,6 @@ class RankEvalRunnerTest extends Unit
      * miss both rated documents entirely, giving a false-negative 0.0-vs-0.0 regardless of whether the
      * override actually applied. A cutoff covering every possible match makes both rated documents' presence
      * (and therefore the assertion) independent of that ES tie-break/window-boundary noise.
-     *
-     * @return void
      */
     public function testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne(): void
     {
@@ -169,8 +164,6 @@ class RankEvalRunnerTest extends Unit
      * A saturation point far below "chair"'s own real specificity (confirmed live, see this package's
      * README) guarantees normalized specificity lands well above the neutral 0.5 point, so a non-zero
      * `specificityWeightShiftMagnitude` must produce a `relevanceWeight` different from the configured one.
-     *
-     * @return void
      */
     public function testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm(): void
     {
@@ -206,9 +199,6 @@ class RankEvalRunnerTest extends Unit
         $this->assertLessThanOrEqual(1.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
     }
 
-    /**
-     * @return void
-     */
     public function testFetchIdfByTermCachesTheResultAcrossRepeatedCalls(): void
     {
         // Arrange
@@ -230,9 +220,6 @@ class RankEvalRunnerTest extends Unit
         $this->assertArrayHasKey($indexName . ':chair', $cache);
     }
 
-    /**
-     * @return void
-     */
     public function testApplySpecificityWeightingIsANoOpWhenNoQueryTermCarriesRealCorpusEvidence(): void
     {
         // Arrange -- a search term that matches nothing in the corpus at all has no idf to compute.
@@ -267,8 +254,6 @@ class RankEvalRunnerTest extends Unit
      * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s own docblock for the
      * fix), `createRankEvalRunner()`'s result legitimately depends on whatever THIS shop's own project
      * config says, which this test must not depend on to stay deterministic.
-     *
-     * @return void
      */
     public function testApplySpecificityWeightingIsANoOpWhenSpecificityWeightingIsDisabled(): void
     {
@@ -297,9 +282,6 @@ class RankEvalRunnerTest extends Unit
         $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateSkipsAQueryWithNoRatedProductsRatherThanSendingAnEmptyRatingsArray(): void
     {
         // Arrange — rank_eval itself rejects a request with an empty `ratings` array, so a query with no
@@ -322,9 +304,6 @@ class RankEvalRunnerTest extends Unit
         $this->assertCount(0, iterator_to_array($responseTransfer->getQueryScores()));
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsAnEmptyResponseForARequestWithNoQueriesAtAll(): void
     {
         // Arrange
@@ -345,8 +324,6 @@ class RankEvalRunnerTest extends Unit
      * including the real `SearchRankingOptimizerToSearchRankingClientBridge`, so this exercises the actual
      * project-override-aware `isSpecificityWeightingEnabled()` resolution (off by default, since nothing in
      * this test environment overrides it), not the old, no-longer-needed hardcoded-Shared-static fallback.
-     *
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
     protected function createRankEvalRunner(): RankEvalRunner
     {
@@ -372,8 +349,6 @@ class RankEvalRunnerTest extends Unit
      * `getSpecificityProbeFieldSearchAnalyzers()` mirrors this shop's own real project override
      * (`Pyz\Client\SearchRanking\SearchRankingConfig`), since the field/analyzer names must match this
      * shop's real `page.json` schema for a live `_termvectors` probe to find anything at all.
-     *
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
     protected function createRankEvalRunnerWithSpecificityWeightingForcedEnabled(): RankEvalRunner
     {
@@ -382,9 +357,6 @@ class RankEvalRunnerTest extends Unit
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
         $specificityWeightingForcedEnabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
-            /**
-             * @return bool
-             */
             public function isSpecificityWeightingEnabled(): bool
             {
                 return true;
@@ -417,8 +389,6 @@ class RankEvalRunnerTest extends Unit
      * The counterpart to {@see createRankEvalRunnerWithSpecificityWeightingForcedEnabled()} —
      * deterministically OFF regardless of what this shop's own project config says, for tests that
      * specifically need to prove the disabled path rather than depend on ambient environment state.
-     *
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
     protected function createRankEvalRunnerWithSpecificityWeightingForcedDisabled(): RankEvalRunner
     {
@@ -427,9 +397,6 @@ class RankEvalRunnerTest extends Unit
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
         $specificityWeightingForcedDisabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
-            /**
-             * @return bool
-             */
             public function isSpecificityWeightingEnabled(): bool
             {
                 return false;

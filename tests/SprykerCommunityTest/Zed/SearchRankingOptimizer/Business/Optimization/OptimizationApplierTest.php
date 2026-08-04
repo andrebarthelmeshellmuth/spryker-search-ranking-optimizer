@@ -32,9 +32,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class OptimizationApplierTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testApplyReturnsNullWhenTheRunDoesNotExist(): void
     {
         // Arrange
@@ -56,9 +53,6 @@ class OptimizationApplierTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testApplyReturnsNullWhenTheRunIsNotDoneYet(): void
     {
         // Arrange
@@ -81,9 +75,6 @@ class OptimizationApplierTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testApplyWritesTheWinningCandidateThroughTheFacadeRecordsAnOptimizerSourcedCheckpointAndMarksTheRunApplied(): void
     {
         // Arrange
@@ -156,8 +147,6 @@ class OptimizationApplierTest extends Unit
      * finished and when an admin clicks Apply. Proves the whole apply rolls back rather than leaving
      * relevanceWeight/specificity settings live with only some metric weights applied (which would silently
      * leave the live metric weights summing to less than 1, with the run still marked applied).
-     *
-     * @return void
      */
     public function testApplyRollsBackEverythingAndReturnsNullWhenAMetricNoLongerExists(): void
     {
@@ -206,8 +195,6 @@ class OptimizationApplierTest extends Unit
     /**
      * The checkpoint must snapshot the state BEFORE this run's values are written — recording it after
      * would checkpoint the just-applied state itself, useless as a way back.
-     *
-     * @return void
      */
     public function testApplyRecordsTheCheckpointBeforeWritingAnyWeights(): void
     {
@@ -258,8 +245,6 @@ class OptimizationApplierTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface|null $recorder
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier
      */
     protected function createApplier(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -285,16 +270,12 @@ class OptimizationApplierTest extends Unit
      * just invokes the callback directly (no real transaction), which is all `OptimizationApplier` needs
      * from it: the callback runs, and any exception it throws propagates same as the real handler would
      * after its own rollback.
-     *
-     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
      */
     protected function createPassThroughTransactionHandler(): TransactionHandlerInterface
     {
         return new class implements TransactionHandlerInterface {
             /**
              * @param \Closure $callback
-             *
-             * @return mixed
              */
             public function handleTransaction(Closure $callback): mixed
             {

@@ -33,8 +33,6 @@ class LiveCatalogSearchQueryBuilder implements LiveCatalogSearchQueryBuilderInte
      * @param string $storeName
      * @param string $localeName
      * @param int|null $limit
-     *
-     * @return \Elastica\Query
      */
     public function build(string $searchTerm, string $storeName, string $localeName, ?int $limit = null): Query
     {
@@ -63,8 +61,6 @@ class LiveCatalogSearchQueryBuilder implements LiveCatalogSearchQueryBuilderInte
      * @param \Elastica\Query\BoolQuery $boolQuery
      * @param string $field
      * @param string $value
-     *
-     * @return void
      */
     protected function addMatchFilter(BoolQuery $boolQuery, string $field, string $value): void
     {

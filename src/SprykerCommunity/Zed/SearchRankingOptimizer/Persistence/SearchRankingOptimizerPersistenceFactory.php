@@ -22,73 +22,46 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\Search
 
 class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactory
 {
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery
-     */
     public function createSearchRankingCalibrationQuery(): SpySearchRankingCalibrationQuery
     {
         return SpySearchRankingCalibrationQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery
-     */
     public function createSearchRankingCalibrationSearchTermQuery(): SpySearchRankingCalibrationSearchTermQuery
     {
         return SpySearchRankingCalibrationSearchTermQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery
-     */
     public function createSearchRankingQueryQuery(): SpySearchRankingQueryQuery
     {
         return SpySearchRankingQueryQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery
-     */
     public function createSearchRankingQueryRatingQuery(): SpySearchRankingQueryRatingQuery
     {
         return SpySearchRankingQueryRatingQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery
-     */
     public function createSearchRankingEvaluationQuery(): SpySearchRankingEvaluationQuery
     {
         return SpySearchRankingEvaluationQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery
-     */
     public function createSearchRankingWeightCheckpointQuery(): SpySearchRankingWeightCheckpointQuery
     {
         return SpySearchRankingWeightCheckpointQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery
-     */
     public function createSearchRankingAutoTuneMetricConfigQuery(): SpySearchRankingAutoTuneMetricConfigQuery
     {
         return SpySearchRankingAutoTuneMetricConfigQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery
-     */
     public function createSearchRankingOptimizerRunQuery(): SpySearchRankingOptimizerRunQuery
     {
         return SpySearchRankingOptimizerRunQuery::create();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper
-     */
     public function createSearchRankingOptimizerMapper(): SearchRankingOptimizerMapper
     {
         return new SearchRankingOptimizerMapper();

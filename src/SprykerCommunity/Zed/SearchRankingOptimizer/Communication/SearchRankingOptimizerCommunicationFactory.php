@@ -35,9 +35,6 @@ use Symfony\Component\Form\FormInterface;
 
 class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFactory
 {
-    /**
-     * @return \Symfony\Component\Form\FormInterface
-     */
     public function createCalibrationUploadForm(): FormInterface
     {
         $storeChoices = [];
@@ -58,8 +55,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
 
     /**
      * @param array<string, string> $data
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createEvaluationForm(array $data = []): FormInterface
     {
@@ -84,8 +79,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
      * @param string $storeName
      * @param string $localeName
      * @param string $calibrationType
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createCalibrationApplyForm(
         float $saturationPointValue,
@@ -101,33 +94,21 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         ]);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     public function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeInterface
-     */
     public function getSearchRankingStorageFacade(): SearchRankingOptimizerToSearchRankingStorageFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING_STORAGE);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface
-     */
     public function getStoreFacade(): SearchRankingOptimizerToStoreFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_STORE);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface
-     */
     public function getLocaleFacade(): SearchRankingOptimizerToLocaleFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_LOCALE);
@@ -155,25 +136,16 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return array_values($this->getLocaleFacade()->getAvailableLocales());
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface
-     */
     public function getCompanyUserFacade(): SearchRankingOptimizerToCompanyUserFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_COMPANY_USER);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface
-     */
     public function getPermissionFacade(): SearchRankingOptimizerToPermissionFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_PERMISSION);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface
-     */
     public function createRelevanceJudgmentAuthorizer(): RelevanceJudgmentAuthorizerInterface
     {
         return new RelevanceJudgmentAuthorizer(
@@ -182,9 +154,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable
-     */
     public function createQueryTable(): QueryTable
     {
         return new QueryTable(SpySearchRankingQueryQuery::create());
@@ -192,8 +161,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
 
     /**
      * @param float $importanceWeight
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createQueryImportanceWeightForm(float $importanceWeight): FormInterface
     {
@@ -202,9 +169,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         ]);
     }
 
-    /**
-     * @return \Symfony\Component\Form\FormInterface
-     */
     public function createRecordWeightCheckpointForm(): FormInterface
     {
         return $this->getFormFactory()->create(RecordWeightCheckpointForm::class);
@@ -214,8 +178,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
      * @param int $idSearchRankingWeightCheckpoint
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createRestoreWeightCheckpointForm(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): FormInterface
     {
@@ -232,8 +194,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
      * @param bool $isAutoUpdateEnabled
      * @param string $autoUpdateScope
      * @param bool $isNotifyEnabled
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createAutoTuneMetricConfigForm(
         int $idSearchRankingMetric,
@@ -251,9 +211,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         ]);
     }
 
-    /**
-     * @return \Symfony\Component\Form\FormInterface
-     */
     public function createOptimizeRunForm(): FormInterface
     {
         $storeChoices = [];
@@ -274,8 +231,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
 
     /**
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Symfony\Component\Form\FormInterface
      */
     public function createOptimizationApplyForm(int $idSearchRankingOptimizerRun): FormInterface
     {

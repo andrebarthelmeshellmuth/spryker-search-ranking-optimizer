@@ -48,69 +48,30 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      */
     protected array $fixedMetricWeights;
 
-    /**
-     * @var float
-     */
     protected float $fixedWeightBudget;
 
-    /**
-     * @var float
-     */
     protected float $relevanceWeightLowerBound;
 
-    /**
-     * @var float
-     */
     protected float $relevanceWeightUpperBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightExponentLowerBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightExponentUpperBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightShiftMagnitudeLowerBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightShiftMagnitudeUpperBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityBlendWeightLowerBound;
 
-    /**
-     * @var float
-     */
     protected float $specificityBlendWeightUpperBound;
 
-    /**
-     * @var bool
-     */
     protected bool $specificityWeightingEnabled;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightExponentAtRunStart;
 
-    /**
-     * @var float
-     */
     protected float $specificityWeightShiftMagnitudeAtRunStart;
 
-    /**
-     * @var float
-     */
     protected float $specificityBlendWeightAtRunStart;
 
     /**
@@ -193,9 +154,6 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         );
     }
 
-    /**
-     * @return int
-     */
     public function getDimensionCount(): int
     {
         return 1 + $this->getFreeMetricWeightDimensionCount() + $this->getSpecificityDimensionCount();
@@ -250,8 +208,6 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      *
      * @param array<int, float> $vector
      * @param float $relevanceSaturationPoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
      */
     public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer
     {
@@ -372,17 +328,11 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         return $metricWeightsByName;
     }
 
-    /**
-     * @return int
-     */
     protected function getFreeMetricWeightDimensionCount(): int
     {
         return max(0, count($this->metrics) - 1);
     }
 
-    /**
-     * @return int
-     */
     protected function getSpecificityDimensionCount(): int
     {
         return $this->specificityWeightingEnabled ? 3 : 0;

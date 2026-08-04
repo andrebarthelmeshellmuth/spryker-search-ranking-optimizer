@@ -39,9 +39,6 @@ class ParameterVectorMapperTest extends Unit
      */
     protected const SPECIFICITY_BLEND_WEIGHT_AT_RUN_START = 0.7;
 
-    /**
-     * @return void
-     */
     public function testGetDimensionCountIsFourForZeroActiveMetrics(): void
     {
         $mapper = $this->buildMapper([]);
@@ -49,9 +46,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 3 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
     public function testGetDimensionCountIsFourForASingleActiveMetric(): void
     {
         $mapper = $this->buildMapper([['idSearchRankingMetric' => 1, 'name' => 'top_seller']]);
@@ -59,9 +53,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 3 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
     public function testGetDimensionCountIsRelevanceWeightPlusNMinusOneMetricsPlusThreeSpecificityDimensionsForNActiveMetrics(): void
     {
         $mapper = $this->buildMapper($this->buildThreeMetrics());
@@ -69,9 +60,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(6, $mapper->getDimensionCount(), '1 (relevanceWeight) + (3 - 1) free z values + 3 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
     public function testBoundsClampTheRelevanceWeightTrustRegionToStayWithinZeroAndOne(): void
     {
         // Arrange -- a relevanceWeight of 0.05 with a trust region wider than 0.05 must clip the lower
@@ -84,9 +72,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertLessThanOrEqual(1.0, $mapper->getUpperBounds()[0]);
     }
 
-    /**
-     * @return void
-     */
     public function testFreeZDimensionsAreBoundedByTheConfiguredZSpaceBoundNotLiterallyInfinite(): void
     {
         // Arrange -- both CmaEsAlgorithm (needs a finite midpoint for its default initial mean) and
@@ -104,9 +89,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame($zSpaceBound, $upperBounds[1]);
     }
 
-    /**
-     * @return void
-     */
     public function testSpecificityDimensionsAppearAsTheFinalThreeBoundsAfterTheMetricSimplexDimensions(): void
     {
         // Arrange -- 3 metrics => 2 free z dimensions, so the specificity triplet must start at index 3
@@ -134,8 +116,6 @@ class ParameterVectorMapperTest extends Unit
      * disabled (see `RankEvalRunnerTest`'s own coverage of that gate), so spending any search budget on
      * these 3 dimensions in that case would be pure waste -- they must be omitted from the vector entirely,
      * not merely fixed like an excluded non-deterministic metric.
-     *
-     * @return void
      */
     public function testSpecificityDimensionsAreOmittedEntirelyWhenSpecificityWeightingIsDisabled(): void
     {
@@ -148,9 +128,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertCount(3, $mapper->getUpperBounds());
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationCarriesTheAtRunStartSpecificityValuesUnchangedWhenDisabled(): void
     {
         // Arrange -- no specificity tail on this vector at all (3 metrics => 1 relevanceWeight + 2 free z).
@@ -165,9 +142,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(static::SPECIFICITY_BLEND_WEIGHT_AT_RUN_START, $configurationTransfer->getSpecificityBlendWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorOmitsTheSpecificityTailWhenDisabled(): void
     {
         // Arrange
@@ -187,9 +161,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertCount(3, $vector);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationProducesMetricWeightsSummingToOneKeyedByName(): void
     {
         // Arrange
@@ -214,9 +185,6 @@ class ParameterVectorMapperTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationClampsSpecificityBlendWeightToItsOwnAbsoluteBounds(): void
     {
         // Arrange -- specificityBlendWeight's trust region [0.5, 0.9] (see
@@ -234,9 +202,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta(0.5, $clampedLow->getSpecificityBlendWeight(), 1e-9, 'clamped to this run\'s own trust-region lower bound of 0.7 - 0.2');
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationClampsRelevanceWeightToItsOwnTrustRegionBounds(): void
     {
         // Arrange -- default relevanceWeightAtRunStart=0.75, trust region max distance 0.15 => [0.6, 0.9].
@@ -255,9 +220,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(0.6, $clampedLow->getRelevanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationClampsSpecificityWeightExponentAndShiftMagnitudeToTheirOwnTrustRegionBounds(): void
     {
         // Arrange -- exponent trust region [0.5, 1.5], shift magnitude trust region [0.1, 0.3] (see
@@ -275,9 +237,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta(0.1, $clampedLow->getSpecificityWeightShiftMagnitude(), 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationGivesTheSingleMetricWeightOneExactly(): void
     {
         // Arrange
@@ -290,9 +249,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(['top_seller' => 1.0], $configurationTransfer->getMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationProducesNoMetricWeightsAtAllForZeroActiveMetrics(): void
     {
         // Arrange
@@ -305,9 +261,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame([], $configurationTransfer->getMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorIsTheInverseOfMapVectorToConfiguration(): void
     {
         // Arrange
@@ -322,9 +275,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta($originalVector, $roundTrippedVector, 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorDefaultsAMissingMetricWeightToZero(): void
     {
         // Arrange -- a live configuration that predates one of the currently-active metrics being added
@@ -347,9 +297,6 @@ class ParameterVectorMapperTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorFallsBackToSensibleSpecificityDefaultsWhenUnset(): void
     {
         // Arrange -- specificity fields are only ever populated once search-ranking's specificity
@@ -368,9 +315,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta([0.75, 1.0, 0.0, 0.7], $vector, 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationHoldsAFixedMetricWeightConstantAndScalesTheOptimizableSimplexToFillTheRemainingBudget(): void
     {
         // Arrange -- "random" is excluded from the search (e.g. a non-deterministic formula) and pinned at
@@ -398,8 +342,6 @@ class ParameterVectorMapperTest extends Unit
      * weights that were never renormalized, or floating-point drift across many small weights) -- every
      * optimizable metric correctly gets zero either way, but the fixed weights themselves must be
      * rescaled down to sum to exactly 1, not left silently summing to more than that.
-     *
-     * @return void
      */
     public function testMapVectorToConfigurationRescalesFixedWeightsDownWhenTheyAloneExceedTheFullBudget(): void
     {
@@ -420,9 +362,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta(0.5 / 1.2, $metricWeights['other_random'], 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationGivesTheSingleOptimizableMetricTheFullRemainingBudget(): void
     {
         // Arrange
@@ -438,9 +377,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(['random' => 0.4, 'top_seller' => 0.6], $configurationTransfer->getMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationReturnsOnlyTheFixedWeightsWhenNothingIsOptimizable(): void
     {
         // Arrange -- every active metric turned out non-deterministic; there's nothing left to search.
@@ -458,8 +394,6 @@ class ParameterVectorMapperTest extends Unit
      * @param array<string, float> $fixedMetricWeights
      * @param float $relevanceWeightAtRunStart
      * @param bool $specificityWeightingEnabled
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper
      */
     protected function buildMapper(
         array $metrics,

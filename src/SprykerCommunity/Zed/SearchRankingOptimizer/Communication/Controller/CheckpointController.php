@@ -83,8 +83,6 @@ class CheckpointController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function recordAction(Request $request): RedirectResponse
     {
@@ -116,8 +114,6 @@ class CheckpointController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function restoreAction(Request $request): RedirectResponse
     {
@@ -161,8 +157,6 @@ class CheckpointController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return string
      */
     protected function resolveStoreName(Request $request): string
     {
@@ -171,8 +165,6 @@ class CheckpointController extends AbstractController
 
     /**
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return string
      */
     protected function resolveLocaleName(Request $request): string
     {
@@ -182,8 +174,6 @@ class CheckpointController extends AbstractController
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return string
      */
     protected function buildCheckpointUrl(string $storeName, string $localeName): string
     {

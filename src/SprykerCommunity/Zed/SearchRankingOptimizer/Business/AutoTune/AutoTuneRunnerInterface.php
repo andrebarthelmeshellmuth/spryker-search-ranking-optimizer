@@ -27,8 +27,6 @@ interface AutoTuneRunnerInterface
      *   holding {@see \SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::AUTO_TUNE_NOTIFICATION_ROLE_NAME},
      *   covering every metric that crossed its threshold AND has isNotifyEnabled on. Sends nothing (and
      *   returns notifiedEmailCount=0) when no metric needs one, or when no admin holds that role yet.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
      */
     public function run(): SearchRankingAutoTuneResultTransfer;
 }

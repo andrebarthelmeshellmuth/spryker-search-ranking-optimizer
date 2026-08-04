@@ -29,8 +29,6 @@ class SearchRankingOptimizerToCompanyUserFacadeBridge implements SearchRankingOp
 
     /**
      * @param \Generated\Shared\Transfer\CustomerTransfer $customerTransfer
-     *
-     * @return \Generated\Shared\Transfer\CompanyUserCollectionTransfer
      */
     public function getActiveCompanyUsersByCustomerReference(CustomerTransfer $customerTransfer): CompanyUserCollectionTransfer
     {

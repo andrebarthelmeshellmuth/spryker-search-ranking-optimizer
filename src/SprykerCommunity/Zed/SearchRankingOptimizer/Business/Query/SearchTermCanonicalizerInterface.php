@@ -17,8 +17,6 @@ interface SearchTermCanonicalizerInterface
      * and "office chair" canonicalize to the same string; "office chairs" does not.
      *
      * @param string $rawSearchTerm
-     *
-     * @return string
      */
     public function canonicalize(string $rawSearchTerm): string;
 }

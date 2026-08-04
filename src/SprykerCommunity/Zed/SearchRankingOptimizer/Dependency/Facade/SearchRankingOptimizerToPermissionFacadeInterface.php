@@ -14,8 +14,6 @@ interface SearchRankingOptimizerToPermissionFacadeInterface
     /**
      * @param string $permissionKey
      * @param string|int $identifier
-     *
-     * @return bool
      */
     public function can(string $permissionKey, $identifier): bool;
 }

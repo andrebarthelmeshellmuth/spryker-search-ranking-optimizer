@@ -17,8 +17,6 @@ interface SearchRankingOptimizerToZedRequestInterface
      * @param string $url
      * @param \Spryker\Shared\Kernel\Transfer\TransferInterface $requestTransfer
      * @param int|null $timeoutInSeconds
-     *
-     * @return \Spryker\Shared\Kernel\Transfer\TransferInterface
      */
     public function call(string $url, TransferInterface $requestTransfer, ?int $timeoutInSeconds = null): TransferInterface;
 }

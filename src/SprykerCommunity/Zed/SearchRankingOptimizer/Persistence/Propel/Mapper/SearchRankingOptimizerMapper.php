@@ -32,8 +32,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration $calibrationEntity
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function mapCalibrationEntityToTransfer(
         SpySearchRankingCalibration $calibrationEntity,
@@ -64,8 +62,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm $searchTermEntity
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer $searchTermTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer
      */
     public function mapCalibrationSearchTermEntityToTransfer(
         SpySearchRankingCalibrationSearchTerm $searchTermEntity,
@@ -95,8 +91,6 @@ class SearchRankingOptimizerMapper
 
     /**
      * @param array<float> $values
-     *
-     * @return string|null
      */
     public function implodeValues(array $values): ?string
     {
@@ -106,8 +100,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery $queryEntity
      * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     public function mapQueryEntityToTransfer(
         SpySearchRankingQuery $queryEntity,
@@ -126,8 +118,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating $ratingEntity
      * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function mapQueryRatingEntityToTransfer(
         SpySearchRankingQueryRating $ratingEntity,
@@ -146,8 +136,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation $evaluationEntity
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
      */
     public function mapEvaluationEntityToTransfer(
         SpySearchRankingEvaluation $evaluationEntity,
@@ -165,8 +153,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint $weightCheckpointEntity
      * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function mapWeightCheckpointEntityToTransfer(
         SpySearchRankingWeightCheckpoint $weightCheckpointEntity,
@@ -193,8 +179,6 @@ class SearchRankingOptimizerMapper
 
     /**
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $metricWeightTransfers
-     *
-     * @return string
      */
     public function encodeMetricWeights(array $metricWeightTransfers): string
     {
@@ -234,8 +218,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function mapAutoTuneMetricConfigEntityToTransfer(
         SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
@@ -253,8 +235,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
      */
     public function mapAutoTuneMetricConfigTransferToEntity(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -272,8 +252,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun $optimizerRunEntity
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function mapOptimizerRunEntityToTransfer(
         SpySearchRankingOptimizerRun $optimizerRunEntity,

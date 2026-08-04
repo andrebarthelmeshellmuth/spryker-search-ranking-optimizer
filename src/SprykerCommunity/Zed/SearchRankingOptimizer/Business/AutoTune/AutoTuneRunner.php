@@ -49,8 +49,6 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
     /**
      * {@inheritDoc}
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
      */
     public function run(): SearchRankingAutoTuneResultTransfer
     {
@@ -87,8 +85,6 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * "safe, silent skip vs. real result" shape, uncomplicated by exception handling.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer|null
      */
     protected function processMetricSafely(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -108,8 +104,6 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * both safe, silent skips, never an error.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer|null
      */
     protected function processMetric(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -164,8 +158,6 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer
      * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null} $metric
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer
      */
     protected function refit(
         SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer,
@@ -243,8 +235,6 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
     /**
      * @param array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer> $metricResultTransfers
-     *
-     * @return int
      */
     protected function sendSummaryEmail(array $metricResultTransfers): int
     {

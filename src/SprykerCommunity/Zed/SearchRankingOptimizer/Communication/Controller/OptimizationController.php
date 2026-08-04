@@ -84,8 +84,6 @@ class OptimizationController extends AbstractController
     /**
      * Polled by the Optimization page's own JS while a run is in status=running — deliberately tiny (id/
      * status/counts only) since this fires roughly once a second for however long the run takes.
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function progressAction(): JsonResponse
     {

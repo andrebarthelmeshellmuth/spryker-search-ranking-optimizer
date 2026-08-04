@@ -38,8 +38,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
         string $calibrationType,
@@ -57,8 +55,6 @@ interface SearchRankingOptimizerFacadeInterface
      *   when there is nothing to run.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function runNextCalibration(): ?SearchRankingCalibrationTransfer;
 
@@ -68,8 +64,6 @@ interface SearchRankingOptimizerFacadeInterface
      *   ever finished.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
 
@@ -79,8 +73,6 @@ interface SearchRankingOptimizerFacadeInterface
      *   the Calibration page's live progress counter.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
 
@@ -99,8 +91,6 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer;
 
@@ -115,8 +105,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return void
      */
     public function clearProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void;
 
@@ -138,8 +126,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      *
      * @param int $idSearchRankingQuery
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
 
@@ -151,8 +137,6 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @param int $idSearchRankingQuery
      * @param float $importanceWeight
-     *
-     * @return void
      */
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void;
 
@@ -166,8 +150,6 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 
@@ -180,8 +162,6 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 
@@ -209,8 +189,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $source
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function recordWeightCheckpoint(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer;
 
@@ -231,8 +209,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @param int $idSearchRankingWeightCheckpoint
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function restoreWeightCheckpoint(
         int $idSearchRankingWeightCheckpoint,
@@ -258,8 +234,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      *
      * @param int $idSearchRankingMetric
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
      */
     public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
 
@@ -281,8 +255,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function saveAutoTuneMetricConfig(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -295,8 +267,6 @@ interface SearchRankingOptimizerFacadeInterface
      *   for the full specification.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
      */
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer;
 
@@ -310,8 +280,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer;
 
@@ -322,8 +290,6 @@ interface SearchRankingOptimizerFacadeInterface
      *   for the full specification. Returns null when nothing is queued.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function runNextOptimization(): ?SearchRankingOptimizerRunTransfer;
 
@@ -332,8 +298,6 @@ interface SearchRankingOptimizerFacadeInterface
      * - The run currently being worked, if any — backs a live Zed-page progress counter, safe to poll.
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer;
 
@@ -345,8 +309,6 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
 
@@ -363,8 +325,6 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function applyOptimizationRun(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 }

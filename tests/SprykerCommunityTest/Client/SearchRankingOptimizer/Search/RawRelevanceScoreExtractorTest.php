@@ -24,9 +24,6 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtra
  */
 class RawRelevanceScoreExtractorTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testFallsBackToTheRootValueWhenNotFunctionScoreWrapped(): void
     {
         // Arrange
@@ -46,9 +43,6 @@ class RawRelevanceScoreExtractorTest extends Unit
         $this->assertSame(16.826042, $score);
     }
 
-    /**
-     * @return void
-     */
     public function testReturnsTheWrappedQueryScoreWhenFunctionScoreWrapped(): void
     {
         // Arrange
@@ -84,8 +78,6 @@ class RawRelevanceScoreExtractorTest extends Unit
     /**
      * The script-score node can sit arbitrarily deep — the extractor must find it regardless of nesting,
      * not just at a fixed depth.
-     *
-     * @return void
      */
     public function testFindsTheScriptScoreNodeRegardlessOfNestingDepth(): void
     {
@@ -121,8 +113,6 @@ class RawRelevanceScoreExtractorTest extends Unit
     /**
      * A zero-valued node is filter-clause noise (e.g. an inactive-facet filter) and must not be
      * descended into, even if it happens to contain a deeper non-zero value.
-     *
-     * @return void
      */
     public function testDoesNotDescendIntoAZeroValuedNode(): void
     {

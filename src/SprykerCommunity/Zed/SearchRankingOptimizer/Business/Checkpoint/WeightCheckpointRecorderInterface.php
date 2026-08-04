@@ -23,8 +23,6 @@ interface WeightCheckpointRecorderInterface
      * @param string $source
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function record(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer;
 }

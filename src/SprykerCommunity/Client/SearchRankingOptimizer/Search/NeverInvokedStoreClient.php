@@ -25,8 +25,6 @@ class NeverInvokedStoreClient implements SearchElasticsearchToStoreClientInterfa
 {
     /**
      * @throws \LogicException
-     *
-     * @return \Generated\Shared\Transfer\StoreTransfer
      */
     public function getCurrentStore(): StoreTransfer
     {

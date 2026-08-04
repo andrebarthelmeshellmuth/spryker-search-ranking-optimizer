@@ -17,8 +17,6 @@ class FormulaDeterminismChecker implements FormulaDeterminismCheckerInterface
      * {@inheritDoc}
      *
      * @param string $formula
-     *
-     * @return bool
      */
     public function isDeterministic(string $formula): bool
     {

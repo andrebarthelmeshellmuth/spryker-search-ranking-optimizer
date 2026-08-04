@@ -16,19 +16,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
-     */
     protected WeightCheckpointRecorderInterface $recorder;
 
     /**
@@ -52,8 +43,6 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
      * @param int $idSearchRankingWeightCheckpoint
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function restore(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {

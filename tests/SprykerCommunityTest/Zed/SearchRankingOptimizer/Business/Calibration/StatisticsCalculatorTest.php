@@ -25,9 +25,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsC
  */
 class StatisticsCalculatorTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testComputesMinMaxMeanAndSampleCount(): void
     {
         // Arrange
@@ -46,8 +43,6 @@ class StatisticsCalculatorTest extends Unit
 
     /**
      * computedK is defined as the pooled mean — must always equal valueMean exactly, not merely be close.
-     *
-     * @return void
      */
     public function testComputedKIsAlwaysExactlyTheMean(): void
     {
@@ -63,8 +58,6 @@ class StatisticsCalculatorTest extends Unit
 
     /**
      * A single-element sample has no interpolation range — every statistic collapses onto that one value.
-     *
-     * @return void
      */
     public function testASingleScoreMakesEveryStatisticEqualToItself(): void
     {
@@ -88,8 +81,6 @@ class StatisticsCalculatorTest extends Unit
      * [10, 20, 30, 40, 50], p25 sits a quarter of the way from index 1 (20) to index 2 (30) — rank =
      * 0.25 * 4 = 1.0, exactly on index 1 — so p25 = 20 exactly; p75 lands exactly on index 3 = 40 the
      * same way. Median (p50) is the exact middle element, 30.
-     *
-     * @return void
      */
     public function testPercentilesMatchLinearInterpolationOnAKnownDataset(): void
     {
@@ -108,8 +99,6 @@ class StatisticsCalculatorTest extends Unit
     /**
      * Scores must be sorted internally before pooling — passing them in scrambled order must not affect
      * any statistic.
-     *
-     * @return void
      */
     public function testResultIsIndependentOfInputOrder(): void
     {

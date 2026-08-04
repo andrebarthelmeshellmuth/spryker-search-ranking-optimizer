@@ -52,34 +52,16 @@ use Throwable;
  */
 class RankEvalRunner implements RankEvalRunnerInterface
 {
-    /**
-     * @var \Elastica\Client
-     */
     protected Client $elasticaClient;
 
-    /**
-     * @var \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface
-     */
     protected IndexNameResolverInterface $indexNameResolver;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface
-     */
     protected LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface
-     */
     protected FunctionScoreBuilderInterface $functionScoreBuilder;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface
-     */
     protected SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null
-     */
     protected ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
 
     /**
@@ -139,8 +121,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * {@inheritDoc}
      *
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluate(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
     {
@@ -245,8 +225,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      *
      * @param mixed $queryClause
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
-     *
-     * @return mixed
      */
     protected function applyRankingFormula(
         mixed $queryClause,
@@ -273,8 +251,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param string $indexName
      * @param string $searchTerm
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null
      */
     protected function applySpecificityWeighting(
         string $indexName,
@@ -429,8 +405,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param float $normalizedSpecificity
      * @param float $exponent
      * @param float $shiftMagnitude
-     *
-     * @return float
      */
     protected function calculateSpecificityShift(float $normalizedSpecificity, float $exponent, float $shiftMagnitude): float
     {
@@ -448,8 +422,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * `return false;` with no project-override path of its own — only when no bridge was given at all
      * (a caller constructing this class directly with the older argument signature), so this method never
      * hard-fails; it just can't honor a project override without the bridge.
-     *
-     * @return bool
      */
     protected function isSpecificityWeightingEnabled(): bool
     {
@@ -470,8 +442,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return string
      */
     protected function buildProductDocumentId(string $storeName, string $localeName, int $idProductAbstract): string
     {

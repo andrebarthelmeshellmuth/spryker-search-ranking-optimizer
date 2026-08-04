@@ -15,8 +15,6 @@ interface SearchRankingOptimizerToAclFacadeInterface
 {
     /**
      * @param string $name
-     *
-     * @return bool
      */
     public function existsRoleByName(string $name): bool;
 
@@ -24,8 +22,6 @@ interface SearchRankingOptimizerToAclFacadeInterface
      * Only safe to call after {@see existsRoleByName()} confirms the role exists.
      *
      * @param string $name
-     *
-     * @return \Generated\Shared\Transfer\RoleTransfer
      */
     public function getRoleByName(string $name): RoleTransfer;
 }

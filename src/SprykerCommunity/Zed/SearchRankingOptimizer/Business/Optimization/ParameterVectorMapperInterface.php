@@ -22,9 +22,6 @@ use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
  */
 interface ParameterVectorMapperInterface
 {
-    /**
-     * @return int
-     */
     public function getDimensionCount(): int;
 
     /**
@@ -43,8 +40,6 @@ interface ParameterVectorMapperInterface
      * @param float $relevanceSaturationPoint Passed through unchanged — Phase O6 never touches this
      *   (Calibration's own concern), but the resulting configuration transfer needs a real value to be
      *   usable as a rank_eval override.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
      */
     public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer;
 

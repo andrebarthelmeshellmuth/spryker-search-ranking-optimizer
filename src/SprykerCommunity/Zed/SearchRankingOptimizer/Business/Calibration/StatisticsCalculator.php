@@ -17,8 +17,6 @@ class StatisticsCalculator implements StatisticsCalculatorInterface
      * {@inheritDoc}
      *
      * @param array<float> $scores
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function calculate(array $scores): SearchRankingCalibrationTransfer
     {
@@ -43,8 +41,6 @@ class StatisticsCalculator implements StatisticsCalculatorInterface
      *
      * @param array<int, float> $sortedScores
      * @param float $percentile
-     *
-     * @return float
      */
     protected function percentile(array $sortedScores, float $percentile): float
     {

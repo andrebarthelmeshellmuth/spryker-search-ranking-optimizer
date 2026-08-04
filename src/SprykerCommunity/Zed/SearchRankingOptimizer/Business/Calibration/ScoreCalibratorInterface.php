@@ -32,8 +32,6 @@ interface ScoreCalibratorInterface
      *   (see {@see StatisticsCalculatorInterface}), setting status=calculated.
      * - When not a single value was collected across every search term (e.g. every term failed or matched
      *   nothing), sets status=failed with an explanatory errorMessage instead.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function runNextCalibration(): ?SearchRankingCalibrationTransfer;
 }

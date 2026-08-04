@@ -19,24 +19,12 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class OptimizationApplier implements OptimizationApplierInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
-     */
     protected WeightCheckpointRecorderInterface $recorder;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
     /**
@@ -61,8 +49,6 @@ class OptimizationApplier implements OptimizationApplierInterface
      * {@inheritDoc}
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function apply(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
     {
@@ -94,8 +80,6 @@ class OptimizationApplier implements OptimizationApplierInterface
      * @param int $idSearchRankingOptimizerRun
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\MetricNoLongerExistsException
-     *
-     * @return void
      */
     protected function applyWithinTransaction(
         SearchRankingOptimizerRunTransfer $optimizerRunTransfer,

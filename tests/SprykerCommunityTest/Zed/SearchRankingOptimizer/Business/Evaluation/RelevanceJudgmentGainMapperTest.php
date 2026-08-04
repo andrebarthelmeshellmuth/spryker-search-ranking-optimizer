@@ -26,9 +26,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJud
  */
 class RelevanceJudgmentGainMapperTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testMapRatingTypeMapsHeartToItsConfiguredGain(): void
     {
         // Act
@@ -38,9 +35,6 @@ class RelevanceJudgmentGainMapperTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()[SearchRankingOptimizerConfig::RATING_TYPE_HEART], $gain);
     }
 
-    /**
-     * @return void
-     */
     public function testMapRatingTypeMapsCheckToItsConfiguredGain(): void
     {
         // Act
@@ -50,9 +44,6 @@ class RelevanceJudgmentGainMapperTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()[SearchRankingOptimizerConfig::RATING_TYPE_CHECK], $gain);
     }
 
-    /**
-     * @return void
-     */
     public function testMapRatingTypeMapsXToItsConfiguredGain(): void
     {
         // Act
@@ -62,9 +53,6 @@ class RelevanceJudgmentGainMapperTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()[SearchRankingOptimizerConfig::RATING_TYPE_X], $gain);
     }
 
-    /**
-     * @return void
-     */
     public function testMapRatingTypeReturnsZeroForAnUnrecognizedRatingType(): void
     {
         // Act

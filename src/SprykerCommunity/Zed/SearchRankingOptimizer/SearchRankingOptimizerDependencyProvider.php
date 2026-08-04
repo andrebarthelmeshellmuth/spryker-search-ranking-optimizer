@@ -104,8 +104,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     #[\Override]
     public function provideBusinessLayerDependencies(Container $container): Container
@@ -128,8 +126,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      * base package beyond the Client it already used.
      *
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     #[\Override]
     public function provideCommunicationLayerDependencies(Container $container): Container
@@ -148,8 +144,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addSearchRankingClient(Container $container): Container
     {
@@ -162,8 +156,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addSearchRankingFacade(Container $container): Container
     {
@@ -176,8 +168,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addSearchRankingStorageFacade(Container $container): Container
     {
@@ -190,8 +180,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addStoreFacade(Container $container): Container
     {
@@ -204,8 +192,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addLocaleFacade(Container $container): Container
     {
@@ -218,8 +204,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addCompanyUserFacade(Container $container): Container
     {
@@ -232,8 +216,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addPermissionFacade(Container $container): Container
     {
@@ -246,8 +228,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addAclFacade(Container $container): Container
     {
@@ -260,8 +240,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addAclQueryContainer(Container $container): Container
     {
@@ -274,8 +252,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
      */
     protected function addSymfonyMailerFacade(Container $container): Container
     {

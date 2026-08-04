@@ -28,8 +28,6 @@ class SearchRankingOptimizerToAclFacadeBridge implements SearchRankingOptimizerT
 
     /**
      * @param string $name
-     *
-     * @return bool
      */
     public function existsRoleByName(string $name): bool
     {
@@ -38,8 +36,6 @@ class SearchRankingOptimizerToAclFacadeBridge implements SearchRankingOptimizerT
 
     /**
      * @param string $name
-     *
-     * @return \Generated\Shared\Transfer\RoleTransfer
      */
     public function getRoleByName(string $name): RoleTransfer
     {

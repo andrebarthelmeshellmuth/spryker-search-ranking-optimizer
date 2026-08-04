@@ -16,8 +16,6 @@ interface SearchRankingOptimizerToSearchRankingStorageClientInterface
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null
      */
     public function findRankingConfiguration(string $storeName, string $localeName): ?SearchRankingConfigurationStorageTransfer;
 }

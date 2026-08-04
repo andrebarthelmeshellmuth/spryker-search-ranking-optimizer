@@ -20,8 +20,6 @@ interface RelevanceJudgmentAuthorizerInterface
      *
      * @param string $customerReference
      * @param string $permissionKey
-     *
-     * @return bool
      */
     public function isAuthorized(string $customerReference, string $permissionKey): bool;
 }

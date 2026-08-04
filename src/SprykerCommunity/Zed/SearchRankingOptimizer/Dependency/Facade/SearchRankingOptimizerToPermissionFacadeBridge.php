@@ -27,8 +27,6 @@ class SearchRankingOptimizerToPermissionFacadeBridge implements SearchRankingOpt
     /**
      * @param string $permissionKey
      * @param string|int $identifier
-     *
-     * @return bool
      */
     public function can(string $permissionKey, $identifier): bool
     {

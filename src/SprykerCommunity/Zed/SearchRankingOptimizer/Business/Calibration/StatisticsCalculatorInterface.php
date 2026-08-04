@@ -21,8 +21,6 @@ interface StatisticsCalculatorInterface
      * - Returns a transfer with ONLY the statistics properties set (no id, status, search terms).
      *
      * @param array<float> $scores
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function calculate(array $scores): SearchRankingCalibrationTransfer;
 }

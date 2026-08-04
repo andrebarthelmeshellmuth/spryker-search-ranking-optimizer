@@ -70,8 +70,6 @@ class EvaluationController extends AbstractController
 
     /**
      * @param \Symfony\Component\Form\FormInterface $evaluationForm
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     protected function processSubmission(FormInterface $evaluationForm): RedirectResponse
     {

@@ -27,9 +27,6 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentS
  */
 class ProductRelevanceJudgmentStubTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testSubmitProductRelevanceJudgmentCallsTheExpectedGatewayUrlWithTheRequestTransfer(): void
     {
         // Arrange
@@ -58,9 +55,6 @@ class ProductRelevanceJudgmentStubTest extends Unit
         $this->assertSame($responseTransfer, $result);
     }
 
-    /**
-     * @return void
-     */
     public function testClearProductRelevanceJudgmentCallsTheExpectedGatewayUrlWithTheRequestTransfer(): void
     {
         // Arrange

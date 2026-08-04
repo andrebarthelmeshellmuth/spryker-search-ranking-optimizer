@@ -15,8 +15,6 @@ interface SearchRankingOptimizerToSymfonyMailerFacadeInterface
 {
     /**
      * @param \Generated\Shared\Transfer\MailTransfer $mailTransfer
-     *
-     * @return void
      */
     public function send(MailTransfer $mailTransfer): void;
 }

@@ -25,24 +25,12 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  */
 class CalibrationSearcher implements CalibrationSearcherInterface
 {
-    /**
-     * @var \Elastica\Client
-     */
     protected Client $elasticaClient;
 
-    /**
-     * @var \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface
-     */
     protected IndexNameResolverInterface $indexNameResolver;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface
-     */
     protected RawRelevanceScoreExtractorInterface $rawRelevanceScoreExtractor;
 
-    /**
-     * @var \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface
-     */
     protected LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder;
 
     /**

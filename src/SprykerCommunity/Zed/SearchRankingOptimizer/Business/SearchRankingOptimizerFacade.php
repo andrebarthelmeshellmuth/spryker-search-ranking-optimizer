@@ -37,8 +37,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
         string $calibrationType,
@@ -54,8 +52,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function runNextCalibration(): ?SearchRankingCalibrationTransfer
     {
@@ -66,8 +62,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer
     {
@@ -78,8 +72,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
     {
@@ -95,8 +87,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer
     {
@@ -109,8 +99,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return void
      */
     public function clearProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void
     {
@@ -135,8 +123,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingQuery
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer
     {
@@ -150,8 +136,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param int $idSearchRankingQuery
      * @param float $importanceWeight
-     *
-     * @return void
      */
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void
     {
@@ -165,8 +149,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
@@ -180,8 +162,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
@@ -209,8 +189,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param string $source
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function recordWeightCheckpoint(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {
@@ -223,8 +201,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingWeightCheckpoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {
@@ -249,8 +225,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingMetric
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
      */
     public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
     {
@@ -275,8 +249,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function saveAutoTuneMetricConfig(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -288,8 +260,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer
      */
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer
     {
@@ -304,8 +274,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer
     {
@@ -321,8 +289,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function runNextOptimization(): ?SearchRankingOptimizerRunTransfer
     {
@@ -333,8 +299,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer
     {
@@ -348,8 +312,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer
     {
@@ -362,8 +324,6 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function applyOptimizationRun(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
     {

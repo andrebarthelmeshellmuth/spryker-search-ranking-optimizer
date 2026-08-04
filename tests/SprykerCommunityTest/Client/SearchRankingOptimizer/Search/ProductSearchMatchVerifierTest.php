@@ -36,9 +36,6 @@ class ProductSearchMatchVerifierTest extends Unit
      */
     protected const ID_PRODUCT_ABSTRACT_BESUCHERSTUHL = 9;
 
-    /**
-     * @return void
-     */
     public function testMatchesReturnsTrueForARealProductAmongTheRealSearchResultsForATerm(): void
     {
         // Act
@@ -48,9 +45,6 @@ class ProductSearchMatchVerifierTest extends Unit
         $this->assertTrue($matches);
     }
 
-    /**
-     * @return void
-     */
     public function testMatchesReturnsFalseWhenTheSearchTermHasNoRealCatalogMatches(): void
     {
         // Act
@@ -65,9 +59,6 @@ class ProductSearchMatchVerifierTest extends Unit
         $this->assertFalse($matches);
     }
 
-    /**
-     * @return void
-     */
     public function testMatchesReturnsFalseForAProductIdThatDoesNotExist(): void
     {
         // Act
@@ -80,8 +71,6 @@ class ProductSearchMatchVerifierTest extends Unit
     /**
      * Same composition `SearchRankingOptimizerFactory::createProductSearchMatchVerifier()` uses in
      * production — directly-instantiable value objects, no Locator/container needed.
-     *
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifier
      */
     protected function createVerifier(): ProductSearchMatchVerifier
     {

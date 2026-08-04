@@ -39,8 +39,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * {@inheritDoc}
-     *
-     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
      */
     public function getTransactionHandler(): TransactionHandlerInterface
     {
@@ -55,8 +53,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * way to ever finish or be flagged failed.
      *
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(SearchRankingCalibrationTransfer $calibrationTransfer): SearchRankingCalibrationTransfer
     {
@@ -67,8 +63,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     protected function createCalibrationWithinTransaction(
         SearchRankingCalibrationTransfer $calibrationTransfer,
@@ -105,8 +99,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingCalibration
      * @param string $status
-     *
-     * @return void
      */
     public function updateCalibrationStatus(int $idSearchRankingCalibration, string $status): void
     {
@@ -126,8 +118,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param int $idSearchRankingCalibrationSearchTerm
      * @param int $productsFound
      * @param array<float> $values
-     *
-     * @return void
      */
     public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $values): void
     {
@@ -150,8 +140,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * pattern every other method here uses) needs no extra locking.
      *
      * @param int $idSearchRankingCalibration
-     *
-     * @return void
      */
     public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void
     {
@@ -170,8 +158,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingCalibration
      * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $statisticsTransfer
-     *
-     * @return void
      */
     public function saveCalibrationStatistics(int $idSearchRankingCalibration, SearchRankingCalibrationTransfer $statisticsTransfer): void
     {
@@ -199,8 +185,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingCalibration
      * @param string $errorMessage
-     *
-     * @return void
      */
     public function markCalibrationFailed(int $idSearchRankingCalibration, string $errorMessage): void
     {
@@ -219,8 +203,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     public function createQuery(SearchRankingQueryTransfer $queryTransfer): SearchRankingQueryTransfer
     {
@@ -243,8 +225,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingQuery
      * @param float $importanceWeight
-     *
-     * @return void
      */
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void
     {
@@ -262,8 +242,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param int $idSearchRankingQuery
-     *
-     * @return void
      */
     public function touchQuery(int $idSearchRankingQuery): void
     {
@@ -281,8 +259,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function upsertRating(SearchRankingQueryRatingTransfer $ratingTransfer): SearchRankingQueryRatingTransfer
     {
@@ -322,8 +298,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param int $fkSearchRankingQuery
      * @param string $customerReference
      * @param int $fkProductAbstract
-     *
-     * @return void
      */
     public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void
     {
@@ -337,8 +311,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
      */
     public function createEvaluation(SearchRankingEvaluationTransfer $evaluationTransfer): SearchRankingEvaluationTransfer
     {
@@ -356,8 +328,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer
     {
@@ -386,8 +356,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * create new, then overwrite the editable fields" shape as {@see upsertRating()}.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function saveAutoTuneMetricConfig(SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer): SearchRankingAutoTuneMetricConfigTransfer
     {
@@ -411,8 +379,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function createOptimizerRun(SearchRankingOptimizerRunTransfer $optimizerRunTransfer): SearchRankingOptimizerRunTransfer
     {
@@ -432,8 +398,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param int $idSearchRankingOptimizerRun
      * @param int $totalCount
      * @param float $baselineScore
-     *
-     * @return void
      */
     public function startOptimizerRun(int $idSearchRankingOptimizerRun, int $totalCount, float $baselineScore): void
     {
@@ -454,8 +418,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingOptimizerRun
      * @param int $processedCount
-     *
-     * @return void
      */
     public function updateOptimizerRunProgress(int $idSearchRankingOptimizerRun, int $processedCount): void
     {
@@ -479,8 +441,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param float $bestSpecificityBlendWeight
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
-     *
-     * @return void
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
@@ -513,8 +473,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingOptimizerRun
      * @param string $errorMessage
-     *
-     * @return void
      */
     public function failOptimizerRun(int $idSearchRankingOptimizerRun, string $errorMessage): void
     {
@@ -533,8 +491,6 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
     /**
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return void
      */
     public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void
     {

@@ -28,23 +28,17 @@ interface SearchRankingOptimizerRepositoryInterface
 
     /**
      * @param int $idSearchRankingCalibration
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationWithSearchTerms(int $idSearchRankingCalibration): ?SearchRankingCalibrationTransfer;
 
     /**
      * The most recent calibration run with status=calculated, or null when none has ever finished.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
 
     /**
      * The run currently in status=calculating, if any — at most one at a time by design. Backs the
      * Calibration page's live progress counter.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
      */
     public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
 
@@ -55,8 +49,6 @@ interface SearchRankingOptimizerRepositoryInterface
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryByTermStoreLocale(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryTransfer;
 
@@ -70,8 +62,6 @@ interface SearchRankingOptimizerRepositoryInterface
 
     /**
      * @param int $idSearchRankingQuery
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
 
@@ -118,8 +108,6 @@ interface SearchRankingOptimizerRepositoryInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 
@@ -143,8 +131,6 @@ interface SearchRankingOptimizerRepositoryInterface
 
     /**
      * @param int $idSearchRankingWeightCheckpoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
 
@@ -153,8 +139,6 @@ interface SearchRankingOptimizerRepositoryInterface
      * safe, expected state for most metrics, not an error.
      *
      * @param int $idSearchRankingMetric
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
      */
     public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
 
@@ -168,8 +152,6 @@ interface SearchRankingOptimizerRepositoryInterface
 
     /**
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 
@@ -178,16 +160,12 @@ interface SearchRankingOptimizerRepositoryInterface
      * `search-ranking-optimizer:optimize` invocation, same "at most one at a time" discipline as
      * Calibration (though Calibration instead always picks the NEWEST upload, since there only the latest
      * search-term list matters; here every queued run is a distinct, equally-valid request).
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOldestQueuedOptimizerRun(): ?SearchRankingOptimizerRunTransfer;
 
     /**
      * The run currently being worked, if any — backs the Zed page's live progress counter. Deliberately
      * cheap (a single indexed lookup by status), safe to poll.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer;
 
@@ -197,8 +175,6 @@ interface SearchRankingOptimizerRepositoryInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
 }

@@ -36,9 +36,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class ProductRelevanceJudgmentWriterTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testSubmitJudgmentCanonicalizesTheSearchTermBeforeLookingUpTheQuery(): void
     {
         // Arrange
@@ -63,9 +60,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->submitJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testSubmitJudgmentCreatesTheQueryWhenNoneExistsYetForThatCanonicalTermStoreLocale(): void
     {
         // Arrange
@@ -100,8 +94,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
      * term at nearly the same time can both find null and both reach createQuery() -- the DB's own unique
      * (search_term, store_name, locale_name) constraint lets exactly one insert win, and the loser must
      * recover by re-fetching rather than losing that rater's judgment entirely.
-     *
-     * @return void
      */
     public function testSubmitJudgmentRecoversWhenCreateQueryLosesARaceToAConcurrentInsert(): void
     {
@@ -132,9 +124,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->submitJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testSubmitJudgmentRethrowsWhenCreateQueryFailsForAReasonOtherThanARace(): void
     {
         // Arrange -- the re-fetch after the failure STILL comes back null, so this was never a race in the
@@ -160,9 +149,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->submitJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testSubmitJudgmentRejectsAnUnknownRatingTypeWithoutTouchingPersistence(): void
     {
         // Arrange
@@ -184,9 +170,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->submitJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testSubmitJudgmentRejectsAProductThatIsNotAmongTheRealCurrentSearchResultsWithoutTouchingPersistence(): void
     {
         // Arrange
@@ -215,9 +198,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->submitJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testClearJudgmentDeletesTheRatingWhenTheQueryExists(): void
     {
         // Arrange
@@ -242,9 +222,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
         $writer->clearJudgment($requestTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testClearJudgmentIsASafeNoOpWhenNoQueryExistsForThatTerm(): void
     {
         // Arrange
@@ -268,8 +245,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
     /**
      * @param string $searchTerm
      * @param string $ratingType
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer
      */
     protected function createRequestTransfer(string $searchTerm, string $ratingType): SearchRankingProductRelevanceJudgmentRequestTransfer
     {
@@ -290,8 +265,6 @@ class ProductRelevanceJudgmentWriterTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repositoryMock
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManagerMock
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClientMock
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter
      */
     protected function createWriter(
         SearchTermCanonicalizerInterface $canonicalizerMock,

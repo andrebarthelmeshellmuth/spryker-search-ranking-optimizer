@@ -40,9 +40,6 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentS
 
 class SearchRankingOptimizerFactory extends AbstractFactory
 {
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface
-     */
     public function createCalibrationSearcher(): CalibrationSearcherInterface
     {
         return new CalibrationSearcher(
@@ -53,17 +50,11 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface
-     */
     public function createRawRelevanceScoreExtractor(): RawRelevanceScoreExtractorInterface
     {
         return new RawRelevanceScoreExtractor();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcherInterface
-     */
     public function createSpecificitySearcher(): SpecificitySearcherInterface
     {
         return new SpecificitySearcher(
@@ -74,25 +65,16 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface
-     */
     public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
     {
         return new QuerySpecificityCalculator();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface
-     */
     public function createLiveCatalogSearchQueryBuilder(): LiveCatalogSearchQueryBuilderInterface
     {
         return new LiveCatalogSearchQueryBuilder();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifierInterface
-     */
     public function createProductSearchMatchVerifier(): ProductSearchMatchVerifierInterface
     {
         return new ProductSearchMatchVerifier(
@@ -102,9 +84,6 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface
-     */
     public function createRankEvalRunner(): RankEvalRunnerInterface
     {
         return new RankEvalRunner(
@@ -125,25 +104,17 @@ class SearchRankingOptimizerFactory extends AbstractFactory
      * already is in {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder}.
      * This package already hard-requires spryker-community/search-ranking (composer.json), so this is a
      * real dependency, not a standalone-installability concern.
-     *
-     * @return \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface
      */
     public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
     {
         return new FunctionScoreBuilder();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface
-     */
     public function getSearchRankingStorageClient(): SearchRankingOptimizerToSearchRankingStorageClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_STORAGE);
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface
-     */
     public function getSearchRankingClient(): SearchRankingOptimizerToSearchRankingClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING);
@@ -153,8 +124,6 @@ class SearchRankingOptimizerFactory extends AbstractFactory
      * COMPOSITION over the core SearchElasticsearch module, deliberately — the same pattern (and the same
      * reasoning) as the base spryker-community/search-ranking package's own Client factory, and as
      * `SprykerCommunity\Client\SearchDebug\SearchDebugFactory::getElasticaClient()`.
-     *
-     * @return \Elastica\Client
      */
     public function getElasticaClient(): Client
     {
@@ -163,25 +132,16 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * @return \Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory
-     */
     public function createElasticaClientFactory(): ElasticaClientFactory
     {
         return new ElasticaClientFactory();
     }
 
-    /**
-     * @return \Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig
-     */
     public function createSearchElasticsearchConfig(): SearchElasticsearchConfig
     {
         return new SearchElasticsearchConfig();
     }
 
-    /**
-     * @return \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface
-     */
     public function createIndexNameResolver(): IndexNameResolverInterface
     {
         return new IndexNameResolver(
@@ -190,25 +150,16 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient
-     */
     public function createNeverInvokedStoreClient(): NeverInvokedStoreClient
     {
         return new NeverInvokedStoreClient();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStubInterface
-     */
     public function createProductRelevanceJudgmentStub(): ProductRelevanceJudgmentStubInterface
     {
         return new ProductRelevanceJudgmentStub($this->getZedRequestClient());
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface
-     */
     public function getZedRequestClient(): SearchRankingOptimizerToZedRequestInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_ZED_REQUEST);

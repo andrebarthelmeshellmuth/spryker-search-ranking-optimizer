@@ -37,9 +37,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\Search
  */
 class SearchRankingOptimizerMapperTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testMapsCalibrationEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
@@ -91,8 +88,6 @@ class SearchRankingOptimizerMapperTest extends Unit
     /**
      * `calculatedAt`/`createdAt` are nullable (e.g. a calibration that hasn't finished running yet) — the
      * nullsafe `?->format()` call must not throw.
-     *
-     * @return void
      */
     public function testMapsCalibrationEntityWithNoTimestampsToNullDates(): void
     {
@@ -114,9 +109,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertNull($calibrationTransfer->getCreatedAt());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsCalibrationSearchTermEntityFieldsOntoTheTransferIncludingExplodedValues(): void
     {
         // Arrange
@@ -144,8 +136,6 @@ class SearchRankingOptimizerMapperTest extends Unit
     /**
      * A search term with no values yet must map to an empty array rather than `[0.0]` (which is what a
      * naive `explode(',', '')` would produce).
-     *
-     * @return void
      */
     public function testMapsACalibrationSearchTermWithNoValuesToAnEmptyArray(): void
     {
@@ -165,9 +155,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame([], $searchTermTransfer->getValues());
     }
 
-    /**
-     * @return void
-     */
     public function testImplodeValuesJoinsValuesWithACommaSeparator(): void
     {
         // Act
@@ -180,8 +167,6 @@ class SearchRankingOptimizerMapperTest extends Unit
     /**
      * An empty values array must become a genuine NULL, not an empty string, so "no values recorded"
      * stays distinguishable from a calibration search term that scored everything at zero.
-     *
-     * @return void
      */
     public function testImplodeValuesReturnsNullForAnEmptyArray(): void
     {
@@ -192,9 +177,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertNull($values);
     }
 
-    /**
-     * @return void
-     */
     public function testMapsEvaluationEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
@@ -219,9 +201,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(12, $evaluationTransfer->getQueryCount());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAutoTuneMetricConfigEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
@@ -248,9 +227,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertFalse($autoTuneMetricConfigTransfer->getIsNotifyEnabled());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAutoTuneMetricConfigTransferFieldsOntoTheEntity(): void
     {
         // Arrange
@@ -277,8 +253,6 @@ class SearchRankingOptimizerMapperTest extends Unit
 
     /**
      * A NULL threshold (opted-out metric) must map through as NULL, not silently coerced to 0.0.
-     *
-     * @return void
      */
     public function testMapsANullAutoTuneThresholdAsNullNotZero(): void
     {
@@ -300,9 +274,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertNull($autoTuneMetricConfigEntity->getAutoTuneThreshold());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsOptimizerRunEntityFieldsOntoTheTransferIncludingDecodedBestMetricWeights(): void
     {
         // Arrange
@@ -351,9 +322,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(0.6, $bestMetricWeights[0]->getWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAnOptimizerRunWithNoBestMetricWeightsYetToAnEmptyCollection(): void
     {
         // Arrange

@@ -13,8 +13,5 @@ use Generated\Shared\Transfer\CustomerTransfer;
 
 interface SearchRankingOptimizerWidgetToCustomerClientInterface
 {
-    /**
-     * @return \Generated\Shared\Transfer\CustomerTransfer|null
-     */
     public function getCustomer(): ?CustomerTransfer;
 }

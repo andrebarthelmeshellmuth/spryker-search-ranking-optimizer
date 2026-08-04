@@ -26,9 +26,6 @@ class RateSearchRelevancePermissionPlugin implements PermissionPluginInterface
      */
     public const KEY = 'RateSearchRelevancePermissionPlugin';
 
-    /**
-     * @return string
-     */
     public function getKey(): string
     {
         return static::KEY;

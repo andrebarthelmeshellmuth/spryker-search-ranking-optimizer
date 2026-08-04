@@ -54,8 +54,6 @@ class SubmitRelevanceJudgmentController extends AbstractController
      * customer actually click this button").
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return bool
      */
     protected function isCsrfTokenValid(Request $request): bool
     {
@@ -74,8 +72,6 @@ class SubmitRelevanceJudgmentController extends AbstractController
      * the buttons for in the first place.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function submitAction(Request $request): JsonResponse
     {
@@ -116,8 +112,6 @@ class SubmitRelevanceJudgmentController extends AbstractController
      * submitting one does.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function clearAction(Request $request): JsonResponse
     {

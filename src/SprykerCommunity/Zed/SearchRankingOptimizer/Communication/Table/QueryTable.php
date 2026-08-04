@@ -35,9 +35,6 @@ class QueryTable extends AbstractTable
      */
     protected const COL_ACTIONS = 'actions';
 
-    /**
-     * @var \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery
-     */
     protected SpySearchRankingQueryQuery $queryQuery;
 
     /**
@@ -50,8 +47,6 @@ class QueryTable extends AbstractTable
 
     /**
      * @param \Spryker\Zed\Gui\Communication\Table\TableConfiguration $config
-     *
-     * @return \Spryker\Zed\Gui\Communication\Table\TableConfiguration
      */
     protected function configure(TableConfiguration $config): TableConfiguration
     {
@@ -117,8 +112,6 @@ class QueryTable extends AbstractTable
 
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery $queryEntity
-     *
-     * @return string
      */
     protected function createEditButton(SpySearchRankingQuery $queryEntity): string
     {

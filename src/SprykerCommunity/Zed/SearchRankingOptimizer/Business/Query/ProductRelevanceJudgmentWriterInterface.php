@@ -26,8 +26,6 @@ interface ProductRelevanceJudgmentWriterInterface
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer;
 
@@ -37,8 +35,6 @@ interface ProductRelevanceJudgmentWriterInterface
      * deletes the rater's row for that (query, product) pair, if any.
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return void
      */
     public function clearJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void;
 }

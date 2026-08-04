@@ -26,34 +26,16 @@ use Throwable;
 
 class OptimizationRunner implements OptimizationRunnerInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface
-     */
     protected RankEvaluationRunnerInterface $rankEvaluationRunner;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface
-     */
     protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker;
 
-    /**
-     * @var int|null
-     */
     protected ?int $maxGenerations;
 
     /**
@@ -84,8 +66,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
     /**
      * {@inheritDoc}
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function runNext(): ?SearchRankingOptimizerRunTransfer
     {
@@ -108,8 +88,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
-     *
-     * @return void
      */
     protected function process(SearchRankingOptimizerRunTransfer $queuedRunTransfer): void
     {
@@ -183,8 +161,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
      */
     protected function buildLiveConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
@@ -243,8 +219,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * this run picked, and so the total evaluation count is knowable before the run actually starts.
      *
      * @param int $dimensionCount
-     *
-     * @return int
      */
     protected function computePopulationSize(int $dimensionCount): int
     {
@@ -255,8 +229,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param string $algorithmName
      * @param int $populationSize
      * @param int $maxGenerations
-     *
-     * @return int
      */
     protected function computeTotalEvaluationCount(string $algorithmName, int $populationSize, int $maxGenerations): int
     {
@@ -273,8 +245,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param string $algorithmName
      * @param int $populationSize
      * @param int $maxGenerations
-     *
-     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
      */
     protected function buildAlgorithm(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface
     {
@@ -305,8 +275,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idOptimizerRun
-     *
-     * @return callable
      */
     protected function buildObjectiveFunction(
         ParameterVectorMapperInterface $mapper,

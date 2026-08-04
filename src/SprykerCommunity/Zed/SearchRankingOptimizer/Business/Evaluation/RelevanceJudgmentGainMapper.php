@@ -17,8 +17,6 @@ class RelevanceJudgmentGainMapper implements RelevanceJudgmentGainMapperInterfac
      * {@inheritDoc}
      *
      * @param string $ratingType
-     *
-     * @return float
      */
     public function mapRatingType(string $ratingType): float
     {

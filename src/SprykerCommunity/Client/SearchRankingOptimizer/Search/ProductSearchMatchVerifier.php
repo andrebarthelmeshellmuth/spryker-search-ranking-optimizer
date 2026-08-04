@@ -41,8 +41,6 @@ class ProductSearchMatchVerifier implements ProductSearchMatchVerifierInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function matches(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
     {
@@ -69,8 +67,6 @@ class ProductSearchMatchVerifier implements ProductSearchMatchVerifierInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return string
      */
     protected function buildProductDocumentId(string $storeName, string $localeName, int $idProductAbstract): string
     {

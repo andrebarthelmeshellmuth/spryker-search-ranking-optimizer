@@ -31,8 +31,6 @@ interface WeightCheckpointRestorerInterface
      * @param int $idSearchRankingWeightCheckpoint
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function restore(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer;
 }

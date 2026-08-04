@@ -14,8 +14,6 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getRelevanceSaturationPoint(string $storeName, string $localeName): float;
 
@@ -23,16 +21,12 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $relevanceSaturationPoint
-     *
-     * @return void
      */
     public function saveRelevanceSaturationPoint(string $storeName, string $localeName, float $relevanceSaturationPoint): void;
 
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getRelevanceWeight(string $storeName, string $localeName): float;
 
@@ -40,16 +34,12 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $relevanceWeight
-     *
-     * @return void
      */
     public function saveRelevanceWeight(string $storeName, string $localeName, float $relevanceWeight): void;
 
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificitySaturationPoint(string $storeName, string $localeName): float;
 
@@ -57,16 +47,12 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $specificitySaturationPoint
-     *
-     * @return void
      */
     public function saveSpecificitySaturationPoint(string $storeName, string $localeName, float $specificitySaturationPoint): void;
 
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityBlendWeight(string $storeName, string $localeName): float;
 
@@ -74,16 +60,12 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityBlendWeight
-     *
-     * @return void
      */
     public function saveSpecificityBlendWeight(string $storeName, string $localeName, float $specificityBlendWeight): void;
 
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityWeightExponent(string $storeName, string $localeName): float;
 
@@ -91,16 +73,12 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityWeightExponent
-     *
-     * @return void
      */
     public function saveSpecificityWeightExponent(string $storeName, string $localeName, float $specificityWeightExponent): void;
 
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityWeightShiftMagnitude(string $storeName, string $localeName): float;
 
@@ -108,8 +86,6 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityWeightShiftMagnitude
-     *
-     * @return void
      */
     public function saveSpecificityWeightShiftMagnitude(string $storeName, string $localeName, float $specificityWeightShiftMagnitude): void;
 
@@ -119,8 +95,6 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * (cheap, and keeps a checkpoint a complete snapshot even if the feature gets enabled later), but
      * records this flag alongside them so history honestly shows whether those numbers were actually live
      * at the time, rather than silently implying they always were.
-     *
-     * @return bool
      */
     public function isSpecificityWeightingEnabled(): bool;
 
@@ -169,8 +143,6 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param int $idSearchRankingMetric
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float|null
      */
     public function evaluateCurrentMetricFit(int $idSearchRankingMetric, string $storeName, string $localeName): ?float;
 
@@ -220,8 +192,6 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param int $idSearchRankingMetric
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return bool
      */
     public function recordMetricCheckOnly(int $idSearchRankingMetric, string $storeName, string $localeName): bool;
 }

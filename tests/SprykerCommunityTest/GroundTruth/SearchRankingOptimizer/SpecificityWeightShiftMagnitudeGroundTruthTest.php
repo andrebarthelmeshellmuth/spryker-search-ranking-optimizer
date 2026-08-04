@@ -28,9 +28,6 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  */
 class SpecificityWeightShiftMagnitudeGroundTruthTest extends AbstractGroundTruthTest
 {
-    /**
-     * @return void
-     */
     public function testSpecificityWeightShiftMagnitudeConvergesPositive(): void
     {
         [$specificSearchTerm, $unspecificSearchTerm] = $this->discoverSpecificAndUnspecificSearchTerms();

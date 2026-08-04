@@ -39,8 +39,6 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     #[\Override]
     public function provideDependencies(Container $container): Container
@@ -56,8 +54,6 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addSearchRankingOptimizerClient(Container $container): Container
     {
@@ -70,8 +66,6 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addCustomerClient(Container $container): Container
     {
@@ -84,8 +78,6 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addStoreClient(Container $container): Container
     {
@@ -102,8 +94,6 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
      * registered in the project's `ShopApplicationDependencyProvider` (already true in this shop).
      *
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addCsrfTokenManager(Container $container): Container
     {

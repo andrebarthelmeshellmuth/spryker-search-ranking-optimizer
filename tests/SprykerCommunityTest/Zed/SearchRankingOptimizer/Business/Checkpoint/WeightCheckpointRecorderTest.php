@@ -28,9 +28,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class WeightCheckpointRecorderTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testRecordReadsCurrentStateFromSearchRankingFacadeAndPersistsIt(): void
     {
         // Arrange

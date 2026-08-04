@@ -24,9 +24,6 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
         $this->searchRankingClient = $searchRankingClient;
     }
 
-    /**
-     * @return bool
-     */
     public function isSpecificityWeightingEnabled(): bool
     {
         return $this->searchRankingClient->isSpecificityWeightingEnabled();

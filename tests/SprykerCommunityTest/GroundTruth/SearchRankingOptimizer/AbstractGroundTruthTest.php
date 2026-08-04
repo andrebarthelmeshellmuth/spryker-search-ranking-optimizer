@@ -106,55 +106,28 @@ abstract class AbstractGroundTruthTest extends Unit
      */
     protected const CUSTOMER_REFERENCE = 'ground-truth-test';
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository|null
-     */
     protected ?SearchRankingOptimizerRepository $repository = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager|null
-     */
     protected ?SearchRankingOptimizerEntityManager $entityManager = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade|null
-     */
     protected ?SearchRankingOptimizerFacade $facade = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null
-     */
     protected ?SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade = null;
 
-    /**
-     * @var \Elastica\Client|null
-     */
     protected ?Client $elasticaClient = null;
 
-    /**
-     * @var string|null
-     */
     protected ?string $indexName = null;
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository
-     */
     protected function getRepository(): SearchRankingOptimizerRepository
     {
         return $this->repository ??= new SearchRankingOptimizerRepository();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager
-     */
     protected function getEntityManager(): SearchRankingOptimizerEntityManager
     {
         return $this->entityManager ??= new SearchRankingOptimizerEntityManager();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade
-     */
     protected function getFacade(): SearchRankingOptimizerFacade
     {
         return $this->facade ??= new SearchRankingOptimizerFacade();
@@ -164,17 +137,12 @@ abstract class AbstractGroundTruthTest extends Unit
      * The real bridge production code already uses, wrapping a real, live `search-ranking` Zed facade --
      * reuses the exact same array-shape translation {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}
      * itself depends on, rather than re-deriving it from raw transfer collections here.
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
      */
     protected function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->searchRankingFacade ??= new SearchRankingOptimizerToSearchRankingFacadeBridge(new SearchRankingFacade());
     }
 
-    /**
-     * @return \Elastica\Client
-     */
     protected function getElasticaClient(): Client
     {
         if ($this->elasticaClient === null) {
@@ -185,9 +153,6 @@ abstract class AbstractGroundTruthTest extends Unit
         return $this->elasticaClient;
     }
 
-    /**
-     * @return string
-     */
     protected function getIndexName(): string
     {
         if ($this->indexName === null) {
@@ -203,8 +168,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * uses, confirmed live against this shop's real index.
      *
      * @param int $idProductAbstract
-     *
-     * @return string
      */
     protected function buildProductDocumentId(int $idProductAbstract): string
     {
@@ -307,8 +270,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * verification) that appending it does not change which real products the query returns.
      *
      * @param string $searchTerm
-     *
-     * @return int
      */
     protected function insertSyntheticQuery(string $searchTerm): int
     {
@@ -327,8 +288,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $idSearchRankingQuery
      * @param int $idProductAbstract
      * @param string $ratingType
-     *
-     * @return void
      */
     protected function insertSyntheticRating(int $idSearchRankingQuery, int $idProductAbstract, string $ratingType): void
     {
@@ -375,8 +334,6 @@ abstract class AbstractGroundTruthTest extends Unit
      *
      * @param int $idProductAbstract
      * @param array<string, float> $scores
-     *
-     * @return void
      */
     protected function overrideScores(int $idProductAbstract, array $scores): void
     {
@@ -386,9 +343,6 @@ abstract class AbstractGroundTruthTest extends Unit
         $this->getElasticaClient()->getIndex($this->getIndexName())->refresh();
     }
 
-    /**
-     * @return void
-     */
     protected function refreshIndex(): void
     {
         $this->getElasticaClient()->getIndex($this->getIndexName())->refresh();
@@ -402,8 +356,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * the query's own ratings (`onDelete="CASCADE"` on the FK).
      *
      * @param int $idSearchRankingQuery
-     *
-     * @return void
      */
     protected function deleteSyntheticQuery(int $idSearchRankingQuery): void
     {
@@ -521,8 +473,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * this package's own console command does the same in-request for a shop this size (see the README).
      *
      * @param string $algorithm
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
@@ -554,8 +504,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param callable(\Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer): float $extractor
      * @param int $times
      * @param string $algorithm
-     *
-     * @return float
      */
     protected function runRealOptimizationRepeatedMedian(
         callable $extractor,
@@ -632,8 +580,6 @@ abstract class AbstractGroundTruthTest extends Unit
 
     /**
      * @throws \LogicException
-     *
-     * @return \SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher
      */
     protected function createQueryTermFrequencyFetcher(): QueryTermFrequencyFetcher
     {
@@ -660,9 +606,6 @@ abstract class AbstractGroundTruthTest extends Unit
             $indexName,
         ) extends QueryTermFrequencyFetcher
         {
-            /**
-             * @var string
-             */
             protected string $fixedIndexName;
 
             /**
@@ -684,8 +627,6 @@ abstract class AbstractGroundTruthTest extends Unit
             /**
              * Overridden to bypass Store resolution entirely -- this ground-truth suite already resolves
              * the real index name once via {@see AbstractGroundTruthTest::getIndexName()}.
-             *
-             * @return string
              */
             protected function resolveIndexName(): string
             {
@@ -708,8 +649,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param string $algorithm
      *
      * @throws \LogicException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     protected function runRealOptimizationWithSpecificityForcedEnabled(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
@@ -725,9 +664,6 @@ abstract class AbstractGroundTruthTest extends Unit
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
         ) extends RankEvalRunner {
-            /**
-             * @return bool
-             */
             protected function isSpecificityWeightingEnabled(): bool
             {
                 return true;
@@ -735,9 +671,6 @@ abstract class AbstractGroundTruthTest extends Unit
         };
 
         $searchRankingClientDouble = new class ($forcedEnabledRankEvalRunner) implements SearchRankingOptimizerToSearchRankingClientInterface {
-            /**
-             * @var \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface
-             */
             protected RankEvalRunnerInterface $rankEvalRunner;
 
             /**
@@ -775,8 +708,6 @@ abstract class AbstractGroundTruthTest extends Unit
              * @param float $blendWeight
              *
              * @throws \LogicException
-             *
-             * @return float
              */
             public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
             {
@@ -785,8 +716,6 @@ abstract class AbstractGroundTruthTest extends Unit
 
             /**
              * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-             *
-             * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
              */
             public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
             {
@@ -803,8 +732,6 @@ abstract class AbstractGroundTruthTest extends Unit
              * @param int $idProductAbstract
              *
              * @throws \LogicException
-             *
-             * @return bool
              */
             public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
             {

@@ -35,9 +35,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class ScoreCalibratorTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testReturnsNullWhenThereIsNoUploadedCalibration(): void
     {
         // Arrange
@@ -62,9 +59,6 @@ class ScoreCalibratorTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testSkipsEveryUploadedCalibrationExceptTheNewestWithoutCallingTheSearchClientForThem(): void
     {
         // Arrange
@@ -109,8 +103,6 @@ class ScoreCalibratorTest extends Unit
     /**
      * A single search term's Elasticsearch call throwing must not abort the run — it is treated as 0
      * products found for that term, and every other term is still queried.
-     *
-     * @return void
      */
     public function testTreatsAFailingSearchTermAsZeroScoresWithoutAbortingTheRun(): void
     {
@@ -168,8 +160,6 @@ class ScoreCalibratorTest extends Unit
      * A `calibrationType=specificity` run must fire `getCalibrationSpecificity()` (no real catalog query,
      * unlike `getCalibrationScores()`) using the LIVE `specificityBlendWeight`, and pool exactly ONE value
      * per search term rather than one per product.
-     *
-     * @return void
      */
     public function testSpecificityCalibrationFetchesOneValuePerSearchTermUsingTheLiveBlendWeight(): void
     {
@@ -221,9 +211,6 @@ class ScoreCalibratorTest extends Unit
         $this->assertSame([0.68], $capturedValuesByTermId[11]);
     }
 
-    /**
-     * @return void
-     */
     public function testMarksTheCalibrationFailedWhenNoSearchTermProducedAnyScore(): void
     {
         // Arrange
@@ -257,8 +244,6 @@ class ScoreCalibratorTest extends Unit
      * The live progress counter's numerator: one increment per search term as the loop works through
      * them, regardless of whether that term actually matched anything (a "0 products found" term still
      * counts as processed).
-     *
-     * @return void
      */
     public function testCalculateIncrementsProcessedCountOnceForEverySearchTermRegardlessOfResult(): void
     {
@@ -307,8 +292,6 @@ class ScoreCalibratorTest extends Unit
      * A real, if rare, race: the calibration row is deleted (or otherwise vanishes) between being listed
      * as "uploaded" and actually being picked up to calculate — `calculate()` must surface this loudly
      * rather than silently proceeding with a missing calibration.
-     *
-     * @return void
      */
     public function testThrowsWhenTheCalibrationVanishesBeforeItCanBeCalculated(): void
     {
@@ -340,8 +323,6 @@ class ScoreCalibratorTest extends Unit
     /**
      * @param int $idSearchRankingCalibration
      * @param array<\Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer> $searchTermTransfers
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     protected function createCalibrationTransfer(int $idSearchRankingCalibration, array $searchTermTransfers): SearchRankingCalibrationTransfer
     {
@@ -362,8 +343,6 @@ class ScoreCalibratorTest extends Unit
     /**
      * @param int $idSearchRankingCalibrationSearchTerm
      * @param string $searchTerm
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer
      */
     protected function createSearchTermTransfer(int $idSearchRankingCalibrationSearchTerm, string $searchTerm): SearchRankingCalibrationSearchTermTransfer
     {

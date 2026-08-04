@@ -33,9 +33,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class AutoTuneRunnerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testSkipsAMetricThatNoLongerExists(): void
     {
         // Arrange
@@ -58,9 +55,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
-    /**
-     * @return void
-     */
     public function testSkipsAMetricWithNoDigestYet(): void
     {
         // Arrange
@@ -82,9 +76,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertCount(0, $result->getMetricResults());
     }
 
-    /**
-     * @return void
-     */
     public function testRecordsACheckOnlyRowAndDoesNotRefitWhenTheFitIsAtOrAboveThreshold(): void
     {
         // Arrange
@@ -114,9 +105,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
-    /**
-     * @return void
-     */
     public function testRecordsACheckOnlyRowAndNeverRefitsWhenTheFormulaIsNonDeterministic(): void
     {
         // Arrange -- a placeholder/noise metric (formula calls random()) with a genuinely bad fit, well
@@ -155,9 +143,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertFalse($metricResults[0]->getWasApplied());
     }
 
-    /**
-     * @return void
-     */
     public function testProposesARefitWithoutApplyingWhenAutoUpdateIsDisabled(): void
     {
         // Arrange
@@ -188,9 +173,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame('x / (x + 3)', $metricResults[0]->getAfterFormula());
     }
 
-    /**
-     * @return void
-     */
     public function testAppliesTheRefitThroughTheBridgeWhenAutoUpdateIsEnabled(): void
     {
         // Arrange
@@ -223,8 +205,6 @@ class AutoTuneRunnerTest extends Unit
     /**
      * Scope=parameters-only must stick to the SAME shape the metric already uses, even when a different
      * shape would fit better — that's the whole point of the "parameters only" scope.
-     *
-     * @return void
      */
     public function testParametersOnlyScopePicksTheCandidateMatchingTheCurrentShapeOverTheOverallWinner(): void
     {
@@ -254,8 +234,6 @@ class AutoTuneRunnerTest extends Unit
     /**
      * A metric with no known shape (a freeform/custom formula) has nothing to "stay within", so
      * parameters-only falls back to the overall best-fitting candidate instead of doing nothing.
-     *
-     * @return void
      */
     public function testParametersOnlyScopeFallsBackToTheOverallWinnerWhenTheMetricHasNoKnownShape(): void
     {
@@ -282,9 +260,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame('x / (x + 3)', $result->getMetricResults()[0]->getAfterFormula());
     }
 
-    /**
-     * @return void
-     */
     public function testSendsNoEmailAndReportsZeroWhenNoMetricNeedsNotifying(): void
     {
         // Arrange
@@ -315,9 +290,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
-    /**
-     * @return void
-     */
     public function testSendsExactlyOneCombinedEmailWhenAMetricNeedsNotifyingAndRecipientsExist(): void
     {
         // Arrange
@@ -348,9 +320,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(2, $result->getNotifiedEmailCount());
     }
 
-    /**
-     * @return void
-     */
     public function testAnExceptionWhileProcessingOneMetricDoesNotAbortTheOthers(): void
     {
         // Arrange -- metric 7 blows up (e.g. a transient ES failure inside evaluateCurrentMetricFit()),
@@ -394,9 +363,6 @@ class AutoTuneRunnerTest extends Unit
         $this->assertTrue($metricResults[1]->getWasThresholdMet());
     }
 
-    /**
-     * @return void
-     */
     public function testAFailedMetricIsIncludedInTheNotifyEmailWhenNotifyIsEnabled(): void
     {
         // Arrange
@@ -429,8 +395,6 @@ class AutoTuneRunnerTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface|null $recipientResolver
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface|null $mailerFacade
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -450,8 +414,6 @@ class AutoTuneRunnerTest extends Unit
      * @param bool $isAutoUpdateEnabled
      * @param bool $isNotifyEnabled
      * @param string $autoUpdateScope
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     protected function createConfigTransfer(
         int $idSearchRankingMetric,

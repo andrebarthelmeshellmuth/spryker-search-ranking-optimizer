@@ -26,8 +26,6 @@ class SearchRankingOptimizerWidgetRouteProviderPlugin extends AbstractRouteProvi
 
     /**
      * @param \Spryker\Yves\Router\Route\RouteCollection $routeCollection
-     *
-     * @return \Spryker\Yves\Router\Route\RouteCollection
      */
     public function addRoutes(RouteCollection $routeCollection): RouteCollection
     {

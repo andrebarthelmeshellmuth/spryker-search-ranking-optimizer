@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use Rector\DeadCode\Rector\ClassMethod\RemoveUselessParamTagRector;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 
 return RectorConfig::configure()
@@ -21,11 +22,16 @@ return RectorConfig::configure()
         // producing "Doc Block annotation @var for property missing" across 14 files when tried. Same
         // systemic contradiction search-debug hit with RemoveUselessParamTagRector, different sniff.
         ClassPropertyAssignToConstructorPromotionRector::class,
+        // Spryker.Commenting.DocBlockParam (active in this project's phpcs.xml) requires exactly one
+        // @param tag per method parameter, typed or not. This rule strips @param tags for natively
+        // typed params, which produced 215 "Doc Block params do not match method signature" errors when
+        // tried -- same systemic contradiction search-debug hit with this exact rule.
+        RemoveUselessParamTagRector::class,
     ])
     // Picks up the PHP floor (>=8.3) from composer.json.
     ->withPhpSets()
     // Gradual levels (0 = safest rules only). Raising in batches; stop at the first hit that
     // conflicts with established Spryker style rather than applying it automatically.
-    ->withDeadCodeLevel(15)
-    ->withCodeQualityLevel(15)
+    ->withDeadCodeLevel(20)
+    ->withCodeQualityLevel(20)
     ->withoutParallel();

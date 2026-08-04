@@ -35,8 +35,6 @@ interface LiveCatalogSearchQueryBuilderInterface
      * @param string $storeName
      * @param string $localeName
      * @param int|null $limit
-     *
-     * @return \Elastica\Query
      */
     public function build(string $searchTerm, string $storeName, string $localeName, ?int $limit = null): Query;
 }

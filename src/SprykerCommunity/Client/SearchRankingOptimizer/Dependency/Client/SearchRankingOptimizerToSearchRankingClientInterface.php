@@ -11,9 +11,6 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client;
 
 interface SearchRankingOptimizerToSearchRankingClientInterface
 {
-    /**
-     * @return bool
-     */
     public function isSpecificityWeightingEnabled(): bool;
 
     /**

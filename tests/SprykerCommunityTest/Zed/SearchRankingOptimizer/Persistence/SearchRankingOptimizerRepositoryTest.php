@@ -73,9 +73,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      */
     protected array $weightCheckpointEntities = [];
 
-    /**
-     * @return void
-     */
     protected function _after(): void
     {
         foreach ($this->calibrationEntities as $calibrationEntity) {
@@ -109,9 +106,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         parent::_after();
     }
 
-    /**
-     * @return void
-     */
     public function testGetUploadedCalibrationsReturnsOnlyUploadedStatusRowsNewestFirst(): void
     {
         // Arrange
@@ -132,9 +126,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationWithSearchTermsReturnsTheCalibrationWithItsSearchTermsAttached(): void
     {
         // Arrange
@@ -164,9 +155,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         );
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationWithSearchTermsReturnsNullForANonExistentId(): void
     {
         // Act
@@ -176,9 +164,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestCalculatedCalibrationReturnsTheMostRecentlyCalculatedRow(): void
     {
         // Arrange — "newer" uses a far-future date so it outranks any pre-existing real calibration row
@@ -201,9 +186,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($newer->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationInProgressReturnsTheCalculatingRowWithItsProgressCounts(): void
     {
         // Arrange
@@ -222,9 +204,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame(3, $resultTransfer->getProcessedCount());
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationInProgressReturnsNullWhenNothingIsCalculating(): void
     {
         // Arrange
@@ -238,9 +217,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindDistinctSearchTermsByStoreLocaleReturnsEachTermOnceForTheGivenStoreLocale(): void
     {
         // Arrange — an isolated store name so this never collides with real organic ratings in the shared
@@ -259,9 +235,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertEqualsCanonicalizing(['chair', 'desk'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueriesByStoreLocaleReturnsOnlyQueriesForThatStoreLocale(): void
     {
         // Arrange
@@ -278,9 +251,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matching->getIdSearchRankingQuery(), $queryTransfers[0]->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindRatingsByStoreLocaleReturnsRatingsJoinedThroughTheQuery(): void
     {
         // Arrange — id 9 is a real seeded product abstract (M1006811), needed to satisfy the rating
@@ -300,9 +270,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestEvaluationReturnsTheMostRecentRow(): void
     {
         // Arrange
@@ -323,9 +290,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($newer->getIdSearchRankingEvaluation(), $resultTransfer->getIdSearchRankingEvaluation());
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestEvaluationReturnsNullWhenNoneExists(): void
     {
         // Act
@@ -335,9 +299,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindEvaluationHistoryByStoreLocaleReturnsNewestFirst(): void
     {
         // Arrange
@@ -359,9 +320,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($older->getIdSearchRankingEvaluation(), $historyTransfers[1]->getIdSearchRankingEvaluation());
     }
 
-    /**
-     * @return void
-     */
     public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
     {
         // Arrange
@@ -379,9 +337,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertTrue($resultTransfer->getIsNotifyEnabled());
     }
 
-    /**
-     * @return void
-     */
     public function testFindAutoTuneMetricConfigByMetricIdReturnsNullWhenTheMetricHasNoConfigYet(): void
     {
         // Act
@@ -391,9 +346,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindAutoTuneMetricConfigsWithThresholdSetExcludesConfigsWithNoThreshold(): void
     {
         // Arrange
@@ -415,8 +367,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param bool $isAutoUpdateEnabled
      * @param string $autoUpdateScope
      * @param bool $isNotifyEnabled
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
      */
     protected function createTestAutoTuneMetricConfig(
         int $idSearchRankingMetric,
@@ -442,8 +392,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery
      */
     protected function createTestQuery(string $searchTerm, string $storeName, string $localeName): SpySearchRankingQuery
     {
@@ -460,8 +408,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
     /**
      * @param string $status
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration
      */
     protected function createTestCalibration(string $status): SpySearchRankingCalibration
     {
@@ -482,8 +428,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $customerReference
      * @param int $fkProductAbstract
      * @param string $ratingType
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating
      */
     protected function createTestRating(
         int $fkSearchRankingQuery,
@@ -508,8 +452,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $localeName
      * @param float $metricScore
      * @param int $queryCount
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation
      */
     protected function createTestEvaluation(string $storeName, string $localeName, float $metricScore, int $queryCount): SpySearchRankingEvaluation
     {
@@ -525,9 +467,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         return $evaluationEntity;
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunByIdReturnsTheMatchingRow(): void
     {
         // Arrange
@@ -541,9 +480,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunByIdReturnsNullForANonExistentId(): void
     {
         $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunById(999999999);
@@ -551,9 +487,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindOldestQueuedOptimizerRunReturnsTheOldestOneFirst(): void
     {
         // Arrange -- a done run must never be picked up, only queued ones, and the OLDEST of those.
@@ -569,9 +502,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($older->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunInProgressReturnsTheRunningRow(): void
     {
         // Arrange
@@ -585,9 +515,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOldestQueuedOptimizerRunReturnsNullWhenNothingIsQueued(): void
     {
         // Arrange
@@ -601,9 +528,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunInProgressReturnsNullWhenNothingIsRunning(): void
     {
         // Arrange
@@ -617,9 +541,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestOptimizerRunByStoreLocaleReturnsNullWhenNoneExistsForThatStoreLocale(): void
     {
         // Act
@@ -629,9 +550,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestOptimizerRunByStoreLocaleReturnsTheMostRecentRegardlessOfStatus(): void
     {
         // Arrange
@@ -656,8 +574,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $storeName
      * @param string $localeName
      * @param string $status
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun
      */
     protected function createTestOptimizerRun(string $storeName, string $localeName, string $status): SpySearchRankingOptimizerRun
     {
@@ -673,9 +589,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         return $optimizerRunEntity;
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByTermStoreLocaleReturnsTheMatchingQuery(): void
     {
         // Arrange
@@ -692,9 +605,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matching->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByTermStoreLocaleReturnsNullWhenNoQueryMatches(): void
     {
         // Act
@@ -704,9 +614,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByIdReturnsTheMatchingQuery(): void
     {
         // Arrange
@@ -720,9 +627,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($queryEntity->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByIdReturnsNullForANonExistentId(): void
     {
         // Act
@@ -732,9 +636,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindAllQueriesOrderedByUpdatedAtReturnsNewestFirst(): void
     {
         // Arrange
@@ -759,9 +660,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
     public function testFindWeightCheckpointHistoryReturnsNewestFirst(): void
     {
         // Arrange
@@ -787,9 +685,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
     public function testFindWeightCheckpointByIdReturnsTheMatchingCheckpoint(): void
     {
         // Arrange
@@ -805,9 +700,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testFindWeightCheckpointByIdReturnsNullForANonExistentId(): void
     {
         // Act
@@ -820,8 +712,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     /**
      * @param string $source
      * @param float $relevanceWeight
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint
      */
     protected function createTestWeightCheckpoint(string $source, float $relevanceWeight): SpySearchRankingWeightCheckpoint
     {

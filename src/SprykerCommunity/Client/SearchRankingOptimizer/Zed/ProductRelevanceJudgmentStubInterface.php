@@ -16,8 +16,6 @@ interface ProductRelevanceJudgmentStubInterface
 {
     /**
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -25,8 +23,6 @@ interface ProductRelevanceJudgmentStubInterface
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,

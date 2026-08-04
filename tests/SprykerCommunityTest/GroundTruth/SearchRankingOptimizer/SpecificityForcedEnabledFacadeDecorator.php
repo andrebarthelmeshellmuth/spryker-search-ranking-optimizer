@@ -19,9 +19,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  */
 class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerToSearchRankingFacadeInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $realFacade;
 
     /**
@@ -35,8 +32,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getRelevanceSaturationPoint(string $storeName, string $localeName): float
     {
@@ -47,8 +42,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $relevanceSaturationPoint
-     *
-     * @return void
      */
     public function saveRelevanceSaturationPoint(string $storeName, string $localeName, float $relevanceSaturationPoint): void
     {
@@ -58,8 +51,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getRelevanceWeight(string $storeName, string $localeName): float
     {
@@ -70,8 +61,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $relevanceWeight
-     *
-     * @return void
      */
     public function saveRelevanceWeight(string $storeName, string $localeName, float $relevanceWeight): void
     {
@@ -81,8 +70,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificitySaturationPoint(string $storeName, string $localeName): float
     {
@@ -93,8 +80,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $specificitySaturationPoint
-     *
-     * @return void
      */
     public function saveSpecificitySaturationPoint(string $storeName, string $localeName, float $specificitySaturationPoint): void
     {
@@ -104,8 +89,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityBlendWeight(string $storeName, string $localeName): float
     {
@@ -116,8 +99,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityBlendWeight
-     *
-     * @return void
      */
     public function saveSpecificityBlendWeight(string $storeName, string $localeName, float $specificityBlendWeight): void
     {
@@ -127,8 +108,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityWeightExponent(string $storeName, string $localeName): float
     {
@@ -139,8 +118,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityWeightExponent
-     *
-     * @return void
      */
     public function saveSpecificityWeightExponent(string $storeName, string $localeName, float $specificityWeightExponent): void
     {
@@ -150,8 +127,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float
      */
     public function getSpecificityWeightShiftMagnitude(string $storeName, string $localeName): float
     {
@@ -162,8 +137,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $specificityWeightShiftMagnitude
-     *
-     * @return void
      */
     public function saveSpecificityWeightShiftMagnitude(string $storeName, string $localeName, float $specificityWeightShiftMagnitude): void
     {
@@ -172,8 +145,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
 
     /**
      * The one deliberately overridden method -- see this class's own docblock.
-     *
-     * @return bool
      */
     public function isSpecificityWeightingEnabled(): bool
     {
@@ -196,8 +167,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $weight
-     *
-     * @return bool
      */
     public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight): bool
     {
@@ -216,8 +185,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param int $idSearchRankingMetric
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return float|null
      */
     public function evaluateCurrentMetricFit(int $idSearchRankingMetric, string $storeName, string $localeName): ?float
     {
@@ -249,8 +216,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
-     *
-     * @return bool
      */
     public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool
     {
@@ -261,8 +226,6 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param int $idSearchRankingMetric
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return bool
      */
     public function recordMetricCheckOnly(int $idSearchRankingMetric, string $storeName, string $localeName): bool
     {

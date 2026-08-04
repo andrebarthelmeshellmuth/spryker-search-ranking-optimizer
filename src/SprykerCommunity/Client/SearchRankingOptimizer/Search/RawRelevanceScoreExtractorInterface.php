@@ -22,8 +22,6 @@ interface RawRelevanceScoreExtractorInterface
      *   `_score` — returns the explanation's own root `value`.
      *
      * @param array<string, mixed> $explanation
-     *
-     * @return float
      */
     public function extract(array $explanation): float;
 }
