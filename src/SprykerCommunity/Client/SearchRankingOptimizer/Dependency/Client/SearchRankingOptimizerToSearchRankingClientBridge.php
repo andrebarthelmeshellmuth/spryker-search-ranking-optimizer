@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client;
 
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
+
 class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRankingOptimizerToSearchRankingClientInterface
 {
     /**
@@ -35,5 +38,15 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
     public function getSpecificityProbeFieldSearchAnalyzers(): array
     {
         return $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers();
+    }
+
+    public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
+    {
+        return $this->searchRankingClient->createFunctionScoreBuilder();
+    }
+
+    public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
+    {
+        return $this->searchRankingClient->createQuerySpecificityCalculator();
     }
 }

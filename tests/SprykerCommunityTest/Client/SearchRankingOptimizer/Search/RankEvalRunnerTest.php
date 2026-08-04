@@ -20,6 +20,9 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\SearchRankingClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
@@ -372,6 +375,16 @@ class RankEvalRunnerTest extends Unit
                     'full-text-boosted' => 'fulltext_search_analyzer',
                 ];
             }
+
+            public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
+            {
+                return new FunctionScoreBuilder();
+            }
+
+            public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
+            {
+                return new QuerySpecificityCalculator();
+            }
         };
 
         return new RankEvalRunner(
@@ -411,6 +424,16 @@ class RankEvalRunnerTest extends Unit
                     'full-text' => 'fulltext_search_analyzer',
                     'full-text-boosted' => 'fulltext_search_analyzer',
                 ];
+            }
+
+            public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
+            {
+                return new FunctionScoreBuilder();
+            }
+
+            public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
+            {
+                return new QuerySpecificityCalculator();
             }
         };
 

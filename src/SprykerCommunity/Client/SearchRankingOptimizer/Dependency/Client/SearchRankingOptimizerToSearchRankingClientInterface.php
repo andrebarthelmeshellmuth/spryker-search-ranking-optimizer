@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client;
 
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
+
 interface SearchRankingOptimizerToSearchRankingClientInterface
 {
     public function isSpecificityWeightingEnabled(): bool;
@@ -17,4 +20,8 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
      * @return array<string, string>
      */
     public function getSpecificityProbeFieldSearchAnalyzers(): array;
+
+    public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface;
+
+    public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface;
 }

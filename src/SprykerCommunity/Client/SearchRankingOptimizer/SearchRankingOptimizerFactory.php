@@ -15,9 +15,7 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
-use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
-use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
@@ -67,7 +65,7 @@ class SearchRankingOptimizerFactory extends AbstractFactory
 
     public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
     {
-        return new QuerySpecificityCalculator();
+        return $this->getSearchRankingClient()->createQuerySpecificityCalculator();
     }
 
     public function createLiveCatalogSearchQueryBuilder(): LiveCatalogSearchQueryBuilderInterface
@@ -97,17 +95,9 @@ class SearchRankingOptimizerFactory extends AbstractFactory
         );
     }
 
-    /**
-     * COMPOSITION over spryker-community/search-ranking's own Client\SearchRanking\Query\FunctionScoreBuilder
-     * — a stateless, dependency-free builder (plain query in, function_score out), so it's instantiated
-     * directly here rather than behind a bridge, the same way core Spryker's ProductCatalogSearchQueryPlugin
-     * already is in {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder}.
-     * This package already hard-requires spryker-community/search-ranking (composer.json), so this is a
-     * real dependency, not a standalone-installability concern.
-     */
     public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
     {
-        return new FunctionScoreBuilder();
+        return $this->getSearchRankingClient()->createFunctionScoreBuilder();
     }
 
     public function getSearchRankingStorageClient(): SearchRankingOptimizerToSearchRankingStorageClientInterface
