@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form;
 
+use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
+use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
+use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
 use Spryker\Zed\Kernel\Communication\Form\AbstractType;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -70,16 +73,8 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
 
         $builder->add(static::FIELD_ALGORITHM, ChoiceType::class, [
             'label' => 'Algorithm',
-            'help' => 'CMA-ES adapts a full covariance matrix as it searches — generally the stronger '
-                . 'choice, at some extra complexity. Rechenberg/Schwefel ES is CMA-ES\'s own historical '
-                . 'predecessor — isotropic mutation with the classic 1/5 success rule, no covariance '
-                . 'matrix. Differential Evolution is simpler still (mutation/crossover/selection only) — '
-                . '"the thing to beat."',
-            'choices' => [
-                'CMA-ES' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
-                'Rechenberg/Schwefel ES' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES,
-                'Differential Evolution' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION,
-            ],
+            'help' => $this->buildAlgorithmHelp(),
+            'choices' => $this->buildAlgorithmChoices(),
             'constraints' => [new NotBlank()],
         ]);
     }
@@ -95,6 +90,60 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
             static::OPTION_STORE_CHOICES => [],
             static::OPTION_LOCALE_CHOICES => [],
         ]);
+    }
+
+    /**
+     * One instance per `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*` value, purely to read
+     * their {@see OptimizerAlgorithmInterface::getName()}/`getDescription()` metadata below — never
+     * `optimize()`d. Mirrors how `OptimizationRunner::buildAlgorithm()` instantiates each one.
+     *
+     * @return array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface>
+     */
+    private function getAlgorithms(): array
+    {
+        return [
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES => new RechenbergSchwefelEsAlgorithm(),
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION => new DifferentialEvolutionAlgorithm(),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildAlgorithmChoices(): array
+    {
+        $choices = [];
+
+        foreach ($this->getAlgorithms() as $algorithmName => $algorithm) {
+            $choices[$algorithm->getName()] = $algorithmName;
+        }
+
+        return $choices;
+    }
+
+    /**
+     * Combines `blackbox-optimizer`'s own factual `getDescription()` per algorithm with this package's
+     * own comparative framing (which algorithm to prefer and why) -- framing that stays here rather than
+     * traveling into `blackbox-optimizer`, which is deliberately unopinionated about that.
+     *
+     * @return string
+     */
+    private function buildAlgorithmHelp(): string
+    {
+        $recommendations = [
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => 'Generally the stronger choice, at some extra complexity.',
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES => 'CMA-ES\'s own historical predecessor.',
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION => 'The simplest option here -- "the thing to beat" rather than expected to win.',
+        ];
+
+        $sentences = [];
+
+        foreach ($this->getAlgorithms() as $algorithmName => $algorithm) {
+            $sentences[] = sprintf('%s — %s %s', $algorithm->getName(), $algorithm->getDescription(), $recommendations[$algorithmName]);
+        }
+
+        return implode(' ', $sentences);
     }
 
     #[\Override]
