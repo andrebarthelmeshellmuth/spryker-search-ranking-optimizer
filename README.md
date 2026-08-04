@@ -589,9 +589,14 @@ Then render the widget below each product tile in your SRP template (this packag
         canRate: canRateSearchRelevance(),
         searchTerm: data.searchString,
         idProductAbstract: product.id_product_abstract,
+        csrfToken: searchRankingOptimizerRatingCsrfToken(),
     }
 } only %}
 ```
+
+`searchRankingOptimizerRatingCsrfToken()` comes from the same Twig plugin registered above — the widget's
+submit/clear actions are plain POST controllers, not bound to a Symfony Form, so without this field they'd
+carry none of the CSRF protection every Form-backed POST in this project gets automatically.
 
 Compute `canRateSearchRelevance()` **once per page**, not once per product, and pass the same value into
 every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
