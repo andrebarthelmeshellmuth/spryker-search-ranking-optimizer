@@ -221,10 +221,12 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     {
         $metrics = [];
 
-        foreach ($this->searchRankingFacade->getActiveMetricCollection(
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        )->getMetrics() as $metricTransfer) {
+        foreach (
+            $this->searchRankingFacade->getActiveMetricCollection(
+                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+            )->getMetrics() as $metricTransfer
+        ) {
             $metrics[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),

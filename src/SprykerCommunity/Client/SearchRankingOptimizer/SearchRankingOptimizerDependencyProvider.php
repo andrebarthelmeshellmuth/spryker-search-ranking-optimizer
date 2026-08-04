@@ -37,6 +37,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
      *
      * @return \Spryker\Client\Kernel\Container
      */
+    #[\Override]
     public function provideServiceLayerDependencies(Container $container): Container
     {
         $container = parent::provideServiceLayerDependencies($container);
@@ -54,9 +55,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
      */
     protected function addZedRequestClient(Container $container): Container
     {
-        $container->set(static::CLIENT_ZED_REQUEST, function (Container $container) {
-            return new SearchRankingOptimizerToZedRequestBridge($container->getLocator()->zedRequest()->client());
-        });
+        $container->set(static::CLIENT_ZED_REQUEST, fn (Container $container) => new SearchRankingOptimizerToZedRequestBridge($container->getLocator()->zedRequest()->client()));
 
         return $container;
     }
@@ -68,9 +67,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
      */
     protected function addSearchRankingStorageClient(Container $container): Container
     {
-        $container->set(static::CLIENT_SEARCH_RANKING_STORAGE, function (Container $container) {
-            return new SearchRankingOptimizerToSearchRankingStorageClientBridge($container->getLocator()->searchRankingStorage()->client());
-        });
+        $container->set(static::CLIENT_SEARCH_RANKING_STORAGE, fn (Container $container) => new SearchRankingOptimizerToSearchRankingStorageClientBridge($container->getLocator()->searchRankingStorage()->client()));
 
         return $container;
     }
@@ -82,9 +79,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
      */
     protected function addSearchRankingClient(Container $container): Container
     {
-        $container->set(static::CLIENT_SEARCH_RANKING, function (Container $container) {
-            return new SearchRankingOptimizerToSearchRankingClientBridge($container->getLocator()->searchRanking()->client());
-        });
+        $container->set(static::CLIENT_SEARCH_RANKING, fn (Container $container) => new SearchRankingOptimizerToSearchRankingClientBridge($container->getLocator()->searchRanking()->client()));
 
         return $container;
     }

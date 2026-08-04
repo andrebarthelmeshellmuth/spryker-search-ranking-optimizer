@@ -234,7 +234,11 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
-    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer;
+    public function restoreWeightCheckpoint(
+        int $idSearchRankingWeightCheckpoint,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingWeightCheckpointTransfer;
 
     /**
      * Specification:

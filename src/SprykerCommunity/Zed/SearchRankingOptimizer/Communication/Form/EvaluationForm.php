@@ -87,6 +87,7 @@ class EvaluationForm extends AbstractType
     /**
      * @return string
      */
+    #[\Override]
     public function getBlockPrefix(): string
     {
         return 'search_ranking_optimizer_evaluation';

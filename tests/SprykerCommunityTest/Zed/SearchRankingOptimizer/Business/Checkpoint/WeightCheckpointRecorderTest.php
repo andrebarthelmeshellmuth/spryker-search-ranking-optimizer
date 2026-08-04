@@ -48,17 +48,15 @@ class WeightCheckpointRecorderTest extends Unit
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->once())
             ->method('createWeightCheckpoint')
-            ->with($this->callback(function (SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): bool {
-                return $weightCheckpointTransfer->getSource() === 'manual'
-                    && $weightCheckpointTransfer->getStoreName() === 'DE'
-                    && $weightCheckpointTransfer->getLocaleName() === 'de_DE'
-                    && $weightCheckpointTransfer->getRelevanceWeight() === 0.75
-                    && $weightCheckpointTransfer->getSpecificityBlendWeight() === 0.7
-                    && $weightCheckpointTransfer->getSpecificityWeightExponent() === 2.0
-                    && $weightCheckpointTransfer->getSpecificityWeightShiftMagnitude() === 0.25
-                    && $weightCheckpointTransfer->getIsSpecificityWeightingEnabled() === false
-                    && count($weightCheckpointTransfer->getMetricWeights()) === 2;
-            }))
+            ->with($this->callback(fn (SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): bool => $weightCheckpointTransfer->getSource() === 'manual'
+                && $weightCheckpointTransfer->getStoreName() === 'DE'
+                && $weightCheckpointTransfer->getLocaleName() === 'de_DE'
+                && $weightCheckpointTransfer->getRelevanceWeight() === 0.75
+                && $weightCheckpointTransfer->getSpecificityBlendWeight() === 0.7
+                && $weightCheckpointTransfer->getSpecificityWeightExponent() === 2.0
+                && $weightCheckpointTransfer->getSpecificityWeightShiftMagnitude() === 0.25
+                && $weightCheckpointTransfer->getIsSpecificityWeightingEnabled() === false
+                && count($weightCheckpointTransfer->getMetricWeights()) === 2))
             ->willReturnArgument(0);
 
         $recorder = new WeightCheckpointRecorder($searchRankingFacadeMock, $entityManagerMock);

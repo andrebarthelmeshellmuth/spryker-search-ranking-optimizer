@@ -631,6 +631,8 @@ abstract class AbstractGroundTruthTest extends Unit
     }
 
     /**
+     * @throws \LogicException
+     *
      * @return \SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher
      */
     protected function createQueryTermFrequencyFetcher(): QueryTermFrequencyFetcher
@@ -645,18 +647,19 @@ abstract class AbstractGroundTruthTest extends Unit
             // interface, not search-ranking's. Same "structurally required but never actually exercised"
             // reasoning applies: resolveIndexName() below is overridden and never touches $storeClient.
             new class implements SearchRankingToStoreClientInterface {
-                /**
-                 * @throws \LogicException
-                 *
-                 * @return \Generated\Shared\Transfer\StoreTransfer
-                 */
-                public function getCurrentStore(): StoreTransfer
-                {
-                    throw new LogicException(__METHOD__ . '() was called -- resolveIndexName() below should have made this unreachable.');
-                }
+            /**
+             * @throws \LogicException
+             *
+             * @return \Generated\Shared\Transfer\StoreTransfer
+             */
+            public function getCurrentStore(): StoreTransfer
+            {
+            throw new LogicException(__METHOD__ . '() was called -- resolveIndexName() below should have made this unreachable.');
+            }
             },
             $indexName,
-        ) extends QueryTermFrequencyFetcher {
+        ) extends QueryTermFrequencyFetcher
+        {
             /**
              * @var string
              */

@@ -137,12 +137,10 @@ class OptimizationRunnerTest extends Unit
 
         // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
         // match evaluateCandidate()'s real 3 arguments; only the configuration transfer is used below.
-        $objectiveCallback = function (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer): float {
-            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
-            // A deterministic, cheap "objective": reward relevanceWeight closer to 1.0 -- proves real
-            // candidate configurations (not just the baseline) are actually being scored differently.
-            return $configurationTransfer->getRelevanceWeightOrFail();
-        };
+        // A deterministic, cheap "objective": reward relevanceWeight closer to 1.0 -- proves real
+        // candidate configurations (not just the baseline) are actually being scored differently.
+        $objectiveCallback = fn (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer): float => $configurationTransfer->getRelevanceWeightOrFail();
+        // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
 
         $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
         $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturnCallback($objectiveCallback);

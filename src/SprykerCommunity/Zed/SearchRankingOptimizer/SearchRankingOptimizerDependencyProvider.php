@@ -107,6 +107,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      *
      * @return \Spryker\Zed\Kernel\Container
      */
+    #[\Override]
     public function provideBusinessLayerDependencies(Container $container): Container
     {
         $container = parent::provideBusinessLayerDependencies($container);
@@ -130,6 +131,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      *
      * @return \Spryker\Zed\Kernel\Container
      */
+    #[\Override]
     public function provideCommunicationLayerDependencies(Container $container): Container
     {
         $container = parent::provideCommunicationLayerDependencies($container);
@@ -151,11 +153,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addSearchRankingClient(Container $container): Container
     {
-        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, function (Container $container) {
-            return new SearchRankingOptimizerToSearchRankingClientBridge(
-                $container->getLocator()->searchRankingOptimizer()->client(),
-            );
-        });
+        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, fn (Container $container) => new SearchRankingOptimizerToSearchRankingClientBridge(
+            $container->getLocator()->searchRankingOptimizer()->client(),
+        ));
 
         return $container;
     }
@@ -167,11 +167,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addSearchRankingFacade(Container $container): Container
     {
-        $container->set(static::FACADE_SEARCH_RANKING, function (Container $container) {
-            return new SearchRankingOptimizerToSearchRankingFacadeBridge(
-                $container->getLocator()->searchRanking()->facade(),
-            );
-        });
+        $container->set(static::FACADE_SEARCH_RANKING, fn (Container $container) => new SearchRankingOptimizerToSearchRankingFacadeBridge(
+            $container->getLocator()->searchRanking()->facade(),
+        ));
 
         return $container;
     }
@@ -183,11 +181,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addSearchRankingStorageFacade(Container $container): Container
     {
-        $container->set(static::FACADE_SEARCH_RANKING_STORAGE, function (Container $container) {
-            return new SearchRankingOptimizerToSearchRankingStorageFacadeBridge(
-                $container->getLocator()->searchRankingStorage()->facade(),
-            );
-        });
+        $container->set(static::FACADE_SEARCH_RANKING_STORAGE, fn (Container $container) => new SearchRankingOptimizerToSearchRankingStorageFacadeBridge(
+            $container->getLocator()->searchRankingStorage()->facade(),
+        ));
 
         return $container;
     }
@@ -199,11 +195,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addStoreFacade(Container $container): Container
     {
-        $container->set(static::FACADE_STORE, function (Container $container) {
-            return new SearchRankingOptimizerToStoreFacadeBridge(
-                $container->getLocator()->store()->facade(),
-            );
-        });
+        $container->set(static::FACADE_STORE, fn (Container $container) => new SearchRankingOptimizerToStoreFacadeBridge(
+            $container->getLocator()->store()->facade(),
+        ));
 
         return $container;
     }
@@ -215,11 +209,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addLocaleFacade(Container $container): Container
     {
-        $container->set(static::FACADE_LOCALE, function (Container $container) {
-            return new SearchRankingOptimizerToLocaleFacadeBridge(
-                $container->getLocator()->locale()->facade(),
-            );
-        });
+        $container->set(static::FACADE_LOCALE, fn (Container $container) => new SearchRankingOptimizerToLocaleFacadeBridge(
+            $container->getLocator()->locale()->facade(),
+        ));
 
         return $container;
     }
@@ -231,11 +223,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addCompanyUserFacade(Container $container): Container
     {
-        $container->set(static::FACADE_COMPANY_USER, function (Container $container) {
-            return new SearchRankingOptimizerToCompanyUserFacadeBridge(
-                $container->getLocator()->companyUser()->facade(),
-            );
-        });
+        $container->set(static::FACADE_COMPANY_USER, fn (Container $container) => new SearchRankingOptimizerToCompanyUserFacadeBridge(
+            $container->getLocator()->companyUser()->facade(),
+        ));
 
         return $container;
     }
@@ -247,11 +237,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addPermissionFacade(Container $container): Container
     {
-        $container->set(static::FACADE_PERMISSION, function (Container $container) {
-            return new SearchRankingOptimizerToPermissionFacadeBridge(
-                $container->getLocator()->permission()->facade(),
-            );
-        });
+        $container->set(static::FACADE_PERMISSION, fn (Container $container) => new SearchRankingOptimizerToPermissionFacadeBridge(
+            $container->getLocator()->permission()->facade(),
+        ));
 
         return $container;
     }
@@ -263,11 +251,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addAclFacade(Container $container): Container
     {
-        $container->set(static::FACADE_ACL, function (Container $container) {
-            return new SearchRankingOptimizerToAclFacadeBridge(
-                $container->getLocator()->acl()->facade(),
-            );
-        });
+        $container->set(static::FACADE_ACL, fn (Container $container) => new SearchRankingOptimizerToAclFacadeBridge(
+            $container->getLocator()->acl()->facade(),
+        ));
 
         return $container;
     }
@@ -279,11 +265,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addAclQueryContainer(Container $container): Container
     {
-        $container->set(static::QUERY_CONTAINER_ACL, function (Container $container) {
-            return new SearchRankingOptimizerToAclQueryContainerBridge(
-                $container->getLocator()->acl()->queryContainer(),
-            );
-        });
+        $container->set(static::QUERY_CONTAINER_ACL, fn (Container $container) => new SearchRankingOptimizerToAclQueryContainerBridge(
+            $container->getLocator()->acl()->queryContainer(),
+        ));
 
         return $container;
     }
@@ -295,11 +279,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      */
     protected function addSymfonyMailerFacade(Container $container): Container
     {
-        $container->set(static::FACADE_SYMFONY_MAILER, function (Container $container) {
-            return new SearchRankingOptimizerToSymfonyMailerFacadeBridge(
-                $container->getLocator()->symfonyMailer()->facade(),
-            );
-        });
+        $container->set(static::FACADE_SYMFONY_MAILER, fn (Container $container) => new SearchRankingOptimizerToSymfonyMailerFacadeBridge(
+            $container->getLocator()->symfonyMailer()->facade(),
+        ));
 
         return $container;
     }

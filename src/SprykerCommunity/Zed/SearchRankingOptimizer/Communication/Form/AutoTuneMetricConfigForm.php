@@ -95,6 +95,7 @@ class AutoTuneMetricConfigForm extends AbstractType
     /**
      * @return string
      */
+    #[\Override]
     public function getBlockPrefix(): string
     {
         return 'search_ranking_optimizer_auto_tune_metric_config';

@@ -78,6 +78,7 @@ class CalibrationApplyForm extends AbstractType
     /**
      * @return string
      */
+    #[\Override]
     public function getBlockPrefix(): string
     {
         return 'search_ranking_calibration_apply';

@@ -183,7 +183,7 @@ class ScoreCalibrator implements ScoreCalibratorInterface
     {
         try {
             return $this->searchRankingClient->getCalibrationScores($searchTerm, $storeName, $localeName, $limit);
-        } catch (Throwable $exception) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -209,7 +209,7 @@ class ScoreCalibrator implements ScoreCalibratorInterface
                 $storeName,
                 $this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName),
             );
-        } catch (Throwable $exception) {
+        } catch (Throwable) {
             return [];
         }
 

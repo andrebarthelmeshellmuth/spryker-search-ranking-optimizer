@@ -114,11 +114,6 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     protected float $specificityBlendWeightAtRunStart;
 
     /**
-     * @var \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization
-     */
-    protected SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization;
-
-    /**
      * @param array<int, array{idSearchRankingMetric: int, name: string}> $metrics The OPTIMIZABLE active
      *   metrics this run's simplex searches over — same plain shape as
      *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()},
@@ -143,7 +138,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      *   optimizer to improve, so spending search budget on it would be pure waste (this mirrors, but is
      *   distinct from, $fixedMetricWeights above — that budget must still sum into the simplex; a disabled
      *   specificity knob has no budget to preserve at all).
-     * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization|null $simplexSoftmaxReparametrization
+     * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization
      */
     public function __construct(
         array $metrics,
@@ -153,12 +148,11 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         float $specificityWeightShiftMagnitudeAtRunStart,
         float $specificityBlendWeightAtRunStart,
         bool $specificityWeightingEnabled,
-        ?SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization = null,
+        protected SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization = new SimplexSoftmaxReparametrization(),
     ) {
         $this->metrics = array_values($metrics);
         $this->fixedMetricWeights = $fixedMetricWeights;
         $this->fixedWeightBudget = array_sum($fixedMetricWeights);
-        $this->simplexSoftmaxReparametrization = $simplexSoftmaxReparametrization ?? new SimplexSoftmaxReparametrization();
         $this->specificityWeightingEnabled = $specificityWeightingEnabled;
         $this->specificityWeightExponentAtRunStart = $specificityWeightExponentAtRunStart;
         $this->specificityWeightShiftMagnitudeAtRunStart = $specificityWeightShiftMagnitudeAtRunStart;

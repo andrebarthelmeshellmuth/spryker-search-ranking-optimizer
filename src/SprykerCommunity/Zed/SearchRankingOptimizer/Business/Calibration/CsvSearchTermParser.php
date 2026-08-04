@@ -25,7 +25,7 @@ class CsvSearchTermParser implements CsvSearchTermParserInterface
 
         foreach ($lines as $line) {
             $columns = str_getcsv(trim($line), ',', '"');
-            $searchTerm = trim((string)($columns[0] ?? ''));
+            $searchTerm = trim($columns[0] ?? '');
 
             if ($searchTerm === '') {
                 continue;

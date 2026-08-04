@@ -78,11 +78,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient;
 
     /**
-     * @var \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface
-     */
-    protected QuerySpecificityCalculatorInterface $querySpecificityCalculator;
-
-    /**
      * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null
      */
     protected ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
@@ -120,7 +115,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
      * @param \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface $functionScoreBuilder
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
-     * @param \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface|null $querySpecificityCalculator
+     * @param \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface $querySpecificityCalculator
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
      */
     public function __construct(
@@ -129,7 +124,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder,
         FunctionScoreBuilderInterface $functionScoreBuilder,
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
-        ?QuerySpecificityCalculatorInterface $querySpecificityCalculator = null,
+        protected QuerySpecificityCalculatorInterface $querySpecificityCalculator = new QuerySpecificityCalculator(),
         ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
     ) {
         $this->elasticaClient = $elasticaClient;
@@ -137,7 +132,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $this->liveCatalogSearchQueryBuilder = $liveCatalogSearchQueryBuilder;
         $this->functionScoreBuilder = $functionScoreBuilder;
         $this->searchRankingStorageClient = $searchRankingStorageClient;
-        $this->querySpecificityCalculator = $querySpecificityCalculator ?? new QuerySpecificityCalculator();
         $this->searchRankingClient = $searchRankingClient;
     }
 

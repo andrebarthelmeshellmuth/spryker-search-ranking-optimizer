@@ -125,11 +125,9 @@ class RankEvaluationRunnerTest extends Unit
         $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
         $searchRankingClientMock->expects($this->once())
             ->method('evaluateRankings')
-            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer): bool {
-                return count($requestTransfer->getQueries()) === 2
-                    && $requestTransfer->getStoreNameOrFail() === 'DE'
-                    && $requestTransfer->getLocaleNameOrFail() === 'en_US';
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationRequestTransfer $requestTransfer): bool => count($requestTransfer->getQueries()) === 2
+                && $requestTransfer->getStoreNameOrFail() === 'DE'
+                && $requestTransfer->getLocaleNameOrFail() === 'en_US'))
             ->willReturn(
                 (new SearchRankingEvaluationResponseTransfer())
                     ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.8))
@@ -139,12 +137,10 @@ class RankEvaluationRunnerTest extends Unit
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->once())
             ->method('createEvaluation')
-            ->with($this->callback(function (SearchRankingEvaluationTransfer $evaluationTransfer): bool {
-                return $evaluationTransfer->getStoreNameOrFail() === 'DE'
-                    && $evaluationTransfer->getLocaleNameOrFail() === 'en_US'
-                    && $evaluationTransfer->getQueryCountOrFail() === 2
-                    && abs($evaluationTransfer->getMetricScoreOrFail() - 0.6) < 0.0001;
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationTransfer $evaluationTransfer): bool => $evaluationTransfer->getStoreNameOrFail() === 'DE'
+                && $evaluationTransfer->getLocaleNameOrFail() === 'en_US'
+                && $evaluationTransfer->getQueryCountOrFail() === 2
+                && abs($evaluationTransfer->getMetricScoreOrFail() - 0.6) < 0.0001))
             ->willReturnArgument(0);
 
         $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingClientMock);
@@ -233,9 +229,7 @@ class RankEvaluationRunnerTest extends Unit
         $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
         $searchRankingClientMock->expects($this->once())
             ->method('evaluateRankings')
-            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer) use ($candidateConfigurationTransfer): bool {
-                return $requestTransfer->getRankingConfiguration() === $candidateConfigurationTransfer;
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationRequestTransfer $requestTransfer): bool => $requestTransfer->getRankingConfiguration() === $candidateConfigurationTransfer))
             ->willReturn(
                 (new SearchRankingEvaluationResponseTransfer())
                     ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.5)),

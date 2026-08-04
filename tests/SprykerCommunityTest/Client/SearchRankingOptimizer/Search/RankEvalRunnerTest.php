@@ -115,28 +115,26 @@ class RankEvalRunnerTest extends Unit
     public function testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne(): void
     {
         // Arrange
-        $buildRequestTransfer = function (): SearchRankingEvaluationRequestTransfer {
-            return (new SearchRankingEvaluationRequestTransfer())
-                ->setStoreName('DE')
-                ->setLocaleName('en_US')
-                ->setCutoff(100)
-                ->addQuery(
-                    (new SearchRankingEvaluationQueryTransfer())
-                        ->setIdSearchRankingQuery(1)
-                        ->setSearchTerm('chair')
-                        ->setImportanceWeight(1.0)
-                        ->addProductGain(
-                            (new SearchRankingEvaluationProductGainTransfer())
-                                ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL)
-                                ->setGain(3.0),
-                        )
-                        ->addProductGain(
-                            (new SearchRankingEvaluationProductGainTransfer())
-                                ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_KONFERENZSTUHL)
-                                ->setGain(1.0),
-                        ),
-                );
-        };
+        $buildRequestTransfer = (fn (): SearchRankingEvaluationRequestTransfer => (new SearchRankingEvaluationRequestTransfer())
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setCutoff(100)
+            ->addQuery(
+                (new SearchRankingEvaluationQueryTransfer())
+                    ->setIdSearchRankingQuery(1)
+                    ->setSearchTerm('chair')
+                    ->setImportanceWeight(1.0)
+                    ->addProductGain(
+                        (new SearchRankingEvaluationProductGainTransfer())
+                            ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL)
+                            ->setGain(3.0),
+                    )
+                    ->addProductGain(
+                        (new SearchRankingEvaluationProductGainTransfer())
+                            ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_KONFERENZSTUHL)
+                            ->setGain(1.0),
+                    ),
+            ));
 
         $overriddenConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight(0.0)
