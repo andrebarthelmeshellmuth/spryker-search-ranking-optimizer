@@ -18,6 +18,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibr
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\SearchRankingCalibrationNotFoundException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -51,6 +52,7 @@ class ScoreCalibratorTest extends Unit
             $entityManagerMock,
             $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class),
             $this->createMock(StatisticsCalculatorInterface::class),
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
         );
 
         // Act
@@ -94,6 +96,7 @@ class ScoreCalibratorTest extends Unit
             $entityManagerMock,
             $searchRankingClientMock,
             $this->createMock(StatisticsCalculatorInterface::class),
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
         );
 
         // Act
@@ -145,7 +148,13 @@ class ScoreCalibratorTest extends Unit
             ->with([12.5, 13.5])
             ->willReturn(new SearchRankingCalibrationTransfer());
 
-        $calibrator = new ScoreCalibrator($repositoryMock, $entityManagerMock, $searchRankingClientMock, $statisticsCalculatorMock);
+        $calibrator = new ScoreCalibrator(
+            $repositoryMock,
+            $entityManagerMock,
+            $searchRankingClientMock,
+            $statisticsCalculatorMock,
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
+        );
 
         // Act
         $calibrator->runNextCalibration();
@@ -153,6 +162,63 @@ class ScoreCalibratorTest extends Unit
         // Assert
         $this->assertSame(0, $capturedProductsFoundByTermId[10]);
         $this->assertSame(2, $capturedProductsFoundByTermId[11]);
+    }
+
+    /**
+     * A `calibrationType=specificity` run must fire `getCalibrationSpecificity()` (no real catalog query,
+     * unlike `getCalibrationScores()`) using the LIVE `specificityBlendWeight`, and pool exactly ONE value
+     * per search term rather than one per product.
+     *
+     * @return void
+     */
+    public function testSpecificityCalibrationFetchesOneValuePerSearchTermUsingTheLiveBlendWeight(): void
+    {
+        // Arrange
+        $searchTerms = [
+            $this->createSearchTermTransfer(10, 'm11480'),
+            $this->createSearchTermTransfer(11, 'office'),
+        ];
+        $calibrationTransfer = $this->createCalibrationTransfer(1, $searchTerms)
+            ->setCalibrationType(SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY);
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('getUploadedCalibrations')->willReturn([$calibrationTransfer]);
+        $repositoryMock->method('findCalibrationWithSearchTerms')->willReturn($calibrationTransfer);
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->expects($this->never())->method('getCalibrationScores');
+        $searchRankingClientMock->expects($this->exactly(2))
+            ->method('getCalibrationSpecificity')
+            ->with($this->isType('string'), 'DE', 0.7)
+            ->willReturnCallback(fn (string $searchTerm): float => $searchTerm === 'm11480' ? 6.28 : 0.68);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('getSpecificityBlendWeight')->willReturn(0.7);
+
+        $capturedValuesByTermId = [];
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match saveCalibrationSearchTermResult()'s real 3 arguments; only the values are captured below.
+        $entityManagerMock->method('saveCalibrationSearchTermResult')
+            ->willReturnCallback(function (int $idSearchTerm, int $productsFound, array $values) use (&$capturedValuesByTermId): void {
+                $capturedValuesByTermId[$idSearchTerm] = $values;
+            });
+        // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+
+        $statisticsCalculatorMock = $this->createMock(StatisticsCalculatorInterface::class);
+        $statisticsCalculatorMock->expects($this->once())
+            ->method('calculate')
+            ->with([6.28, 0.68])
+            ->willReturn(new SearchRankingCalibrationTransfer());
+
+        $calibrator = new ScoreCalibrator($repositoryMock, $entityManagerMock, $searchRankingClientMock, $statisticsCalculatorMock, $searchRankingFacadeMock);
+
+        // Act
+        $calibrator->runNextCalibration();
+
+        // Assert
+        $this->assertSame([6.28], $capturedValuesByTermId[10]);
+        $this->assertSame([0.68], $capturedValuesByTermId[11]);
     }
 
     /**
@@ -180,6 +246,7 @@ class ScoreCalibratorTest extends Unit
             $entityManagerMock,
             $searchRankingClientMock,
             $this->createMock(StatisticsCalculatorInterface::class),
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
         );
 
         // Act
@@ -221,7 +288,13 @@ class ScoreCalibratorTest extends Unit
         $statisticsCalculatorMock = $this->createMock(StatisticsCalculatorInterface::class);
         $statisticsCalculatorMock->method('calculate')->willReturn(new SearchRankingCalibrationTransfer());
 
-        $calibrator = new ScoreCalibrator($repositoryMock, $entityManagerMock, $searchRankingClientMock, $statisticsCalculatorMock);
+        $calibrator = new ScoreCalibrator(
+            $repositoryMock,
+            $entityManagerMock,
+            $searchRankingClientMock,
+            $statisticsCalculatorMock,
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
+        );
 
         // Act
         $calibrator->runNextCalibration();
@@ -253,6 +326,7 @@ class ScoreCalibratorTest extends Unit
             $entityManagerMock,
             $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class),
             $this->createMock(StatisticsCalculatorInterface::class),
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
         );
 
         // Assert

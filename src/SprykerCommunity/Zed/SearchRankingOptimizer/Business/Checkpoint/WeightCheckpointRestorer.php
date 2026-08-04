@@ -50,10 +50,12 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
      * {@inheritDoc}
      *
      * @param int $idSearchRankingWeightCheckpoint
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
-    public function restore(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
+    public function restore(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {
         $weightCheckpointTransfer = $this->repository->findWeightCheckpointById($idSearchRankingWeightCheckpoint);
 
@@ -61,18 +63,20 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
             return null;
         }
 
-        $this->searchRankingFacade->saveRelevanceWeight($weightCheckpointTransfer->getRelevanceWeightOrFail());
-        $this->searchRankingFacade->saveEntropyProbeResultSize($weightCheckpointTransfer->getEntropyProbeResultSizeOrFail());
-        $this->searchRankingFacade->saveEntropyWeightExponent($weightCheckpointTransfer->getEntropyWeightExponentOrFail());
-        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($weightCheckpointTransfer->getEntropyWeightShiftMagnitudeOrFail());
+        $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $weightCheckpointTransfer->getRelevanceWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $weightCheckpointTransfer->getSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightShiftMagnitudeOrFail());
 
         foreach ($weightCheckpointTransfer->getMetricWeights() as $metricWeightTransfer) {
             $this->searchRankingFacade->saveMetricWeight(
                 $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
+                $storeName,
+                $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
             );
         }
 
-        return $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL);
+        return $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL, $storeName, $localeName);
     }
 }

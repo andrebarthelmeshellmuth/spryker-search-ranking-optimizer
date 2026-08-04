@@ -18,6 +18,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
 
@@ -826,11 +827,13 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     {
         $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
         $weightCheckpointEntity->setSource($source);
+        $weightCheckpointEntity->setStoreName(SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME);
+        $weightCheckpointEntity->setLocaleName(SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
         $weightCheckpointEntity->setRelevanceWeight($relevanceWeight);
-        $weightCheckpointEntity->setEntropyProbeResultSize(50);
-        $weightCheckpointEntity->setEntropyWeightExponent(1.5);
-        $weightCheckpointEntity->setEntropyWeightShiftMagnitude(0.1);
-        $weightCheckpointEntity->setIsEntropyWeightingEnabled(true);
+        $weightCheckpointEntity->setSpecificityBlendWeight(0.7);
+        $weightCheckpointEntity->setSpecificityWeightExponent(1.5);
+        $weightCheckpointEntity->setSpecificityWeightShiftMagnitude(0.1);
+        $weightCheckpointEntity->setIsSpecificityWeightingEnabled(true);
         $weightCheckpointEntity->setMetricWeights(json_encode([['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 1.0]]));
         $weightCheckpointEntity->save();
 

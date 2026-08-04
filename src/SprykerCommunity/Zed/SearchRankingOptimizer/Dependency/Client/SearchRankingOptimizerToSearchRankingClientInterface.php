@@ -25,6 +25,15 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
     public function getCalibrationScores(string $searchTerm, string $storeName, string $localeName, int $limit): array;
 
     /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     *
+     * @return float
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float;
+
+    /**
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
      *
      * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer

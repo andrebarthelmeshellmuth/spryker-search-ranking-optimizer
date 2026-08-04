@@ -13,17 +13,19 @@ use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\SearchRankingCalibrationNotFoundException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 use Throwable;
 
 /**
  * Fires the calibration query for every uploaded search term directly against Elasticsearch — via
- * `SearchRankingOptimizerToSearchRankingClientInterface::getCalibrationScores()`, which bypasses
- * `Client\Catalog`/`Client\Search` entirely (both throw when called from Zed in this shop; see
- * `SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher` for the full story) — so the sampled
- * scores are faithful to production regardless of whether a `function_score` wrapper happens to be wired
- * in at the time; the raw text-relevance score is recovered either way.
+ * `SearchRankingOptimizerToSearchRankingClientInterface::getCalibrationScores()` (calibrationType
+ * `relevance_score`) or `::getCalibrationSpecificity()` (calibrationType `specificity`, no real catalog
+ * query at all), which bypass `Client\Catalog`/`Client\Search` entirely (both throw when called from Zed
+ * in this shop; see `SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher` for the
+ * full story) — so the sampled values are faithful to production regardless of whether a `function_score`
+ * wrapper happens to be wired in at the time; the raw text-relevance score is recovered either way.
  */
 class ScoreCalibrator implements ScoreCalibratorInterface
 {
@@ -48,21 +50,29 @@ class ScoreCalibrator implements ScoreCalibratorInterface
     protected StatisticsCalculatorInterface $statisticsCalculator;
 
     /**
+     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
+     */
+    protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
+
+    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface $statisticsCalculator
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      */
     public function __construct(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerEntityManagerInterface $entityManager,
         SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient,
         StatisticsCalculatorInterface $statisticsCalculator,
+        SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
     ) {
         $this->repository = $repository;
         $this->entityManager = $entityManager;
         $this->searchRankingClient = $searchRankingClient;
         $this->statisticsCalculator = $statisticsCalculator;
+        $this->searchRankingFacade = $searchRankingFacade;
     }
 
     /**
@@ -100,33 +110,37 @@ class ScoreCalibrator implements ScoreCalibratorInterface
         $this->entityManager->updateCalibrationStatus($idSearchRankingCalibration, SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING);
 
         $calibrationTransfer = $this->requireCalibration($idSearchRankingCalibration);
+        $calibrationType = $calibrationTransfer->getCalibrationType() ?? SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE;
         $limit = $calibrationTransfer->getRelevantProductCountOrFail();
         $storeName = $calibrationTransfer->getStoreNameOrFail();
         $localeName = $calibrationTransfer->getLocaleNameOrFail();
-        $pooledScores = [];
+        $pooledValues = [];
 
         foreach ($calibrationTransfer->getSearchTerms() as $searchTermTransfer) {
-            $scores = $this->fetchScoresForSearchTerm($searchTermTransfer->getSearchTermOrFail(), $storeName, $localeName, $limit);
+            $searchTerm = $searchTermTransfer->getSearchTermOrFail();
+            $values = $calibrationType === SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY
+                ? $this->fetchSpecificityForSearchTerm($searchTerm, $storeName, $localeName)
+                : $this->fetchScoresForSearchTerm($searchTerm, $storeName, $localeName, $limit);
 
             $this->entityManager->saveCalibrationSearchTermResult(
                 $searchTermTransfer->getIdSearchRankingCalibrationSearchTermOrFail(),
-                count($scores),
-                $scores,
+                count($values),
+                $values,
             );
             $this->entityManager->incrementCalibrationProcessedCount($idSearchRankingCalibration);
 
-            array_push($pooledScores, ...$scores);
+            array_push($pooledValues, ...$values);
         }
 
-        if ($pooledScores === []) {
+        if ($pooledValues === []) {
             $this->entityManager->markCalibrationFailed(
                 $idSearchRankingCalibration,
-                'No product scores were found for any uploaded search term.',
+                'No values were found for any uploaded search term.',
             );
         } else {
             $this->entityManager->saveCalibrationStatistics(
                 $idSearchRankingCalibration,
-                $this->statisticsCalculator->calculate($pooledScores),
+                $this->statisticsCalculator->calculate($pooledValues),
             );
         }
 
@@ -172,5 +186,33 @@ class ScoreCalibrator implements ScoreCalibratorInterface
         } catch (Throwable $exception) {
             return [];
         }
+    }
+
+    /**
+     * A single search term's `_termvectors` probe failing is caught here and treated as no value found
+     * for that term — it must not abort the rest of the calibration run. Always at most ONE value (a
+     * search term contributes exactly one raw specificity number, not one per product), wrapped in an
+     * array so it pools into {@see StatisticsCalculatorInterface::calculate()} the same way relevance-score
+     * calibration's per-product values do.
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<float>
+     */
+    protected function fetchSpecificityForSearchTerm(string $searchTerm, string $storeName, string $localeName): array
+    {
+        try {
+            $rawSpecificity = $this->searchRankingClient->getCalibrationSpecificity(
+                $searchTerm,
+                $storeName,
+                $this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName),
+            );
+        } catch (Throwable $exception) {
+            return [];
+        }
+
+        return $rawSpecificity > 0.0 ? [$rawSpecificity] : [];
     }
 }

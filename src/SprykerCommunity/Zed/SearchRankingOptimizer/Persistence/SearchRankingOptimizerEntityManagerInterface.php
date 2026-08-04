@@ -218,9 +218,9 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param float $bestRelevanceWeight
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
      * @param float $bestScore
-     * @param float $bestEntropyWeightExponent
-     * @param float $bestEntropyWeightShiftMagnitude
-     * @param int $bestEntropyProbeResultSize
+     * @param float $bestSpecificityBlendWeight
+     * @param float $bestSpecificityWeightExponent
+     * @param float $bestSpecificityWeightShiftMagnitude
      *
      * @return void
      */
@@ -229,9 +229,9 @@ interface SearchRankingOptimizerEntityManagerInterface
         float $bestRelevanceWeight,
         array $bestMetricWeightTransfers,
         float $bestScore,
-        float $bestEntropyWeightExponent,
-        float $bestEntropyWeightShiftMagnitude,
-        int $bestEntropyProbeResultSize,
+        float $bestSpecificityBlendWeight,
+        float $bestSpecificityWeightExponent,
+        float $bestSpecificityWeightShiftMagnitude,
     ): void;
 
     /**

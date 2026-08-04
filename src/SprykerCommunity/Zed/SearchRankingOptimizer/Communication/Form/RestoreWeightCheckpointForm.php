@@ -22,6 +22,16 @@ class RestoreWeightCheckpointForm extends AbstractType
     public const FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT = 'idSearchRankingWeightCheckpoint';
 
     /**
+     * @var string
+     */
+    public const FIELD_STORE_NAME = 'storeName';
+
+    /**
+     * @var string
+     */
+    public const FIELD_LOCALE_NAME = 'localeName';
+
+    /**
      * @param \Symfony\Component\Form\FormBuilderInterface $builder
      * @param array<string, mixed> $options
      *
@@ -35,6 +45,17 @@ class RestoreWeightCheckpointForm extends AbstractType
             'constraints' => [
                 new NotBlank(),
             ],
+        ]);
+
+        // Not user-editable — the TARGET scope to restore into, carried through as hidden fields from
+        // whichever scope is currently selected on the page (same discipline CalibrationApplyForm already
+        // follows for its own hidden store/locale fields).
+        $builder->add(static::FIELD_STORE_NAME, HiddenType::class, [
+            'constraints' => [new NotBlank()],
+        ]);
+
+        $builder->add(static::FIELD_LOCALE_NAME, HiddenType::class, [
+            'constraints' => [new NotBlank()],
         ]);
     }
 

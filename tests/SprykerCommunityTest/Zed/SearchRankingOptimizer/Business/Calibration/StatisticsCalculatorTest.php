@@ -38,14 +38,14 @@ class StatisticsCalculatorTest extends Unit
 
         // Assert
         $this->assertSame(4, $statisticsTransfer->getSampleCount());
-        $this->assertSame(10.0, $statisticsTransfer->getScoreMin());
-        $this->assertSame(40.0, $statisticsTransfer->getScoreMax());
-        $this->assertSame(25.0, $statisticsTransfer->getScoreMean());
+        $this->assertSame(10.0, $statisticsTransfer->getValueMin());
+        $this->assertSame(40.0, $statisticsTransfer->getValueMax());
+        $this->assertSame(25.0, $statisticsTransfer->getValueMean());
         $this->assertSame(25.0, $statisticsTransfer->getComputedK());
     }
 
     /**
-     * computedK is defined as the pooled mean — must always equal scoreMean exactly, not merely be close.
+     * computedK is defined as the pooled mean — must always equal valueMean exactly, not merely be close.
      *
      * @return void
      */
@@ -58,7 +58,7 @@ class StatisticsCalculatorTest extends Unit
         $statisticsTransfer = $calculator->calculate([3.0, 4.0, 5.0]);
 
         // Assert
-        $this->assertSame($statisticsTransfer->getScoreMean(), $statisticsTransfer->getComputedK());
+        $this->assertSame($statisticsTransfer->getValueMean(), $statisticsTransfer->getComputedK());
     }
 
     /**
@@ -76,11 +76,11 @@ class StatisticsCalculatorTest extends Unit
 
         // Assert
         $this->assertSame(1, $statisticsTransfer->getSampleCount());
-        $this->assertSame(7.5, $statisticsTransfer->getScoreMin());
-        $this->assertSame(7.5, $statisticsTransfer->getScoreMax());
-        $this->assertSame(7.5, $statisticsTransfer->getScoreMedian());
-        $this->assertSame(7.5, $statisticsTransfer->getScoreP25());
-        $this->assertSame(7.5, $statisticsTransfer->getScoreP75());
+        $this->assertSame(7.5, $statisticsTransfer->getValueMin());
+        $this->assertSame(7.5, $statisticsTransfer->getValueMax());
+        $this->assertSame(7.5, $statisticsTransfer->getValueMedian());
+        $this->assertSame(7.5, $statisticsTransfer->getValueP25());
+        $this->assertSame(7.5, $statisticsTransfer->getValueP75());
     }
 
     /**
@@ -100,9 +100,9 @@ class StatisticsCalculatorTest extends Unit
         $statisticsTransfer = $calculator->calculate([50.0, 10.0, 30.0, 40.0, 20.0]);
 
         // Assert
-        $this->assertSame(20.0, $statisticsTransfer->getScoreP25());
-        $this->assertSame(30.0, $statisticsTransfer->getScoreMedian());
-        $this->assertSame(40.0, $statisticsTransfer->getScoreP75());
+        $this->assertSame(20.0, $statisticsTransfer->getValueP25());
+        $this->assertSame(30.0, $statisticsTransfer->getValueMedian());
+        $this->assertSame(40.0, $statisticsTransfer->getValueP75());
     }
 
     /**
@@ -121,10 +121,10 @@ class StatisticsCalculatorTest extends Unit
         $scrambledResult = $calculator->calculate([3.0, 1.0, 5.0, 2.0, 4.0]);
 
         // Assert
-        $this->assertSame($sortedResult->getScoreMin(), $scrambledResult->getScoreMin());
-        $this->assertSame($sortedResult->getScoreMax(), $scrambledResult->getScoreMax());
-        $this->assertSame($sortedResult->getScoreMedian(), $scrambledResult->getScoreMedian());
-        $this->assertSame($sortedResult->getScoreP25(), $scrambledResult->getScoreP25());
-        $this->assertSame($sortedResult->getScoreP75(), $scrambledResult->getScoreP75());
+        $this->assertSame($sortedResult->getValueMin(), $scrambledResult->getValueMin());
+        $this->assertSame($sortedResult->getValueMax(), $scrambledResult->getValueMax());
+        $this->assertSame($sortedResult->getValueMedian(), $scrambledResult->getValueMedian());
+        $this->assertSame($sortedResult->getValueP25(), $scrambledResult->getValueP25());
+        $this->assertSame($sortedResult->getValueP75(), $scrambledResult->getValueP75());
     }
 }

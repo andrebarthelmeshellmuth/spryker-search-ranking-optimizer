@@ -32,6 +32,7 @@ class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
     /**
      * {@inheritDoc}
      *
+     * @param string $calibrationType
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
@@ -40,12 +41,14 @@ class CalibrationUploadHandler implements CalibrationUploadHandlerInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
+        string $calibrationType,
         int $relevantProductCount,
         string $storeName,
         string $localeName,
         ?string $csvContent = null,
     ): SearchRankingCalibrationTransfer {
         $calibrationTransfer = (new SearchRankingCalibrationTransfer())
+            ->setCalibrationType($calibrationType)
             ->setRelevantProductCount($relevantProductCount)
             ->setStoreName($storeName)
             ->setLocaleName($localeName)

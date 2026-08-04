@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\OptimizeRunForm;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -61,15 +62,17 @@ class OptimizationController extends AbstractController
         $latestOptimizerRunTransfer = $storeName !== '' && $localeName !== ''
             ? $this->getFacade()->findLatestOptimizerRunByStoreLocale($storeName, $localeName)
             : null;
+        $currentConfigurationStoreName = $storeName !== '' ? $storeName : SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
+        $currentConfigurationLocaleName = $localeName !== '' ? $localeName : SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
 
         return $this->viewResponse([
             'optimizeRunForm' => $optimizeRunForm->createView(),
             'storeName' => $storeName,
             'localeName' => $localeName,
-            'currentRelevanceWeight' => $this->getFactory()->getSearchRankingFacade()->getRelevanceWeight(),
-            'currentEntropyWeightExponent' => $this->getFactory()->getSearchRankingFacade()->getEntropyWeightExponent(),
-            'currentEntropyWeightShiftMagnitude' => $this->getFactory()->getSearchRankingFacade()->getEntropyWeightShiftMagnitude(),
-            'currentEntropyProbeResultSize' => $this->getFactory()->getSearchRankingFacade()->getEntropyProbeResultSize(),
+            'currentRelevanceWeight' => $this->getFactory()->getSearchRankingFacade()->getRelevanceWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
+            'currentSpecificityWeightExponent' => $this->getFactory()->getSearchRankingFacade()->getSpecificityWeightExponent($currentConfigurationStoreName, $currentConfigurationLocaleName),
+            'currentSpecificityWeightShiftMagnitude' => $this->getFactory()->getSearchRankingFacade()->getSpecificityWeightShiftMagnitude($currentConfigurationStoreName, $currentConfigurationLocaleName),
+            'currentSpecificityBlendWeight' => $this->getFactory()->getSearchRankingFacade()->getSpecificityBlendWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'inProgressOptimizerRun' => $this->getFacade()->findOptimizerRunInProgress(),
             'latestOptimizerRun' => $latestOptimizerRunTransfer,
             'applyForm' => $latestOptimizerRunTransfer !== null

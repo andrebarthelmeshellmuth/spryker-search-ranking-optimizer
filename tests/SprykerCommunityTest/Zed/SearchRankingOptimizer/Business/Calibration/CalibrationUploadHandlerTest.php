@@ -62,7 +62,7 @@ class CalibrationUploadHandlerTest extends Unit
         $handler = new CalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
 
         // Act
-        $handler->createCalibration(6, 'DE', 'en_US', 'chair,desk');
+        $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', 'chair,desk');
     }
 
     /**
@@ -85,7 +85,7 @@ class CalibrationUploadHandlerTest extends Unit
         $handler = new CalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
 
         // Act
-        $handler->createCalibration(6, 'DE', 'en_US', '');
+        $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', '');
     }
 
     /**
@@ -119,7 +119,7 @@ class CalibrationUploadHandlerTest extends Unit
         $handler = new CalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
 
         // Act
-        $handler->createCalibration(6, 'DE', 'en_US');
+        $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US');
     }
 
     /**
@@ -140,7 +140,7 @@ class CalibrationUploadHandlerTest extends Unit
         $handler = new CalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
 
         // Act
-        $resultTransfer = $handler->createCalibration(6, 'DE', 'en_US', '');
+        $resultTransfer = $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', '');
 
         // Assert
         $this->assertSame(42, $resultTransfer->getIdSearchRankingCalibration());

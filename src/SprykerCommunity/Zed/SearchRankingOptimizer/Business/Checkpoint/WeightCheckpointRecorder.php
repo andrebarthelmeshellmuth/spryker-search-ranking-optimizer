@@ -42,20 +42,24 @@ class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
      * {@inheritDoc}
      *
      * @param string $source
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
-    public function record(string $source): SearchRankingWeightCheckpointTransfer
+    public function record(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {
         $weightCheckpointTransfer = (new SearchRankingWeightCheckpointTransfer())
             ->setSource($source)
-            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
-            ->setEntropyProbeResultSize($this->searchRankingFacade->getEntropyProbeResultSize())
-            ->setEntropyWeightExponent($this->searchRankingFacade->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($this->searchRankingFacade->getEntropyWeightShiftMagnitude())
-            ->setIsEntropyWeightingEnabled($this->searchRankingFacade->isEntropyWeightingEnabled());
+            ->setStoreName($storeName)
+            ->setLocaleName($localeName)
+            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
+            ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName))
+            ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
+            ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
+            ->setIsSpecificityWeightingEnabled($this->searchRankingFacade->isSpecificityWeightingEnabled());
 
-        foreach ($this->searchRankingFacade->getMetricWeights() as $metricWeight) {
+        foreach ($this->searchRankingFacade->getMetricWeights($storeName, $localeName) as $metricWeight) {
             $weightCheckpointTransfer->addMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric($metricWeight['idSearchRankingMetric'])

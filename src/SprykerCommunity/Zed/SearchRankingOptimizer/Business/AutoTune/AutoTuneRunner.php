@@ -16,6 +16,7 @@ use Generated\Shared\Transfer\MailTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
@@ -120,7 +121,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             return null;
         }
 
-        $currentFitRSquared = $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric);
+        $currentFitRSquared = $this->searchRankingFacade->evaluateCurrentMetricFit(
+            $idSearchRankingMetric,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+        );
 
         if ($currentFitRSquared === null) {
             return null;
@@ -134,7 +139,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             ->setWasSkippedNonDeterministic(false);
 
         if ($currentFitRSquared >= $autoTuneMetricConfigTransfer->getAutoTuneThresholdOrFail()) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
 
             return $metricResultTransfer->setWasThresholdMet(true)->setWasApplied(false);
         }
@@ -145,7 +150,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         // to whatever randomness happened to be in THIS digest snapshot, then silently swap in a formula
         // that looks like a real fit but carries no more signal than random() did.
         if (!$this->formulaDeterminismChecker->isDeterministic($metric['formula'])) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
 
             return $metricResultTransfer->setWasThresholdMet(false)->setWasSkippedNonDeterministic(true)->setWasApplied(false);
         }
@@ -170,7 +175,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $idSearchRankingMetric = $metric['idSearchRankingMetric'];
         $metricResultTransfer->setWasThresholdMet(false);
 
-        $candidates = $this->searchRankingFacade->getFitCandidates($idSearchRankingMetric);
+        $candidates = $this->searchRankingFacade->getFitCandidates(
+            $idSearchRankingMetric,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+        );
         $chosenCandidate = $this->chooseCandidate($candidates, $autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail(), $metric['shape']);
 
         if ($chosenCandidate === null) {
@@ -189,7 +198,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         }
 
         if (!$wasApplied) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
         }
 
         return $metricResultTransfer->setWasApplied($wasApplied);

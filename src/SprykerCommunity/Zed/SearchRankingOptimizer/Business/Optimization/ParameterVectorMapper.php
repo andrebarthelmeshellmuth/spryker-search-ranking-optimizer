@@ -23,21 +23,18 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  *   is the pinned reference weight, never a free dimension) — omitted entirely when there are 0 or 1
  *   optimizable metrics, since a simplex of size <= 1 has no real degrees of freedom (0 metrics: nothing
  *   to weight at all; 1 metric: its weight is trivially always the full remaining budget).
- * - Final 3 indices, present ONLY when `search-ranking`'s entropy-aware relevance weighting is actually
- *   enabled (see the constructor's `$entropyWeightingEnabled`): `entropyWeightExponent`,
- *   `entropyWeightShiftMagnitude`, `entropyProbeResultSize` — each its own independent box-bounded value (a
- *   trust region around its OWN value at run start, clipped to its own absolute bounds), not part of any
- *   simplex. `entropyProbeResultSize` is rounded to the nearest integer (and re-clamped) when read back off
- *   the vector — this package's optimizer treats every dimension as a plain continuous float, per
- *   `blackbox-optimizer`'s own documented `ParameterType::Integer` caveat (declared, not enforced by any
- *   shipped algorithm). When disabled, these 3 knobs are omitted from the vector entirely (not merely
- *   fixed, like an excluded metric — a disabled feature has no live effect to preserve a budget for) and
- *   every candidate configuration this mapper produces simply carries the values captured at run start,
+ * - Final 3 indices, present ONLY when `search-ranking`'s specificity-aware relevance weighting is
+ *   actually enabled (see the constructor's `$specificityWeightingEnabled`): `specificityWeightExponent`,
+ *   `specificityWeightShiftMagnitude`, `specificityBlendWeight` — each its own independent box-bounded
+ *   value (a trust region around its OWN value at run start, clipped to its own absolute bounds), not part
+ *   of any simplex. When disabled, these 3 knobs are omitted from the vector entirely (not merely fixed,
+ *   like an excluded metric — a disabled feature has no live effect to preserve a budget for) and every
+ *   candidate configuration this mapper produces simply carries the values captured at run start,
  *   unchanged.
  *
- * relevanceSaturationPoint is deliberately never part of this vector at all -- see
- * {@see ParameterVectorMapperInterface} and this package's own README/memory for why (Calibration's own,
- * already-solved concern).
+ * relevanceSaturationPoint/specificitySaturationPoint are deliberately never part of this vector at all --
+ * see {@see ParameterVectorMapperInterface} and this package's own README/memory for why (Calibration's
+ * own, already-solved concern).
  */
 class ParameterVectorMapper implements ParameterVectorMapperInterface
 {
@@ -69,52 +66,52 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     /**
      * @var float
      */
-    protected float $entropyWeightExponentLowerBound;
+    protected float $specificityWeightExponentLowerBound;
 
     /**
      * @var float
      */
-    protected float $entropyWeightExponentUpperBound;
+    protected float $specificityWeightExponentUpperBound;
 
     /**
      * @var float
      */
-    protected float $entropyWeightShiftMagnitudeLowerBound;
+    protected float $specificityWeightShiftMagnitudeLowerBound;
 
     /**
      * @var float
      */
-    protected float $entropyWeightShiftMagnitudeUpperBound;
+    protected float $specificityWeightShiftMagnitudeUpperBound;
 
     /**
      * @var float
      */
-    protected float $entropyProbeResultSizeLowerBound;
+    protected float $specificityBlendWeightLowerBound;
 
     /**
      * @var float
      */
-    protected float $entropyProbeResultSizeUpperBound;
+    protected float $specificityBlendWeightUpperBound;
 
     /**
      * @var bool
      */
-    protected bool $entropyWeightingEnabled;
+    protected bool $specificityWeightingEnabled;
 
     /**
      * @var float
      */
-    protected float $entropyWeightExponentAtRunStart;
+    protected float $specificityWeightExponentAtRunStart;
 
     /**
      * @var float
      */
-    protected float $entropyWeightShiftMagnitudeAtRunStart;
+    protected float $specificityWeightShiftMagnitudeAtRunStart;
 
     /**
-     * @var int
+     * @var float
      */
-    protected int $entropyProbeResultSizeAtRunStart;
+    protected float $specificityBlendWeightAtRunStart;
 
     /**
      * @var \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization
@@ -135,70 +132,70 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      *   this mapper produces.
      * @param float $relevanceWeightAtRunStart The relevanceWeight value to center this run's trust region
      *   on — normally the LIVE value at the moment the run starts, read once and fixed for the whole run.
-     * @param float $entropyWeightExponentAtRunStart Same "center this run's trust region on the live value"
-     *   treatment as $relevanceWeightAtRunStart, for `entropyWeightExponent` — also the value every
-     *   candidate carries unchanged when $entropyWeightingEnabled is false.
-     * @param float $entropyWeightShiftMagnitudeAtRunStart Same, for `entropyWeightShiftMagnitude`.
-     * @param int $entropyProbeResultSizeAtRunStart Same, for `entropyProbeResultSize`.
-     * @param bool $entropyWeightingEnabled `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
-     *   at the moment this run starts — when false, the 3 entropy dimensions are omitted from the search
-     *   vector entirely rather than searched: a disabled feature has no live effect for the optimizer to
-     *   improve, so spending search budget on it would be pure waste (this mirrors, but is distinct from,
-     *   $fixedMetricWeights above — that budget must still sum into the simplex; a disabled entropy knob
-     *   has no budget to preserve at all).
+     * @param float $specificityWeightExponentAtRunStart Same "center this run's trust region on the live
+     *   value" treatment as $relevanceWeightAtRunStart, for `specificityWeightExponent` — also the value
+     *   every candidate carries unchanged when $specificityWeightingEnabled is false.
+     * @param float $specificityWeightShiftMagnitudeAtRunStart Same, for `specificityWeightShiftMagnitude`.
+     * @param float $specificityBlendWeightAtRunStart Same, for `specificityBlendWeight`.
+     * @param bool $specificityWeightingEnabled `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()`
+     *   at the moment this run starts — when false, the 3 specificity dimensions are omitted from the
+     *   search vector entirely rather than searched: a disabled feature has no live effect for the
+     *   optimizer to improve, so spending search budget on it would be pure waste (this mirrors, but is
+     *   distinct from, $fixedMetricWeights above — that budget must still sum into the simplex; a disabled
+     *   specificity knob has no budget to preserve at all).
      * @param \SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrization\SimplexSoftmaxReparametrization|null $simplexSoftmaxReparametrization
      */
     public function __construct(
         array $metrics,
         array $fixedMetricWeights,
         float $relevanceWeightAtRunStart,
-        float $entropyWeightExponentAtRunStart,
-        float $entropyWeightShiftMagnitudeAtRunStart,
-        int $entropyProbeResultSizeAtRunStart,
-        bool $entropyWeightingEnabled,
+        float $specificityWeightExponentAtRunStart,
+        float $specificityWeightShiftMagnitudeAtRunStart,
+        float $specificityBlendWeightAtRunStart,
+        bool $specificityWeightingEnabled,
         ?SimplexSoftmaxReparametrization $simplexSoftmaxReparametrization = null,
     ) {
         $this->metrics = array_values($metrics);
         $this->fixedMetricWeights = $fixedMetricWeights;
         $this->fixedWeightBudget = array_sum($fixedMetricWeights);
         $this->simplexSoftmaxReparametrization = $simplexSoftmaxReparametrization ?? new SimplexSoftmaxReparametrization();
-        $this->entropyWeightingEnabled = $entropyWeightingEnabled;
-        $this->entropyWeightExponentAtRunStart = $entropyWeightExponentAtRunStart;
-        $this->entropyWeightShiftMagnitudeAtRunStart = $entropyWeightShiftMagnitudeAtRunStart;
-        $this->entropyProbeResultSizeAtRunStart = $entropyProbeResultSizeAtRunStart;
+        $this->specificityWeightingEnabled = $specificityWeightingEnabled;
+        $this->specificityWeightExponentAtRunStart = $specificityWeightExponentAtRunStart;
+        $this->specificityWeightShiftMagnitudeAtRunStart = $specificityWeightShiftMagnitudeAtRunStart;
+        $this->specificityBlendWeightAtRunStart = $specificityBlendWeightAtRunStart;
 
         $maxDistance = SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance();
         $this->relevanceWeightLowerBound = max(0.0, $relevanceWeightAtRunStart - $maxDistance);
         $this->relevanceWeightUpperBound = min(1.0, $relevanceWeightAtRunStart + $maxDistance);
 
-        $exponentMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightExponentTrustRegionMaxDistance();
-        $this->entropyWeightExponentLowerBound = max(
-            SearchRankingOptimizerConfig::getEntropyWeightExponentLowerBound(),
-            $entropyWeightExponentAtRunStart - $exponentMaxDistance,
+        $exponentMaxDistance = SearchRankingOptimizerConfig::getSpecificityWeightExponentTrustRegionMaxDistance();
+        $this->specificityWeightExponentLowerBound = max(
+            SearchRankingOptimizerConfig::getSpecificityWeightExponentLowerBound(),
+            $specificityWeightExponentAtRunStart - $exponentMaxDistance,
         );
-        $this->entropyWeightExponentUpperBound = min(
-            SearchRankingOptimizerConfig::getEntropyWeightExponentUpperBound(),
-            $entropyWeightExponentAtRunStart + $exponentMaxDistance,
-        );
-
-        $shiftMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightShiftMagnitudeTrustRegionMaxDistance();
-        $this->entropyWeightShiftMagnitudeLowerBound = max(
-            SearchRankingOptimizerConfig::getEntropyWeightShiftMagnitudeLowerBound(),
-            $entropyWeightShiftMagnitudeAtRunStart - $shiftMaxDistance,
-        );
-        $this->entropyWeightShiftMagnitudeUpperBound = min(
-            SearchRankingOptimizerConfig::getEntropyWeightShiftMagnitudeUpperBound(),
-            $entropyWeightShiftMagnitudeAtRunStart + $shiftMaxDistance,
+        $this->specificityWeightExponentUpperBound = min(
+            SearchRankingOptimizerConfig::getSpecificityWeightExponentUpperBound(),
+            $specificityWeightExponentAtRunStart + $exponentMaxDistance,
         );
 
-        $probeSizeMaxDistance = SearchRankingOptimizerConfig::getEntropyProbeResultSizeTrustRegionMaxDistance();
-        $this->entropyProbeResultSizeLowerBound = max(
-            SearchRankingOptimizerConfig::getEntropyProbeResultSizeLowerBound(),
-            $entropyProbeResultSizeAtRunStart - $probeSizeMaxDistance,
+        $shiftMaxDistance = SearchRankingOptimizerConfig::getSpecificityWeightShiftMagnitudeTrustRegionMaxDistance();
+        $this->specificityWeightShiftMagnitudeLowerBound = max(
+            SearchRankingOptimizerConfig::getSpecificityWeightShiftMagnitudeLowerBound(),
+            $specificityWeightShiftMagnitudeAtRunStart - $shiftMaxDistance,
         );
-        $this->entropyProbeResultSizeUpperBound = min(
-            SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize(),
-            $entropyProbeResultSizeAtRunStart + $probeSizeMaxDistance,
+        $this->specificityWeightShiftMagnitudeUpperBound = min(
+            SearchRankingOptimizerConfig::getSpecificityWeightShiftMagnitudeUpperBound(),
+            $specificityWeightShiftMagnitudeAtRunStart + $shiftMaxDistance,
+        );
+
+        $blendWeightMaxDistance = SearchRankingOptimizerConfig::getSpecificityBlendWeightTrustRegionMaxDistance();
+        $this->specificityBlendWeightLowerBound = max(
+            SearchRankingOptimizerConfig::getSpecificityBlendWeightLowerBound(),
+            $specificityBlendWeightAtRunStart - $blendWeightMaxDistance,
+        );
+        $this->specificityBlendWeightUpperBound = min(
+            SearchRankingOptimizerConfig::getSpecificityBlendWeightUpperBound(),
+            $specificityBlendWeightAtRunStart + $blendWeightMaxDistance,
         );
     }
 
@@ -207,7 +204,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      */
     public function getDimensionCount(): int
     {
-        return 1 + $this->getFreeMetricWeightDimensionCount() + $this->getEntropyDimensionCount();
+        return 1 + $this->getFreeMetricWeightDimensionCount() + $this->getSpecificityDimensionCount();
     }
 
     /**
@@ -223,10 +220,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
             $bounds[] = -$zSpaceBound;
         }
 
-        if ($this->entropyWeightingEnabled) {
-            $bounds[] = $this->entropyWeightExponentLowerBound;
-            $bounds[] = $this->entropyWeightShiftMagnitudeLowerBound;
-            $bounds[] = $this->entropyProbeResultSizeLowerBound;
+        if ($this->specificityWeightingEnabled) {
+            $bounds[] = $this->specificityWeightExponentLowerBound;
+            $bounds[] = $this->specificityWeightShiftMagnitudeLowerBound;
+            $bounds[] = $this->specificityBlendWeightLowerBound;
         }
 
         return $bounds;
@@ -245,10 +242,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
             $bounds[] = $zSpaceBound;
         }
 
-        if ($this->entropyWeightingEnabled) {
-            $bounds[] = $this->entropyWeightExponentUpperBound;
-            $bounds[] = $this->entropyWeightShiftMagnitudeUpperBound;
-            $bounds[] = $this->entropyProbeResultSizeUpperBound;
+        if ($this->specificityWeightingEnabled) {
+            $bounds[] = $this->specificityWeightExponentUpperBound;
+            $bounds[] = $this->specificityWeightShiftMagnitudeUpperBound;
+            $bounds[] = $this->specificityBlendWeightUpperBound;
         }
 
         return $bounds;
@@ -277,35 +274,32 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
 
         $metricWeights = $this->buildMetricWeightsByName($freeZ);
 
-        if ($this->entropyWeightingEnabled) {
-            $entropyWeightExponent = min(
-                $this->entropyWeightExponentUpperBound,
-                max($this->entropyWeightExponentLowerBound, $vector[1 + $freeDimensionCount]),
+        if ($this->specificityWeightingEnabled) {
+            $specificityWeightExponent = min(
+                $this->specificityWeightExponentUpperBound,
+                max($this->specificityWeightExponentLowerBound, $vector[1 + $freeDimensionCount]),
             );
-            $entropyWeightShiftMagnitude = min(
-                $this->entropyWeightShiftMagnitudeUpperBound,
-                max($this->entropyWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 1]),
+            $specificityWeightShiftMagnitude = min(
+                $this->specificityWeightShiftMagnitudeUpperBound,
+                max($this->specificityWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 1]),
             );
-            $entropyProbeResultSize = (int)min(
-                SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize(),
-                max(
-                    SearchRankingOptimizerConfig::getEntropyProbeResultSizeLowerBound(),
-                    round($vector[1 + $freeDimensionCount + 2]),
-                ),
+            $specificityBlendWeight = min(
+                $this->specificityBlendWeightUpperBound,
+                max($this->specificityBlendWeightLowerBound, $vector[1 + $freeDimensionCount + 2]),
             );
         } else {
-            $entropyWeightExponent = $this->entropyWeightExponentAtRunStart;
-            $entropyWeightShiftMagnitude = $this->entropyWeightShiftMagnitudeAtRunStart;
-            $entropyProbeResultSize = $this->entropyProbeResultSizeAtRunStart;
+            $specificityWeightExponent = $this->specificityWeightExponentAtRunStart;
+            $specificityWeightShiftMagnitude = $this->specificityWeightShiftMagnitudeAtRunStart;
+            $specificityBlendWeight = $this->specificityBlendWeightAtRunStart;
         }
 
         return (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight($relevanceWeight)
             ->setRelevanceSaturationPoint($relevanceSaturationPoint)
             ->setMetricWeights($metricWeights)
-            ->setEntropyWeightExponent($entropyWeightExponent)
-            ->setEntropyWeightShiftMagnitude($entropyWeightShiftMagnitude)
-            ->setEntropyProbeResultSize($entropyProbeResultSize);
+            ->setSpecificityWeightExponent($specificityWeightExponent)
+            ->setSpecificityWeightShiftMagnitude($specificityWeightShiftMagnitude)
+            ->setSpecificityBlendWeight($specificityBlendWeight);
     }
 
     /**
@@ -330,10 +324,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
             $vector = array_merge($vector, $this->simplexSoftmaxReparametrization->toFreeZ($orderedWeights));
         }
 
-        if ($this->entropyWeightingEnabled) {
-            $vector[] = (float)($configurationTransfer->getEntropyWeightExponent() ?? 1.0);
-            $vector[] = (float)($configurationTransfer->getEntropyWeightShiftMagnitude() ?? 0.0);
-            $vector[] = (float)($configurationTransfer->getEntropyProbeResultSize() ?? 10);
+        if ($this->specificityWeightingEnabled) {
+            $vector[] = (float)($configurationTransfer->getSpecificityWeightExponent() ?? 1.0);
+            $vector[] = (float)($configurationTransfer->getSpecificityWeightShiftMagnitude() ?? 0.0);
+            $vector[] = (float)($configurationTransfer->getSpecificityBlendWeight() ?? 0.7);
         }
 
         return $vector;
@@ -395,8 +389,8 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     /**
      * @return int
      */
-    protected function getEntropyDimensionCount(): int
+    protected function getSpecificityDimensionCount(): int
     {
-        return $this->entropyWeightingEnabled ? 3 : 0;
+        return $this->specificityWeightingEnabled ? 3 : 0;
     }
 }

@@ -96,7 +96,7 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
 (CMA-ES/differential evolution against the rank-evaluation score, including `search-ranking`'s
-entropy-aware relevance weighting knobs) are all built, tested, and shipping.**
+specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
 The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
 [Roadmap](#roadmap) but not built yet.
 
@@ -109,35 +109,48 @@ permission re-check, and lands correctly in the database.
 
 ## What it does today
 
-### Calibration — empirically sampling `relevanceSaturationPoint` (k)
+### Calibration — empirically sampling `relevanceSaturationPoint`/`specificitySaturationPoint` (k)
 
-`search-ranking` blends text relevance with business signals using a saturating transform of the raw
-Elasticsearch/OpenSearch `_score`: `_score / (_score + k)`, where `k` (`relevanceSaturationPoint`) is the
-score at which text relevance contributes exactly 0.5. That constant has no universal correct value — it
-depends entirely on a shop's own field boosts and typical query shapes, and `search-ranking`'s README is
-explicit that it should be **sampled from real `_score` values, not guessed**. Calibration is the tool that
-does that sampling.
+`search-ranking` blends text relevance with business signals using a saturating transform of an unbounded
+raw value: `raw / (raw + k)`, where `k` is the raw value at which the normalized result contributes
+exactly 0.5. Two separate signals use this exact same shape and each needs its OWN `k`, sampled from real
+data, not guessed:
 
-![The Calibration page: the current live saturation point (k) — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/calibration.png)
+- **`relevance_score`** — `k` is `relevanceSaturationPoint`, the raw Elasticsearch/OpenSearch `_score` at
+  which text relevance contributes 0.5. Sampled from real per-product `_score` values via a live catalog
+  query per search term.
+- **`specificity`** — `k` is `specificitySaturationPoint`, the raw blended-idf specificity value (see
+  `search-ranking`'s own README) at which normalized specificity reaches 0.5. Sampled from one raw
+  specificity value per search term via a lightweight `_termvectors` probe — **no catalog query at all**,
+  cheaper than the `relevance_score` path.
+
+Both constants have no universal correct value — they depend entirely on a shop's own field boosts, catalog
+size, and typical query shapes. Calibration is the one tool, with a type selector, that samples either.
+
+![The Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/calibration.png)
 
 The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page:
 
-1. **Start a run.** Pick the store and locale to run against (Zed has no implicit current store, so both
-   are picked explicitly) and the number of top results per term to sample (X). By default, search terms
-   come from the distinct queries already organically rated via the SRP widget below for that store/locale
-   — no upload needed. Check **"Bootstrap from CSV upload instead"** to bypass those and provide a CSV
-   (one term per line) instead — useful to bootstrap calibration before real ratings exist, or for testing.
-   Either way, the run is persisted in status `uploaded`.
+1. **Start a run.** Pick the **calibration type** (`Relevance score` or `Specificity`), the store and
+   locale to run against (Zed has no implicit current store, so both are picked explicitly), and the
+   number of top results per term to sample (X) — ignored for `Specificity`, which always samples exactly
+   one value per term regardless of X. By default, search terms come from the distinct queries already
+   organically rated via the SRP widget below for that store/locale — no upload needed. Check **"Bootstrap
+   from CSV upload instead"** to bypass those and provide a CSV (one term per line) instead — useful to
+   bootstrap calibration before real ratings exist, or for testing. Either way, the run is persisted in
+   status `uploaded`.
 2. **Calculate.** The `search-ranking-optimizer:calibrate` console command (run on a cron, or by hand)
-   picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, fires the **live catalog
-   search-string query** for each term against the real search index, pools the top-X raw text-relevance
-   `_score` values across all terms, and computes a suggested `k` from that pool. The run moves to
+   picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, and — branching on the
+   run's own `calibrationType` — either fires the **live catalog search-string query** for each term
+   (`relevance_score`) or a single lightweight `_termvectors` probe per term (`specificity`), pools the
+   sampled values across all terms, and computes a suggested `k` from that pool. The run moves to
    `calculated` (or `failed`, with a stored error message). While it's running, the Calibration page shows
    a live "X / Y search terms processed" counter (a small `progressAction()` JSON endpoint the page polls
    once a second) — no fake/indeterminate spinner, since the console command's own per-term loop is a
    genuinely trackable count.
 3. **Apply.** Back on the Calibration page, review the suggested `k` against the current live value and
-   click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` setting — through
+   click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` or
+   `specificitySaturationPoint` setting (routed by the run's own `calibrationType`) — through
    `search-ranking`'s own facade, which republishes the ranking configuration exactly as a manual edit on
    its Settings page would. Applying is a deliberate, separate step: calibration *suggests*, a human
    *decides*.
@@ -145,12 +158,13 @@ The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page
 The console prints, e.g.:
 
 ```
-Calibration #7 done: sampled 214 score(s) across 12 search term(s), computed k = 6.4180.
+Calibration #7 done: sampled 214 value(s) across 12 search term(s), computed k = 6.4180.
 ```
 
-Firing the query from Zed reuses `search-ranking`'s solved raw-Elastica bypass pattern (the standard
-`Client\Search` stack assumes a Yves request context that doesn't exist in a console/Zed process), shipped
-here as the `Client\SearchRankingOptimizer\Search` component.
+Firing the `relevance_score` query (or the `specificity` probe) from Zed reuses `search-ranking`'s solved
+raw-Elastica bypass pattern (the standard `Client\Search` stack assumes a Yves request context that
+doesn't exist in a console/Zed process), shipped here as the `Client\SearchRankingOptimizer\Search`
+component.
 
 ### SRP relevance rating — capturing real (query, product) judgments
 
@@ -247,38 +261,44 @@ apply, auto-tune) is still, today, something an admin edits directly on `search-
 page. A checkpoint is a point-in-time snapshot of every one of those knobs, so a manual edit — or a future
 automated one — is always reversible.
 
-![The Weight Checkpoints page: the current live relevanceWeight, entropy knobs, and per-metric weights, a "Take checkpoint now" button, and a history of past checkpoints each with its own Restore action](docs/screenshots/weight-checkpoints.png)
+![The Weight Checkpoints page: the current live relevanceWeight, specificity knobs, and per-metric weights, a "Take checkpoint now" button, and a history of past checkpoints each with its own Restore action](docs/screenshots/weight-checkpoints.png)
 
-From the **Search Ranking Optimizer → Weight Checkpoints** Zed page:
+From the **Search Ranking Optimizer → Weight Checkpoints** Zed page, which — like every other scoped page
+in this package — has its own **Store + Locale selector** at the top:
 
-1. **Current State** shows exactly what `search-ranking` is using right now, read live off its own facade:
-   `relevanceWeight`, every metric's own weight, the 3 entropy-weighting knobs (probe result size, weight
-   exponent, weight shift magnitude), and whether entropy weighting is currently enabled at the code level.
-   Deliberately excluded: `relevanceSaturationPoint` (k), which already has its own versioning story via
-   Calibration and stays out of checkpoint scope.
-2. **Take checkpoint now** persists that current state as a new row — a manual snapshot, before hand-editing
-   anything.
-3. **History** lists every checkpoint newest-first, each with a **Restore** button. Restoring writes that
-   checkpoint's `relevanceWeight`, metric weights, and 3 entropy knobs back through `search-ranking`'s own
-   facade (a metric that no longer exists is skipped silently — a safe, best-effort restore, not an
-   all-or-nothing transaction), then immediately records the resulting state as a **new** checkpoint of its
-   own. Restoring IS applying, not a special "undo" mechanism — there is always a way back from a restore
-   too.
+1. **Current State** shows exactly what `search-ranking` is using right now **for the selected scope**,
+   read live off its own facade: `relevanceWeight`, every metric's own weight, the 3 specificity-weighting
+   knobs (blend weight, weight exponent, weight shift magnitude), and whether specificity weighting is
+   currently enabled at the code level. Deliberately excluded: `relevanceSaturationPoint`/
+   `specificitySaturationPoint` (k), which already have their own versioning story via Calibration and
+   stay out of checkpoint scope.
+2. **Take checkpoint now** persists that current state as a new row **tagged with the selected (store,
+   locale)** — a manual snapshot, before hand-editing anything.
+3. **History** lists **every** checkpoint newest-first across every scope (with its own Store/Locale
+   columns, not filtered to the currently selected one), each with a **Restore** button. Restoring writes
+   that checkpoint's `relevanceWeight`, metric weights, and 3 specificity knobs back through
+   `search-ranking`'s own facade **for the currently selected scope** — independent of whichever scope the
+   checkpoint itself was originally recorded for, so a DE checkpoint can deliberately be restored into AT
+   if that's genuinely what's wanted (a metric that no longer exists is skipped silently — a safe,
+   best-effort restore, not an all-or-nothing transaction) — then immediately records the resulting state
+   as a **new** checkpoint of its own, for that same target scope. Restoring IS applying, not a special
+   "undo" mechanism — there is always a way back from a restore too.
 
-`isEntropyWeightingEnabled` is captured on every checkpoint for historical transparency but is **never**
-written back by a restore — it is a pure code-level project flag (`Pyz\Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
-in a host shop), with no corresponding save method on `search-ranking`'s facade, deliberately out of scope
-for anything database-driven.
+`isSpecificityWeightingEnabled` is captured on every checkpoint for historical transparency but is
+**never** written back by a restore — it is a pure code-level project flag
+(`Pyz\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` in a host shop), with no
+corresponding save method on `search-ranking`'s facade, deliberately out of scope for anything
+database-driven.
 
 ### Auto-tune — a monthly fit-quality check per metric
 
-Weight checkpoints above cover `relevanceWeight`/metric weights/entropy knobs — but a metric's own
+Weight checkpoints above cover `relevanceWeight`/metric weights/specificity knobs — but a metric's own
 normalization **formula** (does `pdp_impressions` still fit an `atan` curve, or has the underlying data
 drifted enough that a different shape now fits better?) is a completely separate axis, with its own
 audit trail already built into `search-ranking` itself (`spy_search_ranking_metric_history`, see that
 package's own README). Auto-tune is the monthly job that watches that axis and, per metric, proposes or
-applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the entropy
-knobs, so it has no reason to write a weight checkpoint of its own.
+applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
+specificity knobs, so it has no reason to write a weight checkpoint of its own.
 
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
@@ -355,22 +375,25 @@ from a real `SearchRankingConfigurationStorageTransfer` — so every candidate t
 valid, real configuration by construction, with no rejection/repair step needed.
 
 Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 3
-entropy-aware relevance weighting parameters — `entropyWeightExponent`, `entropyWeightShiftMagnitude`, and
-`entropyProbeResultSize` (see `search-ranking`'s own README for what these do: shifting `relevanceWeight`
-per query based on how peaked vs. flat that query's raw text-relevance scores are). Each gets its own
-independent trust region around its current live value, the same "can't wander off in one shot" shape as
-`relevanceWeight`'s own trust region. This closes what would otherwise be a real gap: `search-ranking`'s
-evaluation path builds its own `function_score` query directly rather than going through the live
-storefront's query-expander plugin stack, so without this, a candidate's entropy settings would silently
-never be exercised at all during optimization, no matter how they were configured live.
+specificity-aware relevance weighting parameters — `specificityWeightExponent`,
+`specificityWeightShiftMagnitude`, and `specificityBlendWeight` (see `search-ranking`'s own README for what
+these do: shifting `relevanceWeight` per query based on how specific that query's own text is — a rare
+term like a SKU vs. only common words). Each gets its own independent trust region around its current live
+value, the same "can't wander off in one shot" shape as `relevanceWeight`'s own trust region.
+`specificitySaturationPoint` is deliberately NOT one of these dimensions — like `relevanceSaturationPoint`,
+it's Calibration-tunable only, the same precedent `ParameterVectorMapper`'s own docblock already documents
+for the text-relevance side. This closes what would otherwise be a real gap: `search-ranking`'s evaluation
+path builds its own `function_score` query directly rather than going through the live storefront's
+query-expander plugin stack, so without this, a candidate's specificity settings would silently never be
+exercised at all during optimization, no matter how they were configured live.
 
 These 3 dimensions are only ever searched at all when `search-ranking`'s
-`SearchRankingConfig::isEntropyWeightingEnabled()` is on — a project-level code flag, off by default, the
-same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live probe
-query. When it's off, this package respects that at every layer: evaluation never applies the shift
-regardless of what a candidate's own entropy fields say, and the 3 dimensions are omitted from the search
-vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no live
-effect for the optimizer to spend search budget improving.
+`SearchRankingConfig::isSpecificityWeightingEnabled()` is on — a project-level code flag, off by default,
+the same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live
+probe. When it's off, this package respects that at every layer: evaluation never applies the shift
+regardless of what a candidate's own specificity fields say, and the 3 dimensions are omitted from the
+search vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no
+live effect for the optimizer to spend search budget improving.
 
 Any active metric whose own formula calls a non-deterministic function (`random()` — see
 [Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric) above for the same concept applied there)
@@ -409,9 +432,9 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
    oldest queued run first), and let the page's poll pick up the result once it lands.
 2. **Compare.** Once done, the page shows the baseline score (the live configuration's own rank-evaluation
    score) against the winning candidate's score, plus the concrete `relevanceWeight`, per-metric weight, and
-   entropy-knob values that produced it — never applied automatically.
+   specificity-knob values that produced it — never applied automatically.
 3. **Apply**, only if the comparison looks like a real improvement. Applying writes the winning
-   `relevanceWeight`, metric weights, and entropy knobs through `search-ranking`'s own facade, records an
+   `relevanceWeight`, metric weights, and specificity knobs through `search-ranking`'s own facade, records an
    optimizer-sourced weight checkpoint first (so it's one click back to the prior state via the
    [Weight checkpoints](#weight-checkpoints--a-way-back-before-changing-anything-by-hand) page), and
    republishes the live storefront configuration — the same "write through facade, checkpoint first,
@@ -425,9 +448,11 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - **A real `require` (`^1.1`).** `search-ranking` is public, so a hard `require` resolves cleanly in CI too
   — no `suggest`-plus-runtime-note workaround needed. The coupling goes beyond the Zed dependency bridges'
   own docblock `@param`/`@var` type hints (Spryker's standard untyped-bridge convention): the Client layer
-  (`RankEvalRunner`) also imports `search-ranking`'s `FunctionScoreBuilder`/`ShannonEntropyCalculator`
-  directly, to apply the exact same ranking formula and entropy-aware relevance-weight shift a real
-  storefront search would, rather than reimplementing either.
+  (`RankEvalRunner`) also imports `search-ranking`'s `FunctionScoreBuilder`/`QuerySpecificityCalculator`
+  directly, to apply the exact same ranking formula and specificity-aware relevance-weight shift a real
+  storefront search would, rather than reimplementing either (only the `_termvectors` IO itself is
+  reimplemented, for the same Zed/console execution-context reasons documented in `RankEvalRunner`'s own
+  docblock).
 
 ## Requirements
 
@@ -435,10 +460,9 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/permission-extension/
   company-user/acl/symfony-mailer — see `composer.json` for floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
-- **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.1`, since
-  `RankEvalRunner`'s entropy-aware relevance weighting support depends on `ShannonEntropyCalculator`,
-  only introduced in `search-ranking` v1.1.1); the Apply step writes into its `relevanceSaturationPoint`
-  setting via its facade, and the auto-tune job writes into its metric formulas the same way
+- **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
+  into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
+  auto-tune job writes into its metric formulas the same way
 - **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.0`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
   [Installation](#installation)). Provides the actual CMA-ES/Differential Evolution algorithms the
@@ -737,7 +761,7 @@ composer check-floors
 
 ### Test suite
 
-**199 tests, 657 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**214 tests, 739 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
@@ -763,35 +787,35 @@ crossed its threshold and has notify on), `FormulaDeterminismChecker` (detects a
 call by name, precisely enough not to false-positive on an unrelated function merely sharing a prefix),
 `SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
 softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
-(the trust-region bound around the run's starting `relevanceWeight` and each entropy knob, round-tripping a
-configuration through `mapConfigurationToVector`/`mapVectorToConfiguration`, rounding/clamping
-`entropyProbeResultSize` back to a safe integer, a fixed metric's weight held exactly constant while
+(the trust-region bound around the run's starting `relevanceWeight` and each specificity knob, round-tripping a
+configuration through `mapConfigurationToVector`/`mapVectorToConfiguration`, clamping `specificityBlendWeight`
+to its own absolute bounds, a fixed metric's weight held exactly constant while
 the optimizable metrics' own simplex is scaled to fill only the remaining budget), `OptimizationRunner`
 (queues and processes a run, population/generation-count sizing, the objective function's sign flip since
 the algorithms minimize but a higher rank-evaluation score is better, always propose-only, a
-non-deterministic-formula metric excluded from the search end-to-end, the live entropy knobs seeding the
+non-deterministic-formula metric excluded from the search end-to-end, the live specificity knobs seeding the
 run's baseline candidate and every subsequent candidate staying within its own trust region), and
 `OptimizationApplier` (null when the run doesn't exist or isn't done yet, writing the winning candidate and
-entropy knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied) are
+specificity knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied) are
 covered as pure unit tests — no database needed.
 
-Three real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove
-the entropy wiring isn't just plumbed through but actually changes behavior:
-`RankEvalRunner::applyEntropyWeighting()` shifts `relevanceWeight` for a real, non-symmetric "chair" query's
-score distribution when entropy weighting is force-enabled (it's off by default — see [above](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)),
-is a no-op when `entropyProbeResultSize` isn't configured at all, and is *also* a no-op — even with a fully
-populated entropy configuration — when the feature flag itself is disabled, which documents this shop's own
-real current behavior (entropy weighting is inert end-to-end here today). A
-synthetic ground-truth exercise went further still — two throwaway rated queries against this shop's real
-catalog, one with a single dominant text match (a peaked score distribution) and one with several
-identically-scored matches (a maximally flat distribution), each rated so that only the "correct" per-query
-relevanceWeight would rank the intended product first. A real automated optimization run (not a toy) found
-a positive `entropyWeightShiftMagnitude` and reached a perfect combined score, and — the important
-part — disabling the entropy shift on the exact same winning configuration reproduced the peaked query's
-score exactly but dropped the flat query's score substantially, confirming the shift (not just
-`relevanceWeight` alone) is what makes the difference. Both throwaway queries, their ratings, and the run
-itself were deleted afterward; nothing from this exercise is part of the shipped test suite (it depends on
-this demoshop's specific catalog content, not something portable to another shop's data).
+Real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove the
+specificity wiring isn't just plumbed through but actually changes behavior:
+`RankEvalRunner::applySpecificityWeighting()` shifts `relevanceWeight` for a real query term when
+specificity weighting is force-enabled (it's off by default — see [above](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)),
+is a no-op when no query term carries any real corpus evidence, and is *also* a no-op — even with a fully
+populated specificity configuration — when the feature flag itself is disabled, which documents this
+shop's own real current behavior (specificity weighting is inert end-to-end here today). A synthetic
+ground-truth exercise went further still — two throwaway rated queries against this shop's real catalog,
+one built from a highly specific search term and one built from an unspecific/browsy one, each rated so
+that only the "correct" per-query relevanceWeight would rank the intended product first. A real automated
+optimization run (not a toy) found a positive `specificityWeightShiftMagnitude` and reached a perfect
+combined score, and — the important part — disabling the specificity shift on the exact same winning
+configuration reproduced the specific query's score exactly but dropped the unspecific query's score
+substantially, confirming the shift (not just `relevanceWeight` alone) is what makes the difference. Both
+throwaway queries, their ratings, and the run itself were deleted afterward; nothing from this exercise is
+part of the shipped test suite (it depends on this demoshop's specific catalog content, not something
+portable to another shop's data).
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
 real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button

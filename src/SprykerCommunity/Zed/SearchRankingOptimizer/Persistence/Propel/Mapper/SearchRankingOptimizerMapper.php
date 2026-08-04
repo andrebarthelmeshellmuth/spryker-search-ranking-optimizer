@@ -41,17 +41,18 @@ class SearchRankingOptimizerMapper
     ): SearchRankingCalibrationTransfer {
         return $calibrationTransfer
             ->setIdSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration())
+            ->setCalibrationType($calibrationEntity->getCalibrationType())
             ->setRelevantProductCount($calibrationEntity->getRelevantProductCount())
             ->setStoreName($calibrationEntity->getStoreName())
             ->setLocaleName($calibrationEntity->getLocaleName())
             ->setStatus($calibrationEntity->getStatus())
             ->setComputedK($calibrationEntity->getComputedK())
-            ->setScoreMin($calibrationEntity->getScoreMin())
-            ->setScoreMax($calibrationEntity->getScoreMax())
-            ->setScoreMean($calibrationEntity->getScoreMean())
-            ->setScoreMedian($calibrationEntity->getScoreMedian())
-            ->setScoreP25($calibrationEntity->getScoreP25())
-            ->setScoreP75($calibrationEntity->getScoreP75())
+            ->setValueMin($calibrationEntity->getValueMin())
+            ->setValueMax($calibrationEntity->getValueMax())
+            ->setValueMean($calibrationEntity->getValueMean())
+            ->setValueMedian($calibrationEntity->getValueMedian())
+            ->setValueP25($calibrationEntity->getValueP25())
+            ->setValueP75($calibrationEntity->getValueP75())
             ->setSampleCount($calibrationEntity->getSampleCount())
             ->setCalculatedAt($calibrationEntity->getCalculatedAt()?->format(DATE_ATOM))
             ->setErrorMessage($calibrationEntity->getErrorMessage())
@@ -75,31 +76,31 @@ class SearchRankingOptimizerMapper
             ->setFkSearchRankingCalibration($searchTermEntity->getFkSearchRankingCalibration())
             ->setSearchTerm($searchTermEntity->getSearchTerm())
             ->setProductsFound($searchTermEntity->getProductsFound())
-            ->setScores($this->explodeScores($searchTermEntity->getScores()));
+            ->setValues($this->explodeValues($searchTermEntity->getValues()));
     }
 
     /**
-     * @param string|null $scores
+     * @param string|null $values
      *
      * @return array<float>
      */
-    protected function explodeScores(?string $scores): array
+    protected function explodeValues(?string $values): array
     {
-        if ($scores === null || $scores === '') {
+        if ($values === null || $values === '') {
             return [];
         }
 
-        return array_map(static fn (string $value): float => (float)$value, explode(',', $scores));
+        return array_map(static fn (string $value): float => (float)$value, explode(',', $values));
     }
 
     /**
-     * @param array<float> $scores
+     * @param array<float> $values
      *
      * @return string|null
      */
-    public function implodeScores(array $scores): ?string
+    public function implodeValues(array $values): ?string
     {
-        return $scores === [] ? null : implode(',', $scores);
+        return $values === [] ? null : implode(',', $values);
     }
 
     /**
@@ -174,11 +175,13 @@ class SearchRankingOptimizerMapper
         $weightCheckpointTransfer
             ->setIdSearchRankingWeightCheckpoint($weightCheckpointEntity->getIdSearchRankingWeightCheckpoint())
             ->setSource($weightCheckpointEntity->getSource())
+            ->setStoreName($weightCheckpointEntity->getStoreName())
+            ->setLocaleName($weightCheckpointEntity->getLocaleName())
             ->setRelevanceWeight($weightCheckpointEntity->getRelevanceWeight())
-            ->setEntropyProbeResultSize($weightCheckpointEntity->getEntropyProbeResultSize())
-            ->setEntropyWeightExponent($weightCheckpointEntity->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($weightCheckpointEntity->getEntropyWeightShiftMagnitude())
-            ->setIsEntropyWeightingEnabled($weightCheckpointEntity->getIsEntropyWeightingEnabled())
+            ->setSpecificityBlendWeight($weightCheckpointEntity->getSpecificityBlendWeight())
+            ->setSpecificityWeightExponent($weightCheckpointEntity->getSpecificityWeightExponent())
+            ->setSpecificityWeightShiftMagnitude($weightCheckpointEntity->getSpecificityWeightShiftMagnitude())
+            ->setIsSpecificityWeightingEnabled($weightCheckpointEntity->getIsSpecificityWeightingEnabled())
             ->setCreatedAt($weightCheckpointEntity->getCreatedAt()?->format(DATE_ATOM));
 
         foreach ($this->decodeMetricWeights($weightCheckpointEntity->getMetricWeights()) as $metricWeightTransfer) {
@@ -287,9 +290,9 @@ class SearchRankingOptimizerMapper
             ->setBaselineScore($optimizerRunEntity->getBaselineScore())
             ->setBestRelevanceWeight($optimizerRunEntity->getBestRelevanceWeight())
             ->setBestScore($optimizerRunEntity->getBestScore())
-            ->setBestEntropyWeightExponent($optimizerRunEntity->getBestEntropyWeightExponent())
-            ->setBestEntropyWeightShiftMagnitude($optimizerRunEntity->getBestEntropyWeightShiftMagnitude())
-            ->setBestEntropyProbeResultSize($optimizerRunEntity->getBestEntropyProbeResultSize())
+            ->setBestSpecificityBlendWeight($optimizerRunEntity->getBestSpecificityBlendWeight())
+            ->setBestSpecificityWeightExponent($optimizerRunEntity->getBestSpecificityWeightExponent())
+            ->setBestSpecificityWeightShiftMagnitude($optimizerRunEntity->getBestSpecificityWeightShiftMagnitude())
             ->setCompletedAt($optimizerRunEntity->getCompletedAt()?->format(DATE_ATOM))
             ->setErrorMessage($optimizerRunEntity->getErrorMessage())
             ->setAppliedAt($optimizerRunEntity->getAppliedAt()?->format(DATE_ATOM))

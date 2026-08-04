@@ -41,6 +41,18 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
     }
 
     /**
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     *
+     * @return float
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
+    {
+        return $this->searchRankingOptimizerClient->getCalibrationSpecificity($searchTerm, $storeName, $blendWeight);
+    }
+
+    /**
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
      *
      * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer

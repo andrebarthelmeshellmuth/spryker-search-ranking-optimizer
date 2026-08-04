@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RestoreWeightCheckpointForm;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -27,10 +28,24 @@ class CheckpointController extends AbstractController
     protected const URL_CHECKPOINT = '/search-ranking-optimizer/checkpoint';
 
     /**
+     * @var string
+     */
+    protected const PARAM_STORE_NAME = 'storeName';
+
+    /**
+     * @var string
+     */
+    protected const PARAM_LOCALE_NAME = 'localeName';
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
      * @return array<string, mixed>
      */
-    public function indexAction(): array
+    public function indexAction(Request $request): array
     {
+        $storeName = $this->resolveStoreName($request);
+        $localeName = $this->resolveLocaleName($request);
         $searchRankingFacade = $this->getFactory()->getSearchRankingFacade();
         $weightCheckpointHistory = $this->getFacade()->findWeightCheckpointHistory();
 
@@ -38,20 +53,31 @@ class CheckpointController extends AbstractController
         foreach ($weightCheckpointHistory as $weightCheckpointTransfer) {
             $idSearchRankingWeightCheckpoint = $weightCheckpointTransfer->getIdSearchRankingWeightCheckpointOrFail();
             $restoreForms[$idSearchRankingWeightCheckpoint] = $this->getFactory()
-                ->createRestoreWeightCheckpointForm($idSearchRankingWeightCheckpoint)
+                ->createRestoreWeightCheckpointForm($idSearchRankingWeightCheckpoint, $storeName, $localeName)
                 ->createView();
         }
 
         return $this->viewResponse([
             'recordForm' => $this->getFactory()->createRecordWeightCheckpointForm()->createView(),
-            'relevanceWeight' => $searchRankingFacade->getRelevanceWeight(),
-            'entropyProbeResultSize' => $searchRankingFacade->getEntropyProbeResultSize(),
-            'entropyWeightExponent' => $searchRankingFacade->getEntropyWeightExponent(),
-            'entropyWeightShiftMagnitude' => $searchRankingFacade->getEntropyWeightShiftMagnitude(),
-            'isEntropyWeightingEnabled' => $searchRankingFacade->isEntropyWeightingEnabled(),
-            'metricWeights' => $searchRankingFacade->getMetricWeights(),
+            'recordFormAction' => sprintf(
+                '/search-ranking-optimizer/checkpoint/record?%s=%s&%s=%s',
+                static::PARAM_STORE_NAME,
+                $storeName,
+                static::PARAM_LOCALE_NAME,
+                $localeName,
+            ),
+            'relevanceWeight' => $searchRankingFacade->getRelevanceWeight($storeName, $localeName),
+            'specificityBlendWeight' => $searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName),
+            'specificityWeightExponent' => $searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName),
+            'specificityWeightShiftMagnitude' => $searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName),
+            'isSpecificityWeightingEnabled' => $searchRankingFacade->isSpecificityWeightingEnabled(),
+            'metricWeights' => $searchRankingFacade->getMetricWeights($storeName, $localeName),
             'weightCheckpointHistory' => $weightCheckpointHistory,
             'restoreForms' => $restoreForms,
+            'stores' => $this->getFactory()->getAllStoreNames(),
+            'locales' => $this->getFactory()->getAllLocaleNames(),
+            'selectedStoreName' => $storeName,
+            'selectedLocaleName' => $localeName,
         ]);
     }
 
@@ -62,22 +88,30 @@ class CheckpointController extends AbstractController
      */
     public function recordAction(Request $request): RedirectResponse
     {
+        $storeName = $this->resolveStoreName($request);
+        $localeName = $this->resolveLocaleName($request);
+        $redirectUrl = $this->buildCheckpointUrl($storeName, $localeName);
+
         $recordForm = $this->getFactory()->createRecordWeightCheckpointForm()->handleRequest($request);
 
         if (!$recordForm->isSubmitted() || !$recordForm->isValid()) {
             $this->addErrorMessage('CSRF token is not valid.');
 
-            return $this->redirectResponse(static::URL_CHECKPOINT);
+            return $this->redirectResponse($redirectUrl);
         }
 
-        $weightCheckpointTransfer = $this->getFacade()->recordWeightCheckpoint(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL);
+        $weightCheckpointTransfer = $this->getFacade()->recordWeightCheckpoint(
+            SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL,
+            $storeName,
+            $localeName,
+        );
 
         $this->addSuccessMessage(sprintf(
             'Checkpoint #%d recorded.',
             $weightCheckpointTransfer->getIdSearchRankingWeightCheckpointOrFail(),
         ));
 
-        return $this->redirectResponse(static::URL_CHECKPOINT);
+        return $this->redirectResponse($redirectUrl);
     }
 
     /**
@@ -87,7 +121,9 @@ class CheckpointController extends AbstractController
      */
     public function restoreAction(Request $request): RedirectResponse
     {
-        $restoreForm = $this->getFactory()->createRestoreWeightCheckpointForm(0)->handleRequest($request);
+        $restoreForm = $this->getFactory()
+            ->createRestoreWeightCheckpointForm(0, $this->resolveStoreName($request), $this->resolveLocaleName($request))
+            ->handleRequest($request);
 
         if (!$restoreForm->isSubmitted() || !$restoreForm->isValid()) {
             $this->addErrorMessage('CSRF token is not valid.');
@@ -95,8 +131,13 @@ class CheckpointController extends AbstractController
             return $this->redirectResponse(static::URL_CHECKPOINT);
         }
 
-        $idSearchRankingWeightCheckpoint = (int)$restoreForm->getData()[RestoreWeightCheckpointForm::FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT];
-        $newWeightCheckpointTransfer = $this->getFacade()->restoreWeightCheckpoint($idSearchRankingWeightCheckpoint);
+        $restoreFormData = $restoreForm->getData();
+        $idSearchRankingWeightCheckpoint = (int)$restoreFormData[RestoreWeightCheckpointForm::FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT];
+        $storeName = (string)$restoreFormData[RestoreWeightCheckpointForm::FIELD_STORE_NAME];
+        $localeName = (string)$restoreFormData[RestoreWeightCheckpointForm::FIELD_LOCALE_NAME];
+        $redirectUrl = $this->buildCheckpointUrl($storeName, $localeName);
+
+        $newWeightCheckpointTransfer = $this->getFacade()->restoreWeightCheckpoint($idSearchRankingWeightCheckpoint, $storeName, $localeName);
 
         if ($newWeightCheckpointTransfer === null) {
             $this->addErrorMessage(sprintf('Checkpoint #%d no longer exists.', $idSearchRankingWeightCheckpoint));
@@ -107,12 +148,45 @@ class CheckpointController extends AbstractController
             $this->getFactory()->getSearchRankingStorageFacade()->publishRankingConfiguration();
 
             $this->addSuccessMessage(sprintf(
-                'Restored checkpoint #%d — recorded as new checkpoint #%d.',
+                'Restored checkpoint #%d into %s/%s — recorded as new checkpoint #%d.',
                 $idSearchRankingWeightCheckpoint,
+                $storeName,
+                $localeName,
                 $newWeightCheckpointTransfer->getIdSearchRankingWeightCheckpointOrFail(),
             ));
         }
 
-        return $this->redirectResponse(static::URL_CHECKPOINT);
+        return $this->redirectResponse($redirectUrl);
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
+     * @return string
+     */
+    protected function resolveStoreName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_STORE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
+     * @return string
+     */
+    protected function resolveLocaleName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_LOCALE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return string
+     */
+    protected function buildCheckpointUrl(string $storeName, string $localeName): string
+    {
+        return sprintf('%s?%s=%s&%s=%s', static::URL_CHECKPOINT, static::PARAM_STORE_NAME, $storeName, static::PARAM_LOCALE_NAME, $localeName);
     }
 }

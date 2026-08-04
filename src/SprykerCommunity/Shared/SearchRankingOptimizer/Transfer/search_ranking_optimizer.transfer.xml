@@ -3,25 +3,28 @@
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="spryker:transfer-01 http://static.spryker.com/transfer-01.xsd">
 
-    <!-- One calibration run: an admin-uploaded list of "relevant" search terms, sampled against the
-         live raw text-relevance score (BEFORE any function_score wrapper) to suggest a
-         relevanceSaturationPoint (k) value — the pooled mean of the top relevantProductCount (X) hits'
-         scores across every search term. status is one of the SearchRankingOptimizerConfig::CALIBRATION_STATUS_*
-         constants; the score*/sampleCount/computedK/calculatedAt fields are null until status=calculated,
-         errorMessage is set only on status=failed. -->
+    <!-- One calibration run: an admin-uploaded list of "relevant" search terms, sampled to suggest either
+         relevanceSaturationPoint or specificitySaturationPoint (k), depending on calibrationType
+         (SearchRankingOptimizerConfig::CALIBRATION_TYPE_*) — the pooled mean of the top relevantProductCount
+         (X) hits' raw values across every search term for CALIBRATION_TYPE_RELEVANCE_SCORE (BEFORE any
+         function_score wrapper), or the pooled mean of one raw specificity value per search term (no real
+         catalog query at all) for CALIBRATION_TYPE_SPECIFICITY. status is one of the
+         SearchRankingOptimizerConfig::CALIBRATION_STATUS_* constants; the value*/sampleCount/computedK/
+         calculatedAt fields are null until status=calculated, errorMessage is set only on status=failed. -->
     <transfer name="SearchRankingCalibration" strict="true">
         <property name="idSearchRankingCalibration" type="int"/>
+        <property name="calibrationType" type="string"/>
         <property name="relevantProductCount" type="int"/>
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="status" type="string"/>
         <property name="computedK" type="float"/>
-        <property name="scoreMin" type="float"/>
-        <property name="scoreMax" type="float"/>
-        <property name="scoreMean" type="float"/>
-        <property name="scoreMedian" type="float"/>
-        <property name="scoreP25" type="float"/>
-        <property name="scoreP75" type="float"/>
+        <property name="valueMin" type="float"/>
+        <property name="valueMax" type="float"/>
+        <property name="valueMean" type="float"/>
+        <property name="valueMedian" type="float"/>
+        <property name="valueP25" type="float"/>
+        <property name="valueP75" type="float"/>
         <property name="sampleCount" type="int"/>
         <property name="calculatedAt" type="string"/>
         <property name="errorMessage" type="string"/>
@@ -31,15 +34,17 @@
         <property name="searchTerms" type="SearchRankingCalibrationSearchTerm[]" singular="searchTerm"/>
     </transfer>
 
-    <!-- One uploaded search term of a calibration run. scores is populated by the calibration cron: the
-         raw text-relevance scores of the top-ranked products found for this term, up to the run's
-         relevantProductCount — fewer when the term matched fewer products. Null until calculated. -->
+    <!-- One uploaded search term of a calibration run. values is populated by the calibration cron: for
+         CALIBRATION_TYPE_RELEVANCE_SCORE, the raw text-relevance scores of the top-ranked products found
+         for this term (up to the run's relevantProductCount, fewer when the term matched fewer products);
+         for CALIBRATION_TYPE_SPECIFICITY, exactly one raw specificity value for the term itself (no
+         per-product query at all). Null until calculated. -->
     <transfer name="SearchRankingCalibrationSearchTerm" strict="true">
         <property name="idSearchRankingCalibrationSearchTerm" type="int"/>
         <property name="fkSearchRankingCalibration" type="int"/>
         <property name="searchTerm" type="string"/>
         <property name="productsFound" type="int"/>
-        <property name="scores" type="float[]" singular="score"/>
+        <property name="values" type="float[]" singular="value"/>
     </transfer>
 
     <!-- A canonical search query (trim/lowercase/collapse-whitespace, NOT tokenized) that has accumulated
@@ -164,30 +169,32 @@
     </transfer>
 
     <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
-         reproduce: the relevanceWeight blend, every metric's own weight, and the 3 entropy-weighting
-         knobs (probe size/exponent/shift magnitude) — NOT relevanceSaturationPoint, which already has its
-         own versioning story via Calibration and stays out of checkpoint scope deliberately. The entropy
-         knobs ARE included: they directly shape the live ranking formula's behavior the same way
-         relevanceWeight/metric weights do, so a checkpoint that omitted them wouldn't actually reproduce
-         a past ranking behavior, only part of it. isEntropyWeightingEnabled is captured alongside them —
-         entropy weighting is a code-level, project-wide flag (search-ranking's
-         SearchRankingConfig::isEntropyWeightingEnabled()) independent of the 3 knob VALUES, so a
-         checkpoint honestly records whether those numbers were actually live at the time, rather than
-         silently implying they always were. source is 'manual' for now (a Query Curator-triggered "take
-         checkpoint now" or a restore); a later automated-weight-search phase will add an 'algorithm' value
-         as that producer gets built, per the "one harness, N producers" design. The monthly auto-tune job
-         (see SearchRankingAutoTuneResult below) is NOT a producer here — it refits a metric's FORMULA
-         (curve shape/parameter), never relevanceWeight/metric weight/entropy knobs, so it has no reason
-         to write a weight checkpoint at all; its own before/after audit trail lives entirely in
-         spryker-community/search-ranking's own metric-history table instead. -->
+         reproduce: the relevanceWeight blend, every metric's own weight, and the 3 specificity-weighting
+         knobs (blend weight/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
+         which already have their own versioning story via Calibration and stay out of checkpoint scope
+         deliberately. The specificity knobs ARE included: they directly shape the live ranking formula's
+         behavior the same way relevanceWeight/metric weights do, so a checkpoint that omitted them
+         wouldn't actually reproduce a past ranking behavior, only part of it. isSpecificityWeightingEnabled
+         is captured alongside them — specificity weighting is a code-level, project-wide flag
+         (search-ranking's SearchRankingConfig::isSpecificityWeightingEnabled()) independent of the 3 knob
+         VALUES, so a checkpoint honestly records whether those numbers were actually live at the time,
+         rather than silently implying they always were. source is 'manual' for now (a Query
+         Curator-triggered "take checkpoint now" or a restore); a later automated-weight-search phase will
+         add an 'algorithm' value as that producer gets built, per the "one harness, N producers" design.
+         The monthly auto-tune job (see SearchRankingAutoTuneResult below) is NOT a producer here — it
+         refits a metric's FORMULA (curve shape/parameter), never relevanceWeight/metric weight/specificity
+         knobs, so it has no reason to write a weight checkpoint at all; its own before/after audit trail
+         lives entirely in spryker-community/search-ranking's own metric-history table instead. -->
     <transfer name="SearchRankingWeightCheckpoint" strict="true">
         <property name="idSearchRankingWeightCheckpoint" type="int"/>
         <property name="source" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="relevanceWeight" type="float"/>
-        <property name="entropyProbeResultSize" type="int"/>
-        <property name="entropyWeightExponent" type="float"/>
-        <property name="entropyWeightShiftMagnitude" type="float"/>
-        <property name="isEntropyWeightingEnabled" type="bool"/>
+        <property name="specificityBlendWeight" type="float"/>
+        <property name="specificityWeightExponent" type="float"/>
+        <property name="specificityWeightShiftMagnitude" type="float"/>
+        <property name="isSpecificityWeightingEnabled" type="bool"/>
         <property name="metricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="metricWeight"/>
         <property name="createdAt" type="string"/>
     </transfer>
@@ -282,9 +289,9 @@
         <property name="bestRelevanceWeight" type="float"/>
         <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>
         <property name="bestScore" type="float"/>
-        <property name="bestEntropyWeightExponent" type="float"/>
-        <property name="bestEntropyWeightShiftMagnitude" type="float"/>
-        <property name="bestEntropyProbeResultSize" type="int"/>
+        <property name="bestSpecificityBlendWeight" type="float"/>
+        <property name="bestSpecificityWeightExponent" type="float"/>
+        <property name="bestSpecificityWeightShiftMagnitude" type="float"/>
         <property name="completedAt" type="string"/>
         <property name="errorMessage" type="string"/>
         <property name="appliedAt" type="string"/>

@@ -14,5 +14,10 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
     /**
      * @return bool
      */
-    public function isEntropyWeightingEnabled(): bool;
+    public function isSpecificityWeightingEnabled(): bool;
+
+    /**
+     * @return array<string, string>
+     */
+    public function getSpecificityProbeFieldSearchAnalyzers(): array;
 }

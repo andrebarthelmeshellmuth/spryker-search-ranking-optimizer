@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form;
 
 use Spryker\Zed\Kernel\Communication\Form\AbstractType;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
@@ -28,6 +29,11 @@ use Symfony\Component\Validator\Constraints\NotBlank;
  */
 class CalibrationUploadForm extends AbstractType
 {
+    /**
+     * @var string
+     */
+    public const FIELD_CALIBRATION_TYPE = 'calibrationType';
+
     /**
      * @var string
      */
@@ -73,11 +79,25 @@ class CalibrationUploadForm extends AbstractType
     {
         parent::buildForm($builder, $options);
 
+        $builder->add(static::FIELD_CALIBRATION_TYPE, ChoiceType::class, [
+            'label' => 'Calibration type',
+            'help' => 'Relevance score: samples real per-product text-relevance scores from a live catalog '
+                . 'query, suggesting a relevanceSaturationPoint. Specificity: samples one raw specificity '
+                . 'value per search term via a lightweight probe (no catalog query at all), suggesting a '
+                . 'specificitySaturationPoint.',
+            'choices' => [
+                'Relevance score' => SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
+                'Specificity' => SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY,
+            ],
+            'constraints' => [new NotBlank()],
+        ]);
+
         $builder->add(static::FIELD_RELEVANT_PRODUCT_COUNT, IntegerType::class, [
             'label' => 'Relevant products per search (X)',
             'help' => 'How many of the top-ranked products per search term are assumed relevant — e.g. 6 for '
                 . 'the first two SRP rows. Used as both the sample size and the query limit for every '
-                . 'uploaded search term.',
+                . 'uploaded search term. Ignored for the "Specificity" calibration type, which always '
+                . 'samples exactly one value per search term.',
             'constraints' => [
                 new NotBlank(),
                 new GreaterThan(0),

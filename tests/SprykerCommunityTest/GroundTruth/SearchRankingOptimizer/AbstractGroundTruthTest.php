@@ -14,7 +14,7 @@ namespace SprykerCommunityTest\GroundTruth\SearchRankingOptimizer;
 // matching *Test.php/*Cest.php, so a plain support class living alongside these tests (not matching either
 // pattern) is never autoloaded at all. An explicit require_once is the most surgical fix -- no change to
 // the demoshop's own composer.json (never committed, see the project's git workflow rules) needed.
-require_once __DIR__ . '/EntropyForcedEnabledFacadeDecorator.php';
+require_once __DIR__ . '/SpecificityForcedEnabledFacadeDecorator.php';
 
 use Codeception\Test\Unit;
 use Elastica\Client;
@@ -26,13 +26,16 @@ use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\StoreTransfer;
 use LogicException;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStoreClientInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
-use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
@@ -571,51 +574,132 @@ abstract class AbstractGroundTruthTest extends Unit
     }
 
     /**
-     * Scans every real, already-used search term this shop has (no hardcoded terms), computes the Shannon
-     * entropy of each one's real top-10 raw `_score` distribution the same way {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
-     * does live, and returns the most PEAKED (lowest entropy -- one dominant match) and most FLAT (highest
-     * entropy -- several near-equally-scored matches) terms found. Requires at least 2 scores per term to
-     * compute anything meaningful (same floor {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::applyEntropyWeighting()}
-     * itself enforces).
+     * Scans every real, already-used search term this shop has (no hardcoded terms), computes each one's
+     * real raw specificity (blended per-term idf, the same way {@see \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator}
+     * does live) via a real `_termvectors` probe, and returns the most SPECIFIC (highest idf -- a rare
+     * term like a SKU) and most UNSPECIFIC (lowest idf -- an only-common-words query) terms found. A term
+     * with zero query-term idf values at all (nothing survived the doc_freq>0 filter) is skipped -- same
+     * floor {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator} itself enforces.
      *
-     * @return array{0: string, 1: string} [mostPeakedSearchTerm, mostFlatSearchTerm]
+     * @return array{0: string, 1: string} [mostSpecificSearchTerm, mostUnspecificSearchTerm]
      */
-    protected function discoverPeakedAndFlatSearchTerms(): array
+    protected function discoverSpecificAndUnspecificSearchTerms(): array
     {
-        $entropyCalculator = new ShannonEntropyCalculator();
-        $entropyByTerm = [];
+        $termFrequencyFetcher = $this->createQueryTermFrequencyFetcher();
+        $querySpecificityCalculator = new QuerySpecificityCalculator();
+        $fieldToSearchAnalyzer = [
+            'full-text' => 'fulltext_search_analyzer',
+            'full-text-boosted' => 'fulltext_search_analyzer',
+        ];
+
+        $rawSpecificityByTerm = [];
 
         foreach ($this->getRepository()->findQueriesByStoreLocale(static::STORE_NAME, static::LOCALE_NAME) as $queryTransfer) {
             $searchTerm = $queryTransfer->getSearchTermOrFail();
-            $scores = array_values($this->fetchRawTextRelevanceScores($searchTerm));
-            $scores = array_slice($scores, 0, 10);
+            $termFrequencyResult = $termFrequencyFetcher->fetch($searchTerm, $fieldToSearchAnalyzer);
+            $docCount = $termFrequencyResult->getDocCount();
 
-            if (count($scores) < 2) {
+            if ($docCount <= 0) {
                 continue;
             }
 
-            $entropyByTerm[$searchTerm] = $entropyCalculator->calculateNormalizedEntropy($scores);
+            $idfByTerm = [];
+
+            foreach ($termFrequencyResult->getTermDocumentFrequencies() as $term => $documentFrequency) {
+                if ($documentFrequency <= 0) {
+                    continue;
+                }
+
+                $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
+            }
+
+            if ($idfByTerm === []) {
+                continue;
+            }
+
+            $rawSpecificityByTerm[$searchTerm] = $querySpecificityCalculator->calculateRawSpecificity($idfByTerm, 0.7);
         }
 
-        if (count($entropyByTerm) < 2) {
-            $this->markTestSkipped('Fewer than 2 real search terms have at least 2 raw catalog matches -- nothing to build an entropy ground truth on.');
+        if (count($rawSpecificityByTerm) < 2) {
+            $this->markTestSkipped('Fewer than 2 real search terms have usable corpus idf evidence -- nothing to build a specificity ground truth on.');
         }
 
-        asort($entropyByTerm);
-        $terms = array_keys($entropyByTerm);
+        asort($rawSpecificityByTerm);
+        $terms = array_keys($rawSpecificityByTerm);
 
-        return [$terms[0], $terms[count($terms) - 1]];
+        return [$terms[count($terms) - 1], $terms[0]];
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher
+     */
+    protected function createQueryTermFrequencyFetcher(): QueryTermFrequencyFetcher
+    {
+        $searchElasticsearchConfig = new SearchElasticsearchConfig();
+        $indexName = $this->getIndexName();
+
+        return new class (
+            $this->getElasticaClient(),
+            $searchElasticsearchConfig,
+            // Not NeverInvokedStoreClient -- that implements SearchElasticsearch's own store-client
+            // interface, not search-ranking's. Same "structurally required but never actually exercised"
+            // reasoning applies: resolveIndexName() below is overridden and never touches $storeClient.
+            new class implements SearchRankingToStoreClientInterface {
+                /**
+                 * @throws \LogicException
+                 *
+                 * @return \Generated\Shared\Transfer\StoreTransfer
+                 */
+                public function getCurrentStore(): StoreTransfer
+                {
+                    throw new LogicException(__METHOD__ . '() was called -- resolveIndexName() below should have made this unreachable.');
+                }
+            },
+            $indexName,
+        ) extends QueryTermFrequencyFetcher {
+            /**
+             * @var string
+             */
+            protected string $fixedIndexName;
+
+            /**
+             * @param \Elastica\Client $elasticaClient
+             * @param \Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig $searchElasticsearchConfig
+             * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStoreClientInterface $storeClient
+             * @param string $fixedIndexName
+             */
+            public function __construct(
+                Client $elasticaClient,
+                SearchElasticsearchConfig $searchElasticsearchConfig,
+                SearchRankingToStoreClientInterface $storeClient,
+                string $fixedIndexName,
+            ) {
+                parent::__construct($elasticaClient, $searchElasticsearchConfig, $storeClient);
+                $this->fixedIndexName = $fixedIndexName;
+            }
+
+            /**
+             * Overridden to bypass Store resolution entirely -- this ground-truth suite already resolves
+             * the real index name once via {@see AbstractGroundTruthTest::getIndexName()}.
+             *
+             * @return string
+             */
+            protected function resolveIndexName(): string
+            {
+                return $this->fixedIndexName;
+            }
+        };
     }
 
     /**
      * Constructs and runs a REAL `OptimizationRunner` end-to-end, bypassing this package's own DI Factory
      * and the `search-ranking-optimizer:optimize` console command entirely -- necessary ONLY because
-     * `SearchRankingConfig::isEntropyWeightingEnabled()` is a hardcoded `return false;` with no project
+     * `SearchRankingConfig::isSpecificityWeightingEnabled()` is a hardcoded `return false;` with no project
      * override actually wired up anywhere (same finding as {@see \SprykerCommunityTest\Client\SearchRankingOptimizer\Search\RankEvalRunnerTest}'s
-     * own forced-enabled subclass), so the real Facade path would silently exclude the entropy dimensions
-     * from the search entirely (per Task #51's own fix) on a shop where the feature is off, as it is here.
-     * Every OTHER collaborator (repository, entity manager, rank evaluation runner, determinism checker,
-     * `ParameterVectorMapper`) is the real, unmodified production class -- only entropy's enablement is
+     * own forced-enabled subclass), so the real Facade path would silently exclude the specificity
+     * dimensions from the search entirely on a shop where the feature is off, as it is here. Every OTHER
+     * collaborator (repository, entity manager, rank evaluation runner, determinism checker,
+     * `ParameterVectorMapper`) is the real, unmodified production class -- only specificity's enablement is
      * forced, at exactly the 2 seams that ever check it.
      *
      * @param string $algorithm
@@ -624,7 +708,7 @@ abstract class AbstractGroundTruthTest extends Unit
      *
      * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
-    protected function runRealOptimizationWithEntropyForcedEnabled(
+    protected function runRealOptimizationWithSpecificityForcedEnabled(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
     ): SearchRankingOptimizerRunTransfer {
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
@@ -641,7 +725,7 @@ abstract class AbstractGroundTruthTest extends Unit
             /**
              * @return bool
              */
-            protected function isEntropyWeightingEnabled(): bool
+            protected function isSpecificityWeightingEnabled(): bool
             {
                 return true;
             }
@@ -680,6 +764,23 @@ abstract class AbstractGroundTruthTest extends Unit
             }
 
             /**
+             * @phpcsSuppress SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+             *   interface this test double implements; never called by the optimization path it exists for.
+             *
+             * @param string $searchTerm
+             * @param string $storeName
+             * @param float $blendWeight
+             *
+             * @throws \LogicException
+             *
+             * @return float
+             */
+            public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
+            {
+                throw new LogicException('Not used by the optimization path this test double exists for.');
+            }
+
+            /**
              * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
              *
              * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
@@ -688,9 +789,27 @@ abstract class AbstractGroundTruthTest extends Unit
             {
                 return $this->rankEvalRunner->evaluate($requestTransfer);
             }
+
+            /**
+             * @phpcsSuppress SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+             *   interface this test double implements; never called by the optimization path it exists for.
+             *
+             * @param string $searchTerm
+             * @param string $storeName
+             * @param string $localeName
+             * @param int $idProductAbstract
+             *
+             * @throws \LogicException
+             *
+             * @return bool
+             */
+            public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
+            {
+                throw new LogicException('Not used by the optimization path this test double exists for.');
+            }
         };
 
-        $forcedEnabledFacade = new EntropyForcedEnabledFacadeDecorator($this->getSearchRankingFacade());
+        $forcedEnabledFacade = new SpecificityForcedEnabledFacadeDecorator($this->getSearchRankingFacade());
 
         $optimizationRunner = new OptimizationRunner(
             $this->getRepository(),

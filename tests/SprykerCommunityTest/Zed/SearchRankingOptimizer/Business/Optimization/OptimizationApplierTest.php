@@ -89,11 +89,13 @@ class OptimizationApplierTest extends Unit
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12)
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7)
             ->addBestMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(1)
@@ -119,21 +121,21 @@ class OptimizationApplierTest extends Unit
             ->willReturnOnConsecutiveCalls($doneRunTransfer, $appliedRunTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with(0.85);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightExponent')->with(1.2);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightShiftMagnitude')->with(0.25);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyProbeResultSize')->with(12);
+        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with('DE', 'de_DE', 0.85);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightExponent')->with('DE', 'de_DE', 1.2);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightShiftMagnitude')->with('DE', 'de_DE', 0.25);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityBlendWeight')->with('DE', 'de_DE', 0.7);
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
-                [1, 0.6, true],
-                [2, 0.4, true],
+                [1, 'DE', 'de_DE', 0.6, true],
+                [2, 'DE', 'de_DE', 0.4, true],
             ]);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->expects($this->once())
             ->method('record')
-            ->with(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER)
+            ->with(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, 'DE', 'de_DE')
             ->willReturn(new SearchRankingWeightCheckpointTransfer());
 
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
@@ -152,7 +154,7 @@ class OptimizationApplierTest extends Unit
     /**
      * A metric a winning candidate wants to write can be deleted between when its optimization run
      * finished and when an admin clicks Apply. Proves the whole apply rolls back rather than leaving
-     * relevanceWeight/entropy settings live with only some metric weights applied (which would silently
+     * relevanceWeight/specificity settings live with only some metric weights applied (which would silently
      * leave the live metric weights summing to less than 1, with the run still marked applied).
      *
      * @return void
@@ -162,11 +164,13 @@ class OptimizationApplierTest extends Unit
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12)
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7)
             ->addBestMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(404)
@@ -181,7 +185,7 @@ class OptimizationApplierTest extends Unit
             ->willReturn($doneRunTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 1.0)->willReturn(false);
+        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 'DE', 'de_DE', 1.0)->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->method('record')->willReturn(new SearchRankingWeightCheckpointTransfer());
@@ -210,11 +214,13 @@ class OptimizationApplierTest extends Unit
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12);
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7);
 
         $appliedRunTransfer = (new SearchRankingOptimizerRunTransfer())->setIdSearchRankingOptimizerRun(1);
 

@@ -22,7 +22,11 @@ interface CalibrationUploadHandlerInterface
      * - Either way, creates a new calibration run in status=uploaded, with one child row per search term.
      * - Does not fire any search queries — that happens later, when `search-ranking-optimizer:calibrate`
      *   picks this run up.
+     * - $calibrationType is one of `SearchRankingOptimizerConfig::CALIBRATION_TYPE_*` — decides which
+     *   sampling path the cron takes (real per-product catalog query vs. a per-term `_termvectors` probe),
+     *   see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface}.
      *
+     * @param string $calibrationType
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
@@ -31,6 +35,7 @@ interface CalibrationUploadHandlerInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
+        string $calibrationType,
         int $relevantProductCount,
         string $storeName,
         string $localeName,

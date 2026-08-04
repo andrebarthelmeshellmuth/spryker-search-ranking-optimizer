@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,7 +33,13 @@ class CalibrationApplyController extends AbstractController
      */
     public function indexAction(Request $request): RedirectResponse
     {
-        $applyForm = $this->getFactory()->createCalibrationApplyForm(0.0)->handleRequest($request);
+        $applyForm = $this->getFactory()
+            ->createCalibrationApplyForm(
+                0.0,
+                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+            )
+            ->handleRequest($request);
 
         if (!$applyForm->isSubmitted() || !$applyForm->isValid()) {
             $this->addErrorMessage('CSRF token is not valid.');
@@ -40,13 +48,20 @@ class CalibrationApplyController extends AbstractController
         }
 
         $applyData = $applyForm->getData();
+        $saturationPointValue = (float)$applyData[CalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT];
+        $calibrationType = (string)$applyData[CalibrationApplyForm::FIELD_CALIBRATION_TYPE];
+        $storeName = (string)$applyData[CalibrationApplyForm::FIELD_STORE_NAME];
+        $localeName = (string)$applyData[CalibrationApplyForm::FIELD_LOCALE_NAME];
 
-        $this->getFactory()->getSearchRankingFacade()->saveRelevanceSaturationPoint(
-            (float)$applyData[CalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT],
-        );
+        if ($calibrationType === SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY) {
+            $this->getFactory()->getSearchRankingFacade()->saveSpecificitySaturationPoint($storeName, $localeName, $saturationPointValue);
+            $this->addSuccessMessage('Specificity saturation point (k) was updated.');
+        } else {
+            $this->getFactory()->getSearchRankingFacade()->saveRelevanceSaturationPoint($storeName, $localeName, $saturationPointValue);
+            $this->addSuccessMessage('Relevance saturation point (k) was updated.');
+        }
+
         $this->getFactory()->getSearchRankingStorageFacade()->publishRankingConfiguration();
-
-        $this->addSuccessMessage('Relevance saturation point (k) was updated.');
 
         return $this->redirectResponse(static::URL_CALIBRATION);
     }

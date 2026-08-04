@@ -29,12 +29,12 @@ class StatisticsCalculator implements StatisticsCalculatorInterface
         return (new SearchRankingCalibrationTransfer())
             ->setSampleCount($count)
             ->setComputedK($mean)
-            ->setScoreMean($mean)
-            ->setScoreMin($scores[0])
-            ->setScoreMax($scores[$count - 1])
-            ->setScoreMedian($this->percentile($scores, 0.5))
-            ->setScoreP25($this->percentile($scores, 0.25))
-            ->setScoreP75($this->percentile($scores, 0.75));
+            ->setValueMean($mean)
+            ->setValueMin($scores[0])
+            ->setValueMax($scores[$count - 1])
+            ->setValueMedian($this->percentile($scores, 0.5))
+            ->setValueP25($this->percentile($scores, 0.25))
+            ->setValueP75($this->percentile($scores, 0.75));
     }
 
     /**

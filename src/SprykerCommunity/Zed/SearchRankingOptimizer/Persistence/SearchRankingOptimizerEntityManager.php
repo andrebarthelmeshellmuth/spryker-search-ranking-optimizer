@@ -74,6 +74,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         SearchRankingCalibrationTransfer $calibrationTransfer,
     ): SearchRankingCalibrationTransfer {
         $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity->setCalibrationType(
+            $calibrationTransfer->getCalibrationType() ?? SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
+        );
         $calibrationEntity->setRelevantProductCount($calibrationTransfer->getRelevantProductCountOrFail());
         $calibrationEntity->setStoreName($calibrationTransfer->getStoreNameOrFail());
         $calibrationEntity->setLocaleName($calibrationTransfer->getLocaleNameOrFail());
@@ -122,11 +125,11 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     /**
      * @param int $idSearchRankingCalibrationSearchTerm
      * @param int $productsFound
-     * @param array<float> $scores
+     * @param array<float> $values
      *
      * @return void
      */
-    public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $scores): void
+    public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $values): void
     {
         $searchTermEntity = $this->getFactory()
             ->createSearchRankingCalibrationSearchTermQuery()
@@ -137,7 +140,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         }
 
         $searchTermEntity->setProductsFound($productsFound);
-        $searchTermEntity->setScores($this->getFactory()->createSearchRankingOptimizerMapper()->implodeScores($scores));
+        $searchTermEntity->setValues($this->getFactory()->createSearchRankingOptimizerMapper()->implodeValues($values));
         $searchTermEntity->save();
     }
 
@@ -181,12 +184,12 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         }
 
         $calibrationEntity->setComputedK($statisticsTransfer->getComputedK());
-        $calibrationEntity->setScoreMin($statisticsTransfer->getScoreMin());
-        $calibrationEntity->setScoreMax($statisticsTransfer->getScoreMax());
-        $calibrationEntity->setScoreMean($statisticsTransfer->getScoreMean());
-        $calibrationEntity->setScoreMedian($statisticsTransfer->getScoreMedian());
-        $calibrationEntity->setScoreP25($statisticsTransfer->getScoreP25());
-        $calibrationEntity->setScoreP75($statisticsTransfer->getScoreP75());
+        $calibrationEntity->setValueMin($statisticsTransfer->getValueMin());
+        $calibrationEntity->setValueMax($statisticsTransfer->getValueMax());
+        $calibrationEntity->setValueMean($statisticsTransfer->getValueMean());
+        $calibrationEntity->setValueMedian($statisticsTransfer->getValueMedian());
+        $calibrationEntity->setValueP25($statisticsTransfer->getValueP25());
+        $calibrationEntity->setValueP75($statisticsTransfer->getValueP75());
         $calibrationEntity->setSampleCount($statisticsTransfer->getSampleCount());
         $calibrationEntity->setCalculatedAt(date('c'));
         $calibrationEntity->setStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
@@ -362,11 +365,13 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
 
         $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
         $weightCheckpointEntity->setSource($weightCheckpointTransfer->getSourceOrFail());
+        $weightCheckpointEntity->setStoreName($weightCheckpointTransfer->getStoreNameOrFail());
+        $weightCheckpointEntity->setLocaleName($weightCheckpointTransfer->getLocaleNameOrFail());
         $weightCheckpointEntity->setRelevanceWeight($weightCheckpointTransfer->getRelevanceWeightOrFail());
-        $weightCheckpointEntity->setEntropyProbeResultSize($weightCheckpointTransfer->getEntropyProbeResultSizeOrFail());
-        $weightCheckpointEntity->setEntropyWeightExponent($weightCheckpointTransfer->getEntropyWeightExponentOrFail());
-        $weightCheckpointEntity->setEntropyWeightShiftMagnitude($weightCheckpointTransfer->getEntropyWeightShiftMagnitudeOrFail());
-        $weightCheckpointEntity->setIsEntropyWeightingEnabled($weightCheckpointTransfer->getIsEntropyWeightingEnabledOrFail());
+        $weightCheckpointEntity->setSpecificityBlendWeight($weightCheckpointTransfer->getSpecificityBlendWeightOrFail());
+        $weightCheckpointEntity->setSpecificityWeightExponent($weightCheckpointTransfer->getSpecificityWeightExponentOrFail());
+        $weightCheckpointEntity->setSpecificityWeightShiftMagnitude($weightCheckpointTransfer->getSpecificityWeightShiftMagnitudeOrFail());
+        $weightCheckpointEntity->setIsSpecificityWeightingEnabled($weightCheckpointTransfer->getIsSpecificityWeightingEnabledOrFail());
         $weightCheckpointEntity->setMetricWeights($mapper->encodeMetricWeights(iterator_to_array($weightCheckpointTransfer->getMetricWeights())));
         $weightCheckpointEntity->save();
 
@@ -471,6 +476,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param float $bestRelevanceWeight
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
      * @param float $bestScore
+     * @param float $bestSpecificityBlendWeight
+     * @param float $bestSpecificityWeightExponent
+     * @param float $bestSpecificityWeightShiftMagnitude
      *
      * @return void
      */
@@ -479,9 +487,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         float $bestRelevanceWeight,
         array $bestMetricWeightTransfers,
         float $bestScore,
-        float $bestEntropyWeightExponent,
-        float $bestEntropyWeightShiftMagnitude,
-        int $bestEntropyProbeResultSize,
+        float $bestSpecificityBlendWeight,
+        float $bestSpecificityWeightExponent,
+        float $bestSpecificityWeightShiftMagnitude,
     ): void {
         $optimizerRunEntity = $this->getFactory()
             ->createSearchRankingOptimizerRunQuery()
@@ -495,9 +503,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setBestRelevanceWeight($bestRelevanceWeight);
         $optimizerRunEntity->setBestMetricWeights($this->getFactory()->createSearchRankingOptimizerMapper()->encodeMetricWeights($bestMetricWeightTransfers));
         $optimizerRunEntity->setBestScore($bestScore);
-        $optimizerRunEntity->setBestEntropyWeightExponent($bestEntropyWeightExponent);
-        $optimizerRunEntity->setBestEntropyWeightShiftMagnitude($bestEntropyWeightShiftMagnitude);
-        $optimizerRunEntity->setBestEntropyProbeResultSize($bestEntropyProbeResultSize);
+        $optimizerRunEntity->setBestSpecificityBlendWeight($bestSpecificityBlendWeight);
+        $optimizerRunEntity->setBestSpecificityWeightExponent($bestSpecificityWeightExponent);
+        $optimizerRunEntity->setBestSpecificityWeightShiftMagnitude($bestSpecificityWeightShiftMagnitude);
         $optimizerRunEntity->setCompletedAt(new DateTime());
         $optimizerRunEntity->save();
     }

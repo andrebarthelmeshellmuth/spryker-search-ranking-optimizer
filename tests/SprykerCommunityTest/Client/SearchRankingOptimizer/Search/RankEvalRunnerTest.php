@@ -160,158 +160,140 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
-     * Proves Task #40's fix directly at the source: before it, `entropyProbeResultSize`/
-     * `entropyWeightExponent`/`entropyWeightShiftMagnitude` were carried on every
-     * `SearchRankingConfigurationStorageTransfer` but never actually read anywhere in this evaluation path.
-     * Deliberately invokes the protected `applyEntropyWeighting()` directly (via reflection) against a
-     * REAL base query and this shop's real "chair"-matching catalog data, rather than asserting on the
-     * downstream `rank_eval` nDCG score -- an nDCG-based assertion turned out to be the wrong tool here: for
-     * this query, real Lucene `_score`s across matching documents differ by only a few percent of their
-     * absolute magnitude, so no `relevanceSaturationPoint` choice can make the text-relevance term's spread
-     * competitive with a real business metric's spread, which means the two specific rated documents' rank
-     * ORDER (all rank_eval/nDCG can see) stays identical across a wide range of relevanceWeight values even
-     * though the actual score changes underneath -- confirmed empirically before landing on this approach.
-     * Asserting on the adjusted `relevanceWeight` itself is the direct, non-flaky way to prove the shift is
-     * real: a real "chair" query's top-10 raw scores are essentially never a perfectly symmetric
-     * distribution (normalized entropy of exactly 0.5), so a non-zero `entropyWeightShiftMagnitude` must
-     * produce a `relevanceWeight` different from the configured one.
+     * Proves the specificity-weighting reimplementation directly at the source: before it existed,
+     * `specificityBlendWeight`/`specificitySaturationPoint`/`specificityWeightExponent`/
+     * `specificityWeightShiftMagnitude` were carried on every `SearchRankingConfigurationStorageTransfer`
+     * but never actually read anywhere in this evaluation path. Deliberately invokes the protected
+     * `applySpecificityWeighting()` directly (via reflection) against this shop's real "chair" search term
+     * and real catalog data, rather than asserting on the downstream `rank_eval` nDCG score -- same
+     * reasoning `testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne()`'s docblock
+     * gives for why a direct assertion on the adjusted value is the non-flaky way to prove a shift is real.
+     * A saturation point far below "chair"'s own real specificity (confirmed live, see this package's
+     * README) guarantees normalized specificity lands well above the neutral 0.5 point, so a non-zero
+     * `specificityWeightShiftMagnitude` must produce a `relevanceWeight` different from the configured one.
      *
      * @return void
      */
-    public function testApplyEntropyWeightingShiftsRelevanceWeightForARealAsymmetricScoreDistribution(): void
+    public function testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm(): void
     {
-        // Arrange -- entropy weighting itself has no runtime override mechanism to flip on for a test (see
-        // createRankEvalRunnerWithEntropyWeightingForcedEnabled()'s own docblock), so this deliberately uses
-        // the forced-enabled subclass rather than createRankEvalRunner().
-        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedEnabled();
-        $queryBuilder = new LiveCatalogSearchQueryBuilder();
-        $baseQuery = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
+        // Arrange -- specificity weighting itself has no runtime override mechanism to flip on for a test
+        // (see createRankEvalRunnerWithSpecificityWeightingForcedEnabled()'s own docblock), so this
+        // deliberately uses the forced-enabled subclass rather than createRankEvalRunner().
+        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
 
         $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight(0.5)
             ->setRelevanceSaturationPoint(12.0)
             ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setEntropyProbeResultSize(10)
-            ->setEntropyWeightExponent(1.0)
-            ->setEntropyWeightShiftMagnitude(0.4);
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificitySaturationPoint(1.0)
+            ->setSpecificityWeightExponent(1.0)
+            ->setSpecificityWeightShiftMagnitude(0.4);
 
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
         $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
 
-        $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
+        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
 
         // Act
-        $adjustedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
+        $adjustedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $configurationTransfer);
 
         // Assert
         $this->assertNotSame(
             $configurationTransfer->getRelevanceWeight(),
             $adjustedConfigurationTransfer->getRelevanceWeight(),
-            'A real, asymmetric top-10 score distribution for "chair" must produce a non-zero entropy shift -- if it doesn\'t, entropy-aware weighting is still inert.',
+            'A real query term must produce a non-zero specificity shift -- if it doesn\'t, specificity-aware weighting is still inert.',
         );
         $this->assertGreaterThanOrEqual(0.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
         $this->assertLessThanOrEqual(1.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
     }
 
     /**
-     * The `page` index this shop uses is one-per-store-multiple-locales — two locales sharing the same
-     * literal search-term text used to collapse onto the SAME probe-score cache entry (the key was
-     * `"<indexName>:<searchTerm>"`, no locale), silently handing one locale's entropy probe scores to the
-     * other. Asserts the cache now holds two DISTINCT entries for the same index+term under two different
-     * locales, via the real cache key format rather than the probe scores themselves (which, for the same
-     * store/term, may legitimately be identical across locales — the key's distinctness is what this bug
-     * was actually about).
-     *
      * @return void
      */
-    public function testFetchProbeScoresCachesSeparatelyPerLocale(): void
+    public function testFetchIdfByTermCachesTheResultAcrossRepeatedCalls(): void
     {
         // Arrange
-        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedEnabled();
-        $queryBuilder = new LiveCatalogSearchQueryBuilder();
-        $baseQueryEnUs = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
-        $baseQueryDeDe = $queryBuilder->build('chair', 'DE', 'de_DE')->getQuery();
+        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
 
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
         $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
 
-        $fetchProbeScores = new ReflectionMethod($runner, 'fetchProbeScores');
+        $fetchIdfByTerm = new ReflectionMethod($runner, 'fetchIdfByTerm');
 
         // Act
-        $fetchProbeScores->invoke($runner, $baseQueryEnUs, $indexName, 'en_US', 'chair');
-        $fetchProbeScores->invoke($runner, $baseQueryDeDe, $indexName, 'de_DE', 'chair');
+        $fetchIdfByTerm->invoke($runner, $indexName, 'chair');
 
-        $cacheProperty = new ReflectionProperty(RankEvalRunner::class, 'probeScoresCache');
+        $cacheProperty = new ReflectionProperty(RankEvalRunner::class, 'idfCache');
         $cacheProperty->setAccessible(true);
         $cache = $cacheProperty->getValue();
 
         // Assert
-        $this->assertArrayHasKey($indexName . ':en_US:chair', $cache);
-        $this->assertArrayHasKey($indexName . ':de_DE:chair', $cache);
+        $this->assertArrayHasKey($indexName . ':chair', $cache);
     }
 
     /**
      * @return void
      */
-    public function testApplyEntropyWeightingIsANoOpWhenProbeResultSizeIsNotConfigured(): void
+    public function testApplySpecificityWeightingIsANoOpWhenNoQueryTermCarriesRealCorpusEvidence(): void
     {
-        // Arrange -- a live configuration that predates search-ranking's entropy weighting feature being
-        // configured at all (entropyProbeResultSize still null) must never attempt the probe/shift at all.
-        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedEnabled();
-        $queryBuilder = new LiveCatalogSearchQueryBuilder();
-        $baseQuery = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
+        // Arrange -- a search term that matches nothing in the corpus at all has no idf to compute.
+        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
 
         $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight(0.5)
             ->setRelevanceSaturationPoint(12.0)
-            ->setMetricWeights(['pdp_impressions' => 1.0]);
+            ->setMetricWeights(['pdp_impressions' => 1.0])
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificitySaturationPoint(1.0)
+            ->setSpecificityWeightExponent(1.0)
+            ->setSpecificityWeightShiftMagnitude(0.4);
 
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
         $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
 
-        $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
+        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
 
         // Act
-        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
+        $unchangedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'nonexistenttermforthistest', $configurationTransfer);
 
         // Assert
         $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
     }
 
     /**
-     * Proves Task #51's fix: evaluation must never apply an effect live traffic never applies, regardless
-     * of what a candidate configuration's own entropy fields say. Deliberately uses an EXPLICIT
-     * forced-disabled stub rather than the real, ambient `createRankEvalRunner()` -- now that
-     * `isEntropyWeightingEnabled()` genuinely resolves through a project override (see
+     * Proves evaluation must never apply an effect live traffic never applies, regardless of what a
+     * candidate configuration's own specificity fields say. Deliberately uses an EXPLICIT forced-disabled
+     * stub rather than the real, ambient `createRankEvalRunner()` -- now that
+     * `isSpecificityWeightingEnabled()` genuinely resolves through a project override (see
      * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s own docblock for the
      * fix), `createRankEvalRunner()`'s result legitimately depends on whatever THIS shop's own project
      * config says, which this test must not depend on to stay deterministic.
      *
      * @return void
      */
-    public function testApplyEntropyWeightingIsANoOpWhenEntropyWeightingIsDisabled(): void
+    public function testApplySpecificityWeightingIsANoOpWhenSpecificityWeightingIsDisabled(): void
     {
-        // Arrange -- a fully-populated entropy configuration that WOULD produce a real shift if entropy
-        // weighting were enabled (see testApplyEntropyWeightingShiftsRelevanceWeightForARealAsymmetricScoreDistribution).
-        $runner = $this->createRankEvalRunnerWithEntropyWeightingForcedDisabled();
-        $queryBuilder = new LiveCatalogSearchQueryBuilder();
-        $baseQuery = $queryBuilder->build('chair', 'DE', 'en_US')->getQuery();
+        // Arrange -- a fully-populated specificity configuration that WOULD produce a real shift if
+        // specificity weighting were enabled (see testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm).
+        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedDisabled();
 
         $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight(0.5)
             ->setRelevanceSaturationPoint(12.0)
             ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setEntropyProbeResultSize(10)
-            ->setEntropyWeightExponent(1.0)
-            ->setEntropyWeightShiftMagnitude(0.4);
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificitySaturationPoint(1.0)
+            ->setSpecificityWeightExponent(1.0)
+            ->setSpecificityWeightShiftMagnitude(0.4);
 
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
         $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
 
-        $applyEntropyWeighting = new ReflectionMethod($runner, 'applyEntropyWeighting');
+        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
 
         // Act
-        $unchangedConfigurationTransfer = $applyEntropyWeighting->invoke($runner, $baseQuery, $indexName, 'en_US', 'chair', $configurationTransfer);
+        $unchangedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $configurationTransfer);
 
         // Assert
         $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
@@ -363,7 +345,7 @@ class RankEvalRunnerTest extends Unit
     /**
      * Same composition `SearchRankingOptimizerFactory::createRankEvalRunner()` uses in production —
      * including the real `SearchRankingOptimizerToSearchRankingClientBridge`, so this exercises the actual
-     * project-override-aware `isEntropyWeightingEnabled()` resolution (off by default, since nothing in
+     * project-override-aware `isSpecificityWeightingEnabled()` resolution (off by default, since nothing in
      * this test environment overrides it), not the old, no-longer-needed hardcoded-Shared-static fallback.
      *
      * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
@@ -387,24 +369,38 @@ class RankEvalRunnerTest extends Unit
 
     /**
      * A real `SearchRankingOptimizerToSearchRankingClientInterface` stub forcing `true` — no longer an
-     * anonymous `RankEvalRunner` subclass overriding a protected method, now that the entropy-enabled flag
-     * genuinely IS dependency-injectable via the bridge {@see createRankEvalRunner()} also uses.
+     * anonymous `RankEvalRunner` subclass overriding a protected method, now that the specificity-enabled
+     * flag genuinely IS dependency-injectable via the bridge {@see createRankEvalRunner()} also uses.
+     * `getSpecificityProbeFieldSearchAnalyzers()` mirrors this shop's own real project override
+     * (`Pyz\Client\SearchRanking\SearchRankingConfig`), since the field/analyzer names must match this
+     * shop's real `page.json` schema for a live `_termvectors` probe to find anything at all.
      *
      * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
-    protected function createRankEvalRunnerWithEntropyWeightingForcedEnabled(): RankEvalRunner
+    protected function createRankEvalRunnerWithSpecificityWeightingForcedEnabled(): RankEvalRunner
     {
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        $entropyWeightingForcedEnabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
+        $specificityWeightingForcedEnabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
             /**
              * @return bool
              */
-            public function isEntropyWeightingEnabled(): bool
+            public function isSpecificityWeightingEnabled(): bool
             {
                 return true;
+            }
+
+            /**
+             * @return array<string, string>
+             */
+            public function getSpecificityProbeFieldSearchAnalyzers(): array
+            {
+                return [
+                    'full-text' => 'fulltext_search_analyzer',
+                    'full-text-boosted' => 'fulltext_search_analyzer',
+                ];
             }
         };
 
@@ -415,30 +411,41 @@ class RankEvalRunnerTest extends Unit
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
             null,
-            $entropyWeightingForcedEnabledClient,
+            $specificityWeightingForcedEnabledClient,
         );
     }
 
     /**
-     * The counterpart to {@see createRankEvalRunnerWithEntropyWeightingForcedEnabled()} — deterministically
-     * OFF regardless of what this shop's own project config says, for tests that specifically need to
-     * prove the disabled path rather than depend on ambient environment state.
+     * The counterpart to {@see createRankEvalRunnerWithSpecificityWeightingForcedEnabled()} —
+     * deterministically OFF regardless of what this shop's own project config says, for tests that
+     * specifically need to prove the disabled path rather than depend on ambient environment state.
      *
      * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner
      */
-    protected function createRankEvalRunnerWithEntropyWeightingForcedDisabled(): RankEvalRunner
+    protected function createRankEvalRunnerWithSpecificityWeightingForcedDisabled(): RankEvalRunner
     {
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        $entropyWeightingForcedDisabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
+        $specificityWeightingForcedDisabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
             /**
              * @return bool
              */
-            public function isEntropyWeightingEnabled(): bool
+            public function isSpecificityWeightingEnabled(): bool
             {
                 return false;
+            }
+
+            /**
+             * @return array<string, string>
+             */
+            public function getSpecificityProbeFieldSearchAnalyzers(): array
+            {
+                return [
+                    'full-text' => 'fulltext_search_analyzer',
+                    'full-text-boosted' => 'fulltext_search_analyzer',
+                ];
             }
         };
 
@@ -449,7 +456,7 @@ class RankEvalRunnerTest extends Unit
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
             null,
-            $entropyWeightingForcedDisabledClient,
+            $specificityWeightingForcedDisabledClient,
         );
     }
 }

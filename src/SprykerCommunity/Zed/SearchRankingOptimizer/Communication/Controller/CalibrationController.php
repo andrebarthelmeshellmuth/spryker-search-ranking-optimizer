@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -43,6 +45,7 @@ class CalibrationController extends AbstractController
             $useCsvUpload = (bool)$uploadData[CalibrationUploadForm::FIELD_USE_CSV_UPLOAD];
 
             $this->getFacade()->createCalibration(
+                (string)$uploadData[CalibrationUploadForm::FIELD_CALIBRATION_TYPE],
                 (int)$uploadData[CalibrationUploadForm::FIELD_RELEVANT_PRODUCT_COUNT],
                 (string)$uploadData[CalibrationUploadForm::FIELD_STORE_NAME],
                 (string)$uploadData[CalibrationUploadForm::FIELD_LOCALE_NAME],
@@ -57,14 +60,31 @@ class CalibrationController extends AbstractController
         }
 
         $latestCalibrationTransfer = $this->getFacade()->findLatestCalculatedCalibration();
-        $currentRelevanceSaturationPoint = $this->getFactory()->getSearchRankingFacade()->getRelevanceSaturationPoint();
+        // The calibration this page is about to offer applying (if any) is what determines which
+        // store+locale the saturation point actually gets written to — never the hardcoded default,
+        // since Zed has no implicit current store to fall back on.
+        $storeName = $latestCalibrationTransfer?->getStoreName() ?? SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
+        $localeName = $latestCalibrationTransfer?->getLocaleName() ?? SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+        $currentRelevanceSaturationPoint = $this->getFactory()->getSearchRankingFacade()->getRelevanceSaturationPoint($storeName, $localeName);
+        $currentSpecificitySaturationPoint = $this->getFactory()->getSearchRankingFacade()->getSpecificitySaturationPoint($storeName, $localeName);
+
+        $latestCalibrationType = $latestCalibrationTransfer?->getCalibrationType() ?? SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE;
+        $currentSaturationPointForLatestType = $latestCalibrationType === SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY
+            ? $currentSpecificitySaturationPoint
+            : $currentRelevanceSaturationPoint;
 
         $applyForm = $this->getFactory()
-            ->createCalibrationApplyForm($latestCalibrationTransfer?->getComputedK() ?? $currentRelevanceSaturationPoint)
+            ->createCalibrationApplyForm(
+                $latestCalibrationTransfer?->getComputedK() ?? $currentSaturationPointForLatestType,
+                $storeName,
+                $localeName,
+                $latestCalibrationType,
+            )
             ->createView();
 
         return $this->viewResponse([
             'currentRelevanceSaturationPoint' => $currentRelevanceSaturationPoint,
+            'currentSpecificitySaturationPoint' => $currentSpecificitySaturationPoint,
             'latestCalibration' => $latestCalibrationTransfer,
             'inProgressCalibration' => $this->getFacade()->findCalibrationInProgress(),
             'uploadForm' => $uploadForm->createView(),

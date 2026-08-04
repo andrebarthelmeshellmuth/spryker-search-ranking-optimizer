@@ -13,6 +13,30 @@ class SearchRankingOptimizerConfig
 {
     /**
      * Specification:
+     * - Calibration type: samples real per-product raw text-relevance scores from a live catalog query
+     *   (BEFORE any function_score wrapper) — the ORIGINAL calibration path, suggesting
+     *   `relevanceSaturationPoint`.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CALIBRATION_TYPE_RELEVANCE_SCORE = 'relevance_score';
+
+    /**
+     * Specification:
+     * - Calibration type: samples one raw specificity value per uploaded search term — no real catalog
+     *   query at all, just a `_termvectors` probe against the term itself — suggesting
+     *   `specificitySaturationPoint`.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CALIBRATION_TYPE_SPECIFICITY = 'specificity';
+
+    /**
+     * Specification:
      * - A calibration run just uploaded, queued for the next `search-ranking-optimizer:calibrate` cron
      *   tick. At most one uploaded row is ever picked up per tick — the newest — the rest move straight to
      *   {@see CALIBRATION_STATUS_SKIPPED}.
@@ -234,46 +258,46 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyWeightExponent` instead — how far a single run may push it away from its own value at the
-     *   moment the run started, before clipping to the absolute bounds
-     *   {@see getEntropyWeightExponentLowerBound()}/{@see getEntropyWeightExponentUpperBound()}.
+     *   `specificityWeightExponent` instead — how far a single run may push it away from its own value at
+     *   the moment the run started, before clipping to the absolute bounds
+     *   {@see getSpecificityWeightExponentLowerBound()}/{@see getSpecificityWeightExponentUpperBound()}.
      *
      * @api
      *
      * @return float
      */
-    public static function getEntropyWeightExponentTrustRegionMaxDistance(): float
+    public static function getSpecificityWeightExponentTrustRegionMaxDistance(): float
     {
         return 0.5;
     }
 
     /**
      * Specification:
-     * - Absolute lower bound on `entropyWeightExponent` regardless of trust region — an exponent must stay
-     *   strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0` is
-     *   always 1 regardless of `x`, discarding the entropy signal entirely; a negative exponent inverts it
-     *   in an unintended way).
+     * - Absolute lower bound on `specificityWeightExponent` regardless of trust region — an exponent must
+     *   stay strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0`
+     *   is always 1 regardless of `x`, discarding the specificity signal entirely; a negative exponent
+     *   inverts it in an unintended way).
      *
      * @api
      *
      * @return float
      */
-    public static function getEntropyWeightExponentLowerBound(): float
+    public static function getSpecificityWeightExponentLowerBound(): float
     {
         return 0.1;
     }
 
     /**
      * Specification:
-     * - Absolute upper bound on `entropyWeightExponent` — deliberately generous (an exponent this high
-     *   makes the shift's response to entropy extremely steep/near-binary, a real if aggressive choice a
-     *   run should be allowed to reach, not artificially capped tighter than that).
+     * - Absolute upper bound on `specificityWeightExponent` — deliberately generous (an exponent this high
+     *   makes the shift's response to specificity extremely steep/near-binary, a real if aggressive choice
+     *   a run should be allowed to reach, not artificially capped tighter than that).
      *
      * @api
      *
      * @return float
      */
-    public static function getEntropyWeightExponentUpperBound(): float
+    public static function getSpecificityWeightExponentUpperBound(): float
     {
         return 5.0;
     }
@@ -281,29 +305,29 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyWeightShiftMagnitude` instead.
+     *   `specificityWeightShiftMagnitude` instead.
      *
      * @api
      *
      * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeTrustRegionMaxDistance(): float
+    public static function getSpecificityWeightShiftMagnitudeTrustRegionMaxDistance(): float
     {
         return 0.1;
     }
 
     /**
      * Specification:
-     * - Absolute bounds on `entropyWeightShiftMagnitude` regardless of trust region — a shift can never
+     * - Absolute bounds on `specificityWeightShiftMagnitude` regardless of trust region — a shift can never
      *   usefully exceed the [0;1] range `relevanceWeight` itself lives in (the calculated relevanceWeight
      *   is clamped to [0;1] regardless, so anything past 1.0 would only ever be reached by an
-     *   already-maximal entropy deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
+     *   already-maximal specificity deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
      *
      * @api
      *
      * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeLowerBound(): float
+    public static function getSpecificityWeightShiftMagnitudeLowerBound(): float
     {
         return 0.0;
     }
@@ -313,7 +337,7 @@ class SearchRankingOptimizerConfig
      *
      * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeUpperBound(): float
+    public static function getSpecificityWeightShiftMagnitudeUpperBound(): float
     {
         return 1.0;
     }
@@ -321,49 +345,40 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyProbeResultSize` instead (rounded to the nearest integer when read back off the optimizer's
-     *   own continuous vector — see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}).
+     *   `specificityBlendWeight` instead.
      *
      * @api
      *
-     * @return int
+     * @return float
      */
-    public static function getEntropyProbeResultSizeTrustRegionMaxDistance(): int
+    public static function getSpecificityBlendWeightTrustRegionMaxDistance(): float
     {
-        return 10;
+        return 0.2;
     }
 
     /**
      * Specification:
-     * - Absolute lower bound on `entropyProbeResultSize` — {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
-     *   itself defines entropy as 0 for fewer than 2 scores, so anything below that has no real signal to
-     *   search over at all.
+     * - Absolute bounds on `specificityBlendWeight` (alpha) regardless of trust region — it's a blend
+     *   weight between `max(idf)` and `harmonicMean(idf)`, so it must stay within [0;1] by definition (0 =
+     *   pure harmonic mean, 1 = pure max).
      *
      * @api
      *
-     * @return int
+     * @return float
      */
-    public static function getEntropyProbeResultSizeLowerBound(): int
+    public static function getSpecificityBlendWeightLowerBound(): float
     {
-        return 2;
+        return 0.0;
     }
 
     /**
-     * Specification:
-     * - Absolute upper bound on `entropyProbeResultSize`, and the actual number of raw `_score` values
-     *   fetched ONCE per query at the start of an optimization run (every candidate evaluation then
-     *   truncates that same cached list to its own proposed size instead of firing a fresh probe query per
-     *   candidate — the probe's raw scores don't depend on relevanceWeight/metric weights/exponent/shift at
-     *   all, only on which raw scores exist for that search term, so re-fetching per candidate would be
-     *   pure waste at the scale a real optimization run evaluates candidates).
-     *
      * @api
      *
-     * @return int
+     * @return float
      */
-    public static function getMaxEntropyProbeResultSize(): int
+    public static function getSpecificityBlendWeightUpperBound(): float
     {
-        return 50;
+        return 1.0;
     }
 
     /**

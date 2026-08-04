@@ -205,7 +205,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     /**
      * @return void
      */
-    public function testSaveCalibrationSearchTermResultPersistsProductsFoundAndImplodedScores(): void
+    public function testSaveCalibrationSearchTermResultPersistsProductsFoundAndImplodedValues(): void
     {
         // Arrange
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
@@ -224,7 +224,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         // Assert
         $searchTermEntity->reload();
         $this->assertSame(3, $searchTermEntity->getProductsFound());
-        $this->assertSame('12.5,13.5', $searchTermEntity->getScores());
+        $this->assertSame('12.5,13.5', $searchTermEntity->getValues());
     }
 
     /**
@@ -245,12 +245,12 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
         $statisticsTransfer = (new SearchRankingCalibrationTransfer())
             ->setComputedK(18.5)
-            ->setScoreMin(10.0)
-            ->setScoreMax(28.0)
-            ->setScoreMean(18.5)
-            ->setScoreMedian(17.0)
-            ->setScoreP25(14.0)
-            ->setScoreP75(22.0)
+            ->setValueMin(10.0)
+            ->setValueMax(28.0)
+            ->setValueMean(18.5)
+            ->setValueMedian(17.0)
+            ->setValueP25(14.0)
+            ->setValueP75(22.0)
             ->setSampleCount(10);
 
         // Act
@@ -262,8 +262,8 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         // Assert
         $calibrationEntity->reload();
         $this->assertSame(18.5, $calibrationEntity->getComputedK());
-        $this->assertSame(10.0, $calibrationEntity->getScoreMin());
-        $this->assertSame(28.0, $calibrationEntity->getScoreMax());
+        $this->assertSame(10.0, $calibrationEntity->getValueMin());
+        $this->assertSame(28.0, $calibrationEntity->getValueMax());
         $this->assertSame(10, $calibrationEntity->getSampleCount());
         $this->assertNotNull($calibrationEntity->getCalculatedAt());
         $this->assertSame(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, $calibrationEntity->getStatus());
@@ -518,16 +518,16 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         ];
 
         // Act
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 1.2, 0.25, 12);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 0.75, 1.2, 0.25);
 
         // Assert
         $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $entity->getStatus());
         $this->assertSame(0.8, $entity->getBestRelevanceWeight());
         $this->assertSame(0.91, $entity->getBestScore());
-        $this->assertSame(1.2, $entity->getBestEntropyWeightExponent());
-        $this->assertSame(0.25, $entity->getBestEntropyWeightShiftMagnitude());
-        $this->assertSame(12, $entity->getBestEntropyProbeResultSize());
+        $this->assertSame(0.75, $entity->getBestSpecificityBlendWeight());
+        $this->assertSame(1.2, $entity->getBestSpecificityWeightExponent());
+        $this->assertSame(0.25, $entity->getBestSpecificityWeightShiftMagnitude());
         $this->assertNotNull($entity->getCompletedAt());
         $this->assertStringContainsString('top_seller', (string)$entity->getBestMetricWeights());
     }
@@ -537,7 +537,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
      */
     public function testCompleteOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 1.2, 0.25, 12);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.2, 0.25);
         $this->addToAssertionCount(1);
     }
 
@@ -814,11 +814,13 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         // Arrange
         $weightCheckpointTransfer = (new SearchRankingWeightCheckpointTransfer())
             ->setSource(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER)
+            ->setStoreName('AT')
+            ->setLocaleName('de_AT')
             ->setRelevanceWeight(0.85)
-            ->setEntropyProbeResultSize(50)
-            ->setEntropyWeightExponent(1.5)
-            ->setEntropyWeightShiftMagnitude(0.1)
-            ->setIsEntropyWeightingEnabled(true)
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityWeightExponent(1.5)
+            ->setSpecificityWeightShiftMagnitude(0.1)
+            ->setIsSpecificityWeightingEnabled(true)
             ->addMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(1)
@@ -833,8 +835,10 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingWeightCheckpoint());
         $this->assertSame(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, $resultTransfer->getSource());
+        $this->assertSame('AT', $resultTransfer->getStoreName());
+        $this->assertSame('de_AT', $resultTransfer->getLocaleName());
         $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
-        $this->assertTrue($resultTransfer->getIsEntropyWeightingEnabled());
+        $this->assertTrue($resultTransfer->getIsSpecificityWeightingEnabled());
         $metricWeightTransfers = iterator_to_array($resultTransfer->getMetricWeights());
         $this->assertCount(1, $metricWeightTransfers);
         $this->assertSame('top_seller', $metricWeightTransfers[0]->getName());

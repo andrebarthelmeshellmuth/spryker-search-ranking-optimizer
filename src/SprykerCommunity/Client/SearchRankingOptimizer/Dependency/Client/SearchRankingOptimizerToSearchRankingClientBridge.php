@@ -27,8 +27,16 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
     /**
      * @return bool
      */
-    public function isEntropyWeightingEnabled(): bool
+    public function isSpecificityWeightingEnabled(): bool
     {
-        return $this->searchRankingClient->isEntropyWeightingEnabled();
+        return $this->searchRankingClient->isSpecificityWeightingEnabled();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getSpecificityProbeFieldSearchAnalyzers(): array
+    {
+        return $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers();
     }
 }

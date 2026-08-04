@@ -24,11 +24,16 @@
 
     {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k)' } %}
         {% block widget_content %}
-            <p>Live value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
+            <p>Live relevance-score value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
+            <p>Live specificity value: <strong>{{ currentSpecificitySaturationPoint }}</strong></p>
 
             {% if latestCalibration %}
                 <table class="table">
                     <tbody>
+                        <tr>
+                            <th>Calibration type</th>
+                            <td>{{ latestCalibration.calibrationType }}</td>
+                        </tr>
                         <tr>
                             <th>Last calculated</th>
                             <td>{{ latestCalibration.calculatedAt }}</td>
@@ -42,7 +47,7 @@
                             <td>{{ latestCalibration.storeName }} / {{ latestCalibration.localeName }}</td>
                         </tr>
                         <tr>
-                            <th>Sampled scores</th>
+                            <th>Sampled values</th>
                             <td>{{ latestCalibration.sampleCount }}</td>
                         </tr>
                         <tr>
@@ -52,11 +57,11 @@
                         <tr>
                             <th>Min / p25 / median / p75 / Max</th>
                             <td>
-                                {{ latestCalibration.scoreMin }} /
-                                {{ latestCalibration.scoreP25 }} /
-                                {{ latestCalibration.scoreMedian }} /
-                                {{ latestCalibration.scoreP75 }} /
-                                {{ latestCalibration.scoreMax }}
+                                {{ latestCalibration.valueMin }} /
+                                {{ latestCalibration.valueP25 }} /
+                                {{ latestCalibration.valueMedian }} /
+                                {{ latestCalibration.valueP75 }} /
+                                {{ latestCalibration.valueMax }}
                             </td>
                         </tr>
                     </tbody>
@@ -79,12 +84,14 @@
             <p>
                 By default, sources search terms from the distinct queries already organically rated via
                 the SRP relevance-rating widget for the chosen store/locale — no upload needed. The next
-                <code>search-ranking-optimizer:calibrate</code> cron tick fires the live catalog
-                search-string query for each term, samples the raw text-relevance score of the top-ranked
-                products (up to X per term), and pools all of them into a suggested k value for
-                spryker-community/search-ranking's ranking formula.
+                <code>search-ranking-optimizer:calibrate</code> cron tick then either (relevance score type)
+                fires the live catalog search-string query for each term, sampling the raw text-relevance
+                score of the top-ranked products (up to X per term), or (specificity type) fires a single
+                lightweight probe per term with no catalog query at all — either way, pooling every sampled
+                value into a suggested k value for spryker-community/search-ranking's ranking formula.
             </p>
             {{ form_start(uploadForm, { action: url('/search-ranking-optimizer/calibration') }) }}
+            {{ form_row(uploadForm.calibrationType) }}
             {{ form_row(uploadForm.relevantProductCount) }}
             {{ form_row(uploadForm.storeName) }}
             {{ form_row(uploadForm.localeName) }}

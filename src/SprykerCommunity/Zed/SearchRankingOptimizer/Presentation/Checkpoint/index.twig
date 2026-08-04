@@ -10,6 +10,24 @@
                 What <code>search-ranking</code> is using for ranking right now — take a checkpoint before
                 changing anything by hand, so there's always a way back.
             </p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
             <table class="table">
                 <tbody>
                     <tr>
@@ -17,9 +35,9 @@
                         <td><strong>{{ relevanceWeight }}</strong></td>
                     </tr>
                     <tr>
-                        <th>Entropy weighting enabled?</th>
+                        <th>Specificity weighting enabled?</th>
                         <td>
-                            {% if isEntropyWeightingEnabled %}
+                            {% if isSpecificityWeightingEnabled %}
                                 <span class="label label-success">Yes</span>
                             {% else %}
                                 <span class="label label-default">No</span>
@@ -27,16 +45,16 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Entropy probe result size</th>
-                        <td>{{ entropyProbeResultSize }}</td>
+                        <th>Specificity blend weight</th>
+                        <td>{{ specificityBlendWeight }}</td>
                     </tr>
                     <tr>
-                        <th>Entropy weight exponent</th>
-                        <td>{{ entropyWeightExponent }}</td>
+                        <th>Specificity weight exponent</th>
+                        <td>{{ specificityWeightExponent }}</td>
                     </tr>
                     <tr>
-                        <th>Entropy weight shift magnitude</th>
-                        <td>{{ entropyWeightShiftMagnitude }}</td>
+                        <th>Specificity weight shift magnitude</th>
+                        <td>{{ specificityWeightShiftMagnitude }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -62,7 +80,7 @@
                 <p>No metrics configured yet.</p>
             {% endif %}
 
-            {{ form_start(recordForm, { action: url('/search-ranking-optimizer/checkpoint/record'), method: 'POST' }) }}
+            {{ form_start(recordForm, { action: recordFormAction, method: 'POST' }) }}
             {{ form_widget(recordForm) }}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ 'Take checkpoint now' | trans }}</button>
@@ -78,9 +96,11 @@
                     <thead>
                         <tr>
                             <th>Recorded at</th>
+                            <th>Store</th>
+                            <th>Locale</th>
                             <th>Source</th>
                             <th>Relevance weight</th>
-                            <th>Entropy enabled?</th>
+                            <th>Specificity enabled?</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -88,9 +108,11 @@
                         {% for weightCheckpoint in weightCheckpointHistory %}
                             <tr>
                                 <td>{{ weightCheckpoint.createdAt }}</td>
+                                <td>{{ weightCheckpoint.storeName }}</td>
+                                <td>{{ weightCheckpoint.localeName }}</td>
                                 <td>{{ weightCheckpoint.source }}</td>
                                 <td>{{ weightCheckpoint.relevanceWeight }}</td>
-                                <td>{{ weightCheckpoint.isEntropyWeightingEnabled ? 'Yes' : 'No' }}</td>
+                                <td>{{ weightCheckpoint.isSpecificityWeightingEnabled ? 'Yes' : 'No' }}</td>
                                 <td>
                                     {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
                                     {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}

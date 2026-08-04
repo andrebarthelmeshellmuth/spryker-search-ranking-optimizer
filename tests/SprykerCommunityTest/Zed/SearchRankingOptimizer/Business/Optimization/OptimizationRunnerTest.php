@@ -159,7 +159,7 @@ class OptimizationRunnerTest extends Unit
                 $this->isType('float'),
                 $this->isType('float'),
                 $this->isType('float'),
-                $this->isType('int'),
+                $this->isType('float'),
             );
         $entityManagerMock->expects($this->never())->method('failOptimizerRun');
 
@@ -233,10 +233,10 @@ class OptimizationRunnerTest extends Unit
     /**
      * @return void
      */
-    public function testRunNextSeedsTheBaselineWithTheLiveEntropySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
+    public function testRunNextSeedsTheBaselineWithTheLiveSpecificitySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
     {
-        // Arrange -- the live facade reports entropyWeightExponent=1.5, entropyWeightShiftMagnitude=0.25,
-        // entropyProbeResultSize=12 (see createBasicSearchRankingFacadeMock()). The very first
+        // Arrange -- the live facade reports specificityWeightExponent=1.5, specificityWeightShiftMagnitude=0.25,
+        // specificityBlendWeight=0.7 (see createBasicSearchRankingFacadeMock()). The very first
         // evaluateCandidate() call is the baseline (unmodified buildLiveConfiguration() output), every
         // later call is a real search candidate that must stay inside the configured trust region around
         // those same live values.
@@ -269,18 +269,18 @@ class OptimizationRunnerTest extends Unit
         $this->assertGreaterThan(1, count($seenConfigurationTransfers), 'A real search must evaluate more than just the baseline.');
 
         $baselineTransfer = $seenConfigurationTransfers[0];
-        $this->assertSame(1.5, $baselineTransfer->getEntropyWeightExponent(), 'The baseline call must carry the LIVE value, untouched.');
-        $this->assertSame(0.25, $baselineTransfer->getEntropyWeightShiftMagnitude());
-        $this->assertSame(12, $baselineTransfer->getEntropyProbeResultSize());
+        $this->assertSame(1.5, $baselineTransfer->getSpecificityWeightExponent(), 'The baseline call must carry the LIVE value, untouched.');
+        $this->assertSame(0.25, $baselineTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.7, $baselineTransfer->getSpecificityBlendWeight());
 
-        $exponentMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightExponentTrustRegionMaxDistance();
-        $shiftMaxDistance = SearchRankingOptimizerConfig::getEntropyWeightShiftMagnitudeTrustRegionMaxDistance();
-        $probeSizeMaxDistance = SearchRankingOptimizerConfig::getEntropyProbeResultSizeTrustRegionMaxDistance();
+        $exponentMaxDistance = SearchRankingOptimizerConfig::getSpecificityWeightExponentTrustRegionMaxDistance();
+        $shiftMaxDistance = SearchRankingOptimizerConfig::getSpecificityWeightShiftMagnitudeTrustRegionMaxDistance();
+        $blendWeightMaxDistance = SearchRankingOptimizerConfig::getSpecificityBlendWeightTrustRegionMaxDistance();
 
         foreach ($seenConfigurationTransfers as $configurationTransfer) {
-            $this->assertEqualsWithDelta(1.5, $configurationTransfer->getEntropyWeightExponent(), $exponentMaxDistance + 1e-9);
-            $this->assertEqualsWithDelta(0.25, $configurationTransfer->getEntropyWeightShiftMagnitude(), $shiftMaxDistance + 1e-9);
-            $this->assertEqualsWithDelta(12, $configurationTransfer->getEntropyProbeResultSize(), $probeSizeMaxDistance + 1e-9);
+            $this->assertEqualsWithDelta(1.5, $configurationTransfer->getSpecificityWeightExponent(), $exponentMaxDistance + 1e-9);
+            $this->assertEqualsWithDelta(0.25, $configurationTransfer->getSpecificityWeightShiftMagnitude(), $shiftMaxDistance + 1e-9);
+            $this->assertEqualsWithDelta(0.7, $configurationTransfer->getSpecificityBlendWeight(), $blendWeightMaxDistance + 1e-9);
         }
     }
 
@@ -331,10 +331,10 @@ class OptimizationRunnerTest extends Unit
         ]);
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
-        $searchRankingFacadeMock->method('getEntropyWeightExponent')->willReturn(1.5);
-        $searchRankingFacadeMock->method('getEntropyWeightShiftMagnitude')->willReturn(0.25);
-        $searchRankingFacadeMock->method('getEntropyProbeResultSize')->willReturn(12);
-        $searchRankingFacadeMock->method('isEntropyWeightingEnabled')->willReturn(true);
+        $searchRankingFacadeMock->method('getSpecificityWeightExponent')->willReturn(1.5);
+        $searchRankingFacadeMock->method('getSpecificityWeightShiftMagnitude')->willReturn(0.25);
+        $searchRankingFacadeMock->method('getSpecificityBlendWeight')->willReturn(0.7);
+        $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(true);
 
         return $searchRankingFacadeMock;
     }

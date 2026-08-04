@@ -94,6 +94,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getEntityManager(),
             $this->getSearchRankingClient(),
             $this->createStatisticsCalculator(),
+            $this->getSearchRankingFacade(),
         );
     }
 

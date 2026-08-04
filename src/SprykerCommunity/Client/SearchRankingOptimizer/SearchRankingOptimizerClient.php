@@ -44,6 +44,24 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      *
      * @api
      *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     *
+     * @return float
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
+    {
+        return $this->getFactory()
+            ->createSpecificitySearcher()
+            ->calculateRawSpecificity($searchTerm, $storeName, $blendWeight);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      *
      * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer

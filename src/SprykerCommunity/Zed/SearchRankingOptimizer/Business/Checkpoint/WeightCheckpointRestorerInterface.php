@@ -15,12 +15,12 @@ interface WeightCheckpointRestorerInterface
 {
     /**
      * Specification:
-     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 entropy knobs back through
+     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 specificity knobs back through
      *   `search-ranking`'s own facade — the SAME operation Calibration's own "Apply" already is (write
      *   current values + record the result as a new checkpoint), not a special "undo" mechanism.
      * - A metric referenced by the checkpoint that no longer exists is skipped silently — a safe,
      *   best-effort restore, not an all-or-nothing transaction.
-     * - `isEntropyWeightingEnabled` is NEVER written back — it's a pure code-level project flag with no
+     * - `isSpecificityWeightingEnabled` is NEVER written back — it's a pure code-level project flag with no
      *   corresponding save method on `search-ranking`'s facade, captured on checkpoints only for
      *   historical transparency.
      * - Records a NEW checkpoint (source `SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL`) of the
@@ -29,8 +29,10 @@ interface WeightCheckpointRestorerInterface
      * - Returns null (writes nothing) when the given id doesn't exist.
      *
      * @param int $idSearchRankingWeightCheckpoint
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
-    public function restore(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
+    public function restore(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer;
 }

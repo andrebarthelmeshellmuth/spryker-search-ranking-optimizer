@@ -32,6 +32,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
+     * @param string $calibrationType
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
@@ -40,12 +41,13 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
+        string $calibrationType,
         int $relevantProductCount,
         string $storeName,
         string $localeName,
         ?string $csvContent = null,
     ): SearchRankingCalibrationTransfer {
-        return $this->getFactory()->createCalibrationUploadHandler()->createCalibration($relevantProductCount, $storeName, $localeName, $csvContent);
+        return $this->getFactory()->createCalibrationUploadHandler()->createCalibration($calibrationType, $relevantProductCount, $storeName, $localeName, $csvContent);
     }
 
     /**
@@ -210,9 +212,9 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
-    public function recordWeightCheckpoint(string $source): SearchRankingWeightCheckpointTransfer
+    public function recordWeightCheckpoint(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {
-        return $this->getFactory()->createWeightCheckpointRecorder()->record($source);
+        return $this->getFactory()->createWeightCheckpointRecorder()->record($source, $storeName, $localeName);
     }
 
     /**
@@ -224,9 +226,9 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
-    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
+    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {
-        return $this->getFactory()->createWeightCheckpointRestorer()->restore($idSearchRankingWeightCheckpoint);
+        return $this->getFactory()->createWeightCheckpointRestorer()->restore($idSearchRankingWeightCheckpoint, $storeName, $localeName);
     }
 
     /**

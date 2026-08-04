@@ -37,6 +37,23 @@ interface SearchRankingOptimizerClientInterface
 
     /**
      * Specification:
+     * - Used only by the calibration feature, for `calibrationType=specificity` runs. Fires ONE
+     *   `_termvectors` probe for $searchTerm directly against Elasticsearch — no real catalog query at
+     *   all, unlike {@see getCalibrationScores()} — and returns the same blended raw specificity value
+     *   `search-ranking`'s own live weighting would compute, at the given $blendWeight.
+     *
+     * @api
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     *
+     * @return float
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float;
+
+    /**
+     * Specification:
      * - Submits a Relevance Rater's heart/checkmark/X judgment for a (query, product) pair via a
      *   synchronous Zed gateway call. Zed independently re-authorizes the caller — this method does not
      *   itself check the RateSearchRelevancePermissionPlugin permission, that only gates whether the

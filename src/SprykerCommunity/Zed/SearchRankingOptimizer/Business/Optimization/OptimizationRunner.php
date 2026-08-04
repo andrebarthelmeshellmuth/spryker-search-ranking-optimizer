@@ -125,7 +125,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        $liveConfigurationTransfer = $this->buildLiveConfiguration();
+        $liveConfigurationTransfer = $this->buildLiveConfiguration($storeName, $localeName);
         $baselineScore = $this->rankEvaluationRunner->evaluateCandidate($storeName, $localeName, $liveConfigurationTransfer);
 
         if ($baselineScore === null) {
@@ -142,10 +142,10 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $optimizableMetrics,
             $fixedMetricWeights,
             $liveConfigurationTransfer->getRelevanceWeightOrFail(),
-            $liveConfigurationTransfer->getEntropyWeightExponentOrFail(),
-            $liveConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
-            $liveConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
-            $this->searchRankingFacade->isEntropyWeightingEnabled(),
+            $liveConfigurationTransfer->getSpecificityWeightExponentOrFail(),
+            $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $this->searchRankingFacade->isSpecificityWeightingEnabled(),
         );
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
@@ -169,9 +169,9 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $bestConfigurationTransfer->getRelevanceWeightOrFail(),
             $this->buildBestMetricWeightTransfers($activeMetrics, $bestConfigurationTransfer),
             -$result->getBestValue(),
-            $bestConfigurationTransfer->getEntropyWeightExponentOrFail(),
-            $bestConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
-            $bestConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
+            $bestConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $bestConfigurationTransfer->getSpecificityWeightExponentOrFail(),
+            $bestConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
         );
     }
 
@@ -181,23 +181,26 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * against what a Query Curator actually configured in Zed, not a possibly-stale-or-never-published
      * snapshot. Includes EVERY metric's weight (not just active ones), same as the real live formula does.
      *
+     * @param string $storeName
+     * @param string $localeName
+     *
      * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
      */
-    protected function buildLiveConfiguration(): SearchRankingConfigurationStorageTransfer
+    protected function buildLiveConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
         $metricWeightsByName = [];
 
-        foreach ($this->searchRankingFacade->getMetricWeights() as $metricWeight) {
+        foreach ($this->searchRankingFacade->getMetricWeights($storeName, $localeName) as $metricWeight) {
             $metricWeightsByName[$metricWeight['name']] = $metricWeight['weight'];
         }
 
         return (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
-            ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint())
+            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
+            ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint($storeName, $localeName))
             ->setMetricWeights($metricWeightsByName)
-            ->setEntropyWeightExponent($this->searchRankingFacade->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($this->searchRankingFacade->getEntropyWeightShiftMagnitude())
-            ->setEntropyProbeResultSize($this->searchRankingFacade->getEntropyProbeResultSize());
+            ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
+            ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
+            ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName));
     }
 
     /**

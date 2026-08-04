@@ -15,8 +15,8 @@ use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
  * The adapter between {@see \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface}'s
  * generic, Spryker-agnostic vectors and this package's own real domain: a `relevanceWeight` scalar, a
  * simplex of metric weights (summing to 1, together with any fixed-weight metrics excluded from the
- * search — see the constructor), and 3 independent entropy-aware relevance weighting parameters
- * (`entropyWeightExponent`, `entropyWeightShiftMagnitude`, `entropyProbeResultSize`). One mapper instance
+ * search — see the constructor), and 3 independent specificity-aware relevance weighting parameters
+ * (`specificityWeightExponent`, `specificityWeightShiftMagnitude`, `specificityBlendWeight`). One mapper instance
  * is scoped to a single optimization run's fixed set of active metrics — build a fresh one per run, never
  * share one across runs with a different metric set.
  */

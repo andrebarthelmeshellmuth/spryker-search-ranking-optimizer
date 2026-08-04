@@ -29,9 +29,11 @@ interface SearchRankingOptimizerFacadeInterface
      *   bypassing organic queries — a bootstrap/test path, not the primary one.
      * - Either way, creates a new calibration run in status=uploaded, with one child row per search term.
      * - Fires no search queries — {@see runNextCalibration()} does that, on its own schedule.
+     * - $calibrationType is one of `SearchRankingOptimizerConfig::CALIBRATION_TYPE_*`.
      *
      * @api
      *
+     * @param string $calibrationType
      * @param int $relevantProductCount
      * @param string $storeName
      * @param string $localeName
@@ -40,6 +42,7 @@ interface SearchRankingOptimizerFacadeInterface
      * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
      */
     public function createCalibration(
+        string $calibrationType,
         int $relevantProductCount,
         string $storeName,
         string $localeName,
@@ -198,34 +201,40 @@ interface SearchRankingOptimizerFacadeInterface
     /**
      * Specification:
      * - Reads the CURRENT state directly from `search-ranking`'s own facade — relevanceWeight, every
-     *   metric's own weight, the 3 entropy-weighting knobs, and whether entropy weighting is currently
+     *   metric's own weight, the 3 specificity-weighting knobs, and whether specificity weighting is currently
      *   enabled at the code level — and persists it as one new weight checkpoint.
      *
      * @api
      *
      * @param string $source
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
-    public function recordWeightCheckpoint(string $source): SearchRankingWeightCheckpointTransfer;
+    public function recordWeightCheckpoint(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer;
 
     /**
      * Specification:
-     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 entropy knobs back through
-     *   `search-ranking`'s own facade, skipping any metric that no longer exists.
-     * - Never writes back `isEntropyWeightingEnabled` — it's a pure code-level project flag with no
+     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 specificity knobs back through
+     *   `search-ranking`'s own facade, for the given (store, locale) — independent of whichever scope the
+     *   checkpoint was originally recorded for, skipping any metric that no longer exists.
+     * - Never writes back `isSpecificityWeightingEnabled` — it's a pure code-level project flag with no
      *   corresponding save method.
-     * - Records a NEW checkpoint of the resulting state (source `manual`) and returns it — restoring IS
-     *   applying, so it gets its own checkpoint like any other applied change.
+     * - Records a NEW checkpoint of the resulting state (source `manual`), for the same (store, locale) it
+     *   was just restored into, and returns it — restoring IS applying, so it gets its own checkpoint like
+     *   any other applied change.
      * - Returns null (writes nothing) when the given id doesn't exist.
      *
      * @api
      *
      * @param int $idSearchRankingWeightCheckpoint
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
-    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
+    public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer;
 
     /**
      * Specification:

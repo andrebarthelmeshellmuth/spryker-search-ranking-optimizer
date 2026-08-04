@@ -17,6 +17,8 @@ use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
@@ -31,6 +33,8 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcherInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStub;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStubInterface;
 
@@ -55,6 +59,27 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function createRawRelevanceScoreExtractor(): RawRelevanceScoreExtractorInterface
     {
         return new RawRelevanceScoreExtractor();
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcherInterface
+     */
+    public function createSpecificitySearcher(): SpecificitySearcherInterface
+    {
+        return new SpecificitySearcher(
+            $this->getElasticaClient(),
+            $this->createIndexNameResolver(),
+            $this->createQuerySpecificityCalculator(),
+            $this->getSearchRankingClient()->getSpecificityProbeFieldSearchAnalyzers(),
+        );
+    }
+
+    /**
+     * @return \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface
+     */
+    public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
+    {
+        return new QuerySpecificityCalculator();
     }
 
     /**

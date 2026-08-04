@@ -10,7 +10,6 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Client\SearchRankingOptimizer\Search;
 
 use Elastica\Client;
-use Elastica\Query;
 use Elastica\Query\AbstractQuery;
 use Elastica\Request;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
@@ -19,8 +18,8 @@ use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
-use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator;
-use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculatorInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig;
@@ -28,24 +27,28 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Throwable;
 
 /**
- * Entropy-aware relevance weighting (see `search-ranking`'s own README) is applied here too, not just on
- * the live storefront: `search-ranking`'s `SearchRankingFunctionScoreQueryExpanderPlugin` is the ONLY place
- * that mechanism runs live, and this class's `applyRankingFormula()` calls `FunctionScoreBuilder::build()`
- * directly, bypassing that plugin entirely -- so a candidate/live configuration's own
- * entropyProbeResultSize/entropyWeightExponent/entropyWeightShiftMagnitude were silently inert here despite
- * always being present on `SearchRankingConfigurationStorageTransfer`. `applyEntropyWeighting()` below
- * closes that gap by reimplementing the same shift formula {@see \SprykerCommunity\Client\SearchRanking\Search\EntropyWeightCalculator}
- * uses -- reimplemented rather than reusing that class directly, since it resolves its own index name via
- * `Spryker\Shared\Kernel\Store::getInstance()`, unavailable in this package's Zed/console execution context
- * (the same reason this class already builds its own raw-Elastica queries with an explicit index name
- * instead of the higher-level Store-dependent Client abstractions).
+ * Specificity-aware relevance weighting (see `search-ranking`'s own README) is applied here too, not just
+ * on the live storefront: `search-ranking`'s `SearchRankingFunctionScoreQueryExpanderPlugin` is the ONLY
+ * place that mechanism runs live, and this class's `applyRankingFormula()` calls
+ * `FunctionScoreBuilder::build()` directly, bypassing that plugin entirely -- so a candidate/live
+ * configuration's own specificityBlendWeight/specificityWeightExponent/specificityWeightShiftMagnitude
+ * were silently inert here despite always being present on `SearchRankingConfigurationStorageTransfer`.
+ * `applySpecificityWeighting()` below closes that gap by reimplementing the same shift formula
+ * {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator} uses -- reimplemented
+ * rather than reusing that class (and its `QueryTermFrequencyFetcher` IO dependency) directly, since that
+ * fetcher resolves its own index name via `Spryker\Shared\Kernel\Store::getInstance()`, unavailable in
+ * this package's Zed/console execution context (the same reason this class already builds its own
+ * raw-Elastica queries with an explicit index name instead of the higher-level Store-dependent Client
+ * abstractions). `QuerySpecificityCalculator` itself (pure math, no Store dependency at all) IS reused
+ * directly -- only the IO half needs reimplementing.
  *
- * `isEntropyWeightingEnabled()`'s project-override resolution is NOT similarly reimplemented, though: it
- * asks {@see \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface::isEntropyWeightingEnabled()}
+ * `isSpecificityWeightingEnabled()`'s project-override resolution is NOT similarly reimplemented, though:
+ * it asks {@see \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface::isSpecificityWeightingEnabled()}
  * (a thin bridge to search-ranking's own Client), which is the correctly Locator-resolved, genuinely
- * project-override-aware path -- unlike `Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
+ * project-override-aware path -- unlike `Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()`
  * (a hardcoded `return false;` this class used to call directly), that Client method has no
- * Store-singleton/execution-context concern to route around.
+ * Store-singleton/execution-context concern to route around. `getSpecificityProbeFieldSearchAnalyzers()`
+ * is resolved the exact same way, for the exact same reason.
  */
 class RankEvalRunner implements RankEvalRunnerInterface
 {
@@ -75,9 +78,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient;
 
     /**
-     * @var \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculatorInterface
+     * @var \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface
      */
-    protected ShannonEntropyCalculatorInterface $entropyCalculator;
+    protected QuerySpecificityCalculatorInterface $querySpecificityCalculator;
 
     /**
      * @var \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null
@@ -87,30 +90,29 @@ class RankEvalRunner implements RankEvalRunnerInterface
     /**
      * @var int
      */
-    protected const PROBE_SCORES_CACHE_TTL_SECONDS = 60;
+    protected const IDF_CACHE_TTL_SECONDS = 60;
 
     /**
-     * Process-scoped cache of raw `_score` values per `"<indexName>:<localeName>:<searchTerm>"` —
+     * Process-scoped cache of per-term idf values (`ln(N/df)`) per `"<indexName>:<searchTerm>"` —
      * deliberately `static`, not an instance property: {@see \SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory::createRankEvalRunner()}
      * constructs a FRESH instance on every single call, but one automated optimization run fires this
      * class's `evaluate()` potentially thousands of times within ONE continuous console-command process —
-     * and the raw probe scores for a given search term don't depend on anything the optimizer actually
-     * searches over (relevanceWeight/metric weights/entropy exponent/shift), only on
-     * `entropyProbeResultSize`'s configured UPPER bound, fetched once here regardless of what any single
-     * candidate proposes.
+     * and a search term's own idf values don't depend on anything the optimizer actually searches over
+     * (relevanceWeight/metric weights/specificity blend/exponent/shift), only on the term itself and the
+     * corpus, fetched once here regardless of what any single candidate proposes. Unlike the entropy-era
+     * probe cache this replaces, the key does NOT include `localeName`: `_termvectors`' corpus stats are
+     * already index-wide (this shop's `page` index is one-per-store-multiple-locales, see this package's
+     * README on that approximation) regardless of which locale's live query happens to be running.
      *
      * NOT actually console-only, though: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\EvaluationController::indexAction()}
      * calls straight into `evaluate()` from a normal Zed HTTP request, which under PHP-FPM reuses worker
-     * processes across many unrelated requests — this `static` property does NOT reset between them like
-     * an older revision of this docblock assumed. `PROBE_SCORES_CACHE_TTL_SECONDS` bounds the resulting
-     * staleness to a short window (still long enough for one optimization run's thousands of calls to
-     * benefit from a single fetch) instead of caching forever, and the key now includes `localeName` —
-     * this shop's `page` index is one-per-store-multiple-locales, so two locales sharing a literal
-     * search-term string used to silently share one locale's scores.
+     * processes across many unrelated requests — this `static` property does NOT reset between them.
+     * `IDF_CACHE_TTL_SECONDS` bounds the resulting staleness to a short window (still long enough for one
+     * optimization run's thousands of calls to benefit from a single fetch) instead of caching forever.
      *
-     * @var array<string, array{0: array<float>, 1: float}>
+     * @var array<string, array{0: array<string, float>, 1: float}>
      */
-    protected static array $probeScoresCache = [];
+    protected static array $idfCache = [];
 
     /**
      * @param \Elastica\Client $elasticaClient
@@ -118,7 +120,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
      * @param \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface $functionScoreBuilder
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
-     * @param \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculatorInterface|null $entropyCalculator
+     * @param \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface|null $querySpecificityCalculator
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
      */
     public function __construct(
@@ -127,7 +129,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder,
         FunctionScoreBuilderInterface $functionScoreBuilder,
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
-        ?ShannonEntropyCalculatorInterface $entropyCalculator = null,
+        ?QuerySpecificityCalculatorInterface $querySpecificityCalculator = null,
         ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
     ) {
         $this->elasticaClient = $elasticaClient;
@@ -135,7 +137,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $this->liveCatalogSearchQueryBuilder = $liveCatalogSearchQueryBuilder;
         $this->functionScoreBuilder = $functionScoreBuilder;
         $this->searchRankingStorageClient = $searchRankingStorageClient;
-        $this->entropyCalculator = $entropyCalculator ?? new ShannonEntropyCalculator();
+        $this->querySpecificityCalculator = $querySpecificityCalculator ?? new QuerySpecificityCalculator();
         $this->searchRankingClient = $searchRankingClient;
     }
 
@@ -153,7 +155,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $storeName = $requestTransfer->getStoreNameOrFail();
         $localeName = $requestTransfer->getLocaleNameOrFail();
         $indexName = $this->indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, $storeName);
-        $configurationTransfer = $requestTransfer->getRankingConfiguration() ?? $this->searchRankingStorageClient->findRankingConfiguration();
+        $configurationTransfer = $requestTransfer->getRankingConfiguration() ?? $this->searchRankingStorageClient->findRankingConfiguration($storeName, $localeName);
 
         $rankEvalRequests = $this->buildRankEvalRequests($requestTransfer, $storeName, $localeName, $indexName, $configurationTransfer);
 
@@ -224,7 +226,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName);
             $baseQuery = $elasticaQuery->getQuery();
 
-            $perQueryConfigurationTransfer = $this->applyEntropyWeighting($baseQuery, $indexName, $localeName, $searchTerm, $configurationTransfer);
+            $perQueryConfigurationTransfer = $this->applySpecificityWeighting($indexName, $searchTerm, $configurationTransfer);
             $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer);
 
             $rankEvalRequests[] = [
@@ -266,52 +268,48 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * Returns a clone of $configurationTransfer with `relevanceWeight` replaced by the entropy-adjusted
-     * value for THIS query's own raw-score distribution — a no-op (the same instance, unchanged) when
-     * there's no configuration at all, {@see \SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()}
+     * Returns a clone of $configurationTransfer with `relevanceWeight` replaced by the specificity-adjusted
+     * value for THIS search term — a no-op (the same instance, unchanged) when there's no configuration at
+     * all, {@see \SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()}
      * is off (the same project-level gate {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin}
-     * itself checks before ever firing the live probe query — evaluation must never apply an effect live
-     * traffic never applies, regardless of what a candidate configuration's own entropy fields say), or its
-     * `entropyProbeResultSize` isn't a meaningful value (unset, or below the 2 scores
-     * {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator} itself requires to
-     * compute anything).
+     * itself checks before ever firing the live probe — evaluation must never apply an effect live traffic
+     * never applies, regardless of what a candidate configuration's own specificity fields say), or no
+     * query term carries any real corpus evidence at all.
      *
-     * @param \Elastica\Query\AbstractQuery $baseQuery
      * @param string $indexName
-     * @param string $localeName
      * @param string $searchTerm
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
      *
      * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null
      */
-    protected function applyEntropyWeighting(
-        AbstractQuery $baseQuery,
+    protected function applySpecificityWeighting(
         string $indexName,
-        string $localeName,
         string $searchTerm,
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
     ): ?SearchRankingConfigurationStorageTransfer {
-        if ($configurationTransfer === null || !$this->isEntropyWeightingEnabled()) {
+        if ($configurationTransfer === null || !$this->isSpecificityWeightingEnabled()) {
             return $configurationTransfer;
         }
 
-        $probeResultSize = $configurationTransfer->getEntropyProbeResultSize();
+        $idfByTerm = $this->fetchIdfByTerm($indexName, $searchTerm);
 
-        if ($probeResultSize === null || $probeResultSize < 2) {
+        if ($idfByTerm === []) {
             return $configurationTransfer;
         }
 
-        $scores = array_slice($this->fetchProbeScores($baseQuery, $indexName, $localeName, $searchTerm), 0, $probeResultSize);
+        $rawSpecificity = $this->querySpecificityCalculator->calculateRawSpecificity(
+            $idfByTerm,
+            (float)$configurationTransfer->getSpecificityBlendWeight(),
+        );
+        $normalizedSpecificity = $this->querySpecificityCalculator->normalize(
+            $rawSpecificity,
+            (float)$configurationTransfer->getSpecificitySaturationPoint(),
+        );
 
-        if (count($scores) < 2) {
-            return $configurationTransfer;
-        }
-
-        $normalizedEntropy = $this->entropyCalculator->calculateNormalizedEntropy($scores);
-        $shift = $this->calculateEntropyShift(
-            $normalizedEntropy,
-            (float)$configurationTransfer->getEntropyWeightExponent(),
-            (float)$configurationTransfer->getEntropyWeightShiftMagnitude(),
+        $shift = $this->calculateSpecificityShift(
+            $normalizedSpecificity,
+            (float)$configurationTransfer->getSpecificityWeightExponent(),
+            (float)$configurationTransfer->getSpecificityWeightShiftMagnitude(),
         );
         $adjustedRelevanceWeight = max(0.0, min(1.0, (float)$configurationTransfer->getRelevanceWeight() + $shift));
 
@@ -322,60 +320,127 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * Fetches (and process-caches, see {@see $probeScoresCache}) the raw `_score` values for the top
-     * {@see \SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize()}
-     * results of $baseQuery — a failing or empty probe must never break the evaluation it was fired
-     * alongside, so any Throwable here is treated as "no usable signal" (falls back to the unadjusted
-     * configured relevanceWeight via the empty array this returns).
+     * Fetches (and process-caches, see {@see $idfCache}) per-term idf values for `$searchTerm` via ONE
+     * `_termvectors` probe against an artificial document — no real catalog query at all, unlike the
+     * entropy-era probe this replaces. A failing probe, or a corpus with zero documents, must never break
+     * the evaluation it was fired alongside, so any Throwable here is treated as "no usable signal" (falls
+     * back to the unadjusted configured relevanceWeight via the empty array this returns). A term with
+     * zero real corpus evidence is skipped, same reasoning as {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator}.
      *
-     * @param \Elastica\Query\AbstractQuery $baseQuery
      * @param string $indexName
-     * @param string $localeName
      * @param string $searchTerm
      *
-     * @return array<float>
+     * @return array<string, float>
      */
-    protected function fetchProbeScores(AbstractQuery $baseQuery, string $indexName, string $localeName, string $searchTerm): array
+    protected function fetchIdfByTerm(string $indexName, string $searchTerm): array
     {
-        $cacheKey = $indexName . ':' . $localeName . ':' . $searchTerm;
+        $cacheKey = $indexName . ':' . $searchTerm;
 
-        if (isset(static::$probeScoresCache[$cacheKey]) && static::$probeScoresCache[$cacheKey][1] > microtime(true)) {
-            return static::$probeScoresCache[$cacheKey][0];
+        if (isset(static::$idfCache[$cacheKey]) && static::$idfCache[$cacheKey][1] > microtime(true)) {
+            return static::$idfCache[$cacheKey][0];
         }
 
-        try {
-            $probeQuery = Query::create($baseQuery);
-            $probeQuery->setSize(SearchRankingOptimizerConfig::getMaxEntropyProbeResultSize());
-            $probeQuery->setSource(false);
+        $fieldToSearchAnalyzer = $this->searchRankingClient !== null
+            ? $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers()
+            : [];
 
-            $resultSet = $this->elasticaClient->getIndex($indexName)->search($probeQuery);
-            $scores = array_map(static fn ($result) => $result->getScore(), $resultSet->getResults());
-        } catch (Throwable) {
-            $scores = [];
+        $idfByTerm = [];
+
+        if ($searchTerm !== '' && $fieldToSearchAnalyzer !== []) {
+            try {
+                $responseData = $this->elasticaClient->request(
+                    sprintf('%s/_termvectors', $indexName),
+                    Request::POST,
+                    [
+                        'doc' => array_fill_keys(array_keys($fieldToSearchAnalyzer), $searchTerm),
+                        'fields' => array_keys($fieldToSearchAnalyzer),
+                        'per_field_analyzer' => $fieldToSearchAnalyzer,
+                        'term_statistics' => true,
+                        'field_statistics' => true,
+                    ],
+                )->getData();
+
+                $idfByTerm = $this->calculateIdfByTermFromResponse($responseData);
+            } catch (Throwable) {
+                $idfByTerm = [];
+            }
         }
 
-        static::$probeScoresCache[$cacheKey] = [$scores, microtime(true) + static::PROBE_SCORES_CACHE_TTL_SECONDS];
+        static::$idfCache[$cacheKey] = [$idfByTerm, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
 
-        return $scores;
+        return $idfByTerm;
     }
 
     /**
-     * Ported from `search-ranking`'s own {@see \SprykerCommunity\Client\SearchRanking\Search\EntropyWeightCalculator::calculateShift()}
-     * — see this class's own docblock for why it's reimplemented rather than reused directly. `1 - 2 *
-     * normalizedEntropy` maps entropy's `[0;1]` range onto a signed `[-1;1]` deviation from the neutral
-     * point (entropy exactly 0.5 → deviation 0): positive when one score dominates (shift toward text
-     * relevance), negative when the distribution is flat (shift toward business signals). The exponent is
-     * applied to the deviation's MAGNITUDE only, sign preserved separately.
+     * Mirrors {@see \SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher}'s own
+     * `_termvectors` response parsing (`doc_freq` `max()`-combined across fields, `doc_count` `max()`-ed
+     * across fields, a missing key treated as a real `0`) plus
+     * {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator}'s own idf derivation
+     * (`ln(N/df)`, skipping any term with zero real corpus evidence) in one pass, since this class needs
+     * only the final per-term idf map, not the intermediate doc-frequency result object.
      *
-     * @param float $normalizedEntropy
+     * @param array<string, mixed> $responseData
+     *
+     * @return array<string, float>
+     */
+    protected function calculateIdfByTermFromResponse(array $responseData): array
+    {
+        $termVectorsByField = is_array($responseData['term_vectors'] ?? null) ? $responseData['term_vectors'] : [];
+
+        $docCount = 0;
+        $termDocumentFrequencies = [];
+
+        foreach ($termVectorsByField as $fieldTermVector) {
+            if (!is_array($fieldTermVector)) {
+                continue;
+            }
+
+            $fieldStatistics = is_array($fieldTermVector['field_statistics'] ?? null) ? $fieldTermVector['field_statistics'] : [];
+            $docCount = max($docCount, (int)($fieldStatistics['doc_count'] ?? 0));
+
+            $terms = is_array($fieldTermVector['terms'] ?? null) ? $fieldTermVector['terms'] : [];
+
+            foreach ($terms as $term => $termStatistics) {
+                $documentFrequency = (int)($termStatistics['doc_freq'] ?? 0);
+                $termDocumentFrequencies[$term] = max($termDocumentFrequencies[$term] ?? 0, $documentFrequency);
+            }
+        }
+
+        if ($docCount <= 0) {
+            return [];
+        }
+
+        $idfByTerm = [];
+
+        foreach ($termDocumentFrequencies as $term => $documentFrequency) {
+            if ($documentFrequency <= 0) {
+                continue;
+            }
+
+            $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
+        }
+
+        return $idfByTerm;
+    }
+
+    /**
+     * Ported from `search-ranking`'s own {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator::calculateShift()}
+     * — see this class's own docblock for why it's reimplemented rather than reused directly. `2 *
+     * normalizedSpecificity - 1` maps specificity's `[0;1[` range onto a signed `[-1;1]` deviation from the
+     * neutral point (normalized specificity exactly 0.5 → deviation 0): positive when the query is MORE
+     * specific than typical (shift toward text relevance), negative when it's LESS specific than typical
+     * (shift toward business signals). The exponent is applied to the deviation's MAGNITUDE only, sign
+     * preserved separately.
+     *
+     * @param float $normalizedSpecificity
      * @param float $exponent
      * @param float $shiftMagnitude
      *
      * @return float
      */
-    protected function calculateEntropyShift(float $normalizedEntropy, float $exponent, float $shiftMagnitude): float
+    protected function calculateSpecificityShift(float $normalizedSpecificity, float $exponent, float $shiftMagnitude): float
     {
-        $signedDeviation = 1 - (2 * $normalizedEntropy);
+        $signedDeviation = (2 * $normalizedSpecificity) - 1;
         $shapedDeviation = ($signedDeviation <=> 0) * (abs($signedDeviation) ** $exponent);
 
         return $shiftMagnitude * $shapedDeviation;
@@ -384,21 +449,21 @@ class RankEvalRunner implements RankEvalRunnerInterface
     /**
      * Delegates to search-ranking's own Client (via the injected bridge) whenever one was provided — the
      * correctly Locator-resolved, genuinely project-override-aware answer, matching exactly what
-     * `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before firing the live probe query.
-     * Falls back to `Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()` — a hardcoded
+     * `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before firing the live probe. Falls
+     * back to `Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` — a hardcoded
      * `return false;` with no project-override path of its own — only when no bridge was given at all
-     * (a caller constructing this class directly with the older 5/6-argument signature), so this method
-     * never hard-fails; it just can't honor a project override without the bridge.
+     * (a caller constructing this class directly with the older argument signature), so this method never
+     * hard-fails; it just can't honor a project override without the bridge.
      *
      * @return bool
      */
-    protected function isEntropyWeightingEnabled(): bool
+    protected function isSpecificityWeightingEnabled(): bool
     {
         if ($this->searchRankingClient !== null) {
-            return $this->searchRankingClient->isEntropyWeightingEnabled();
+            return $this->searchRankingClient->isSpecificityWeightingEnabled();
         }
 
-        return SearchRankingConfig::isEntropyWeightingEnabled();
+        return SearchRankingConfig::isSpecificityWeightingEnabled();
     }
 
     /**

@@ -11,6 +11,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -41,7 +42,11 @@ class AutoTuneController extends AbstractController
 
             $rows[] = [
                 'metricName' => $metric['name'],
-                'currentFitRSquared' => $searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric),
+                'currentFitRSquared' => $searchRankingFacade->evaluateCurrentMetricFit(
+                    $idSearchRankingMetric,
+                    SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+                    SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+                ),
                 'form' => $this->getFactory()->createAutoTuneMetricConfigForm(
                     $idSearchRankingMetric,
                     $autoTuneMetricConfigTransfer?->getAutoTuneThreshold(),

@@ -11,6 +11,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication;
 
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm;
@@ -79,14 +80,24 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     }
 
     /**
-     * @param float $relevanceSaturationPoint
+     * @param float $saturationPointValue
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $calibrationType
      *
      * @return \Symfony\Component\Form\FormInterface
      */
-    public function createCalibrationApplyForm(float $relevanceSaturationPoint): FormInterface
-    {
+    public function createCalibrationApplyForm(
+        float $saturationPointValue,
+        string $storeName,
+        string $localeName,
+        string $calibrationType = SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
+    ): FormInterface {
         return $this->getFormFactory()->create(CalibrationApplyForm::class, [
-            CalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT => $relevanceSaturationPoint,
+            CalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT => $saturationPointValue,
+            CalibrationApplyForm::FIELD_STORE_NAME => $storeName,
+            CalibrationApplyForm::FIELD_LOCALE_NAME => $localeName,
+            CalibrationApplyForm::FIELD_CALIBRATION_TYPE => $calibrationType,
         ]);
     }
 
@@ -120,6 +131,28 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     public function getLocaleFacade(): SearchRankingOptimizerToLocaleFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_LOCALE);
+    }
+
+    /**
+     * Every store name, for the Checkpoint page's own Store+Locale scope selector — matches
+     * spryker-community/search-ranking's own `SearchRankingGuiCommunicationFactory::getAllStoreNames()`.
+     *
+     * @return array<string>
+     */
+    public function getAllStoreNames(): array
+    {
+        return array_map(
+            static fn ($storeTransfer) => $storeTransfer->getNameOrFail(),
+            $this->getStoreFacade()->getAllStores(),
+        );
+    }
+
+    /**
+     * @return array<string>
+     */
+    public function getAllLocaleNames(): array
+    {
+        return array_values($this->getLocaleFacade()->getAvailableLocales());
     }
 
     /**
@@ -179,13 +212,17 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
 
     /**
      * @param int $idSearchRankingWeightCheckpoint
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return \Symfony\Component\Form\FormInterface
      */
-    public function createRestoreWeightCheckpointForm(int $idSearchRankingWeightCheckpoint): FormInterface
+    public function createRestoreWeightCheckpointForm(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): FormInterface
     {
         return $this->getFormFactory()->create(RestoreWeightCheckpointForm::class, [
             RestoreWeightCheckpointForm::FIELD_ID_SEARCH_RANKING_WEIGHT_CHECKPOINT => $idSearchRankingWeightCheckpoint,
+            RestoreWeightCheckpointForm::FIELD_STORE_NAME => $storeName,
+            RestoreWeightCheckpointForm::FIELD_LOCALE_NAME => $localeName,
         ]);
     }
 

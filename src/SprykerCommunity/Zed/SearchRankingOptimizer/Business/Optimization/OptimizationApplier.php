@@ -101,17 +101,22 @@ class OptimizationApplier implements OptimizationApplierInterface
         SearchRankingOptimizerRunTransfer $optimizerRunTransfer,
         int $idSearchRankingOptimizerRun,
     ): void {
-        $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER);
+        $storeName = $optimizerRunTransfer->getStoreNameOrFail();
+        $localeName = $optimizerRunTransfer->getLocaleNameOrFail();
 
-        $this->searchRankingFacade->saveRelevanceWeight($optimizerRunTransfer->getBestRelevanceWeightOrFail());
-        $this->searchRankingFacade->saveEntropyWeightExponent($optimizerRunTransfer->getBestEntropyWeightExponentOrFail());
-        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($optimizerRunTransfer->getBestEntropyWeightShiftMagnitudeOrFail());
-        $this->searchRankingFacade->saveEntropyProbeResultSize($optimizerRunTransfer->getBestEntropyProbeResultSizeOrFail());
+        $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, $storeName, $localeName);
+
+        $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $optimizerRunTransfer->getBestRelevanceWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightShiftMagnitudeOrFail());
 
         foreach ($optimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
             $idSearchRankingMetric = $metricWeightTransfer->getIdSearchRankingMetricOrFail();
             $wasSaved = $this->searchRankingFacade->saveMetricWeight(
                 $idSearchRankingMetric,
+                $storeName,
+                $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
             );
 
