@@ -28,7 +28,7 @@ class SearchRankingOptimizerOptimizeConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Picks up the oldest still-queued automated weight-optimization run (Phase O6), scores its live configuration as a baseline, runs the run\'s own algorithm (CMA-ES or Differential Evolution) against the metric-weight simplex + relevanceWeight trust region, and persists the winning candidate for a human to review and, if they choose, apply -- never applies it automatically.';
+    public const COMMAND_DESCRIPTION = 'Picks up the oldest still-queued automated weight-optimization run (Phase O6), scores its live configuration as a baseline, runs the run\'s own algorithm (CMA-ES, the Rechenberg/Schwefel ES, or Differential Evolution) against the metric-weight simplex + relevanceWeight trust region, and persists the winning candidate for a human to review and, if they choose, apply -- never applies it automatically.';
 
     protected function configure(): void
     {

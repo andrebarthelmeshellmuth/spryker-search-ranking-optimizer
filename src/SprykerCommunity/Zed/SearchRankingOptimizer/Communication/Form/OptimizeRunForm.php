@@ -71,10 +71,13 @@ class OptimizeRunForm extends AbstractType
         $builder->add(static::FIELD_ALGORITHM, ChoiceType::class, [
             'label' => 'Algorithm',
             'help' => 'CMA-ES adapts a full covariance matrix as it searches — generally the stronger '
-                . 'choice, at some extra complexity. Differential Evolution is simpler (mutation/'
-                . 'crossover/selection only) — "the thing to beat."',
+                . 'choice, at some extra complexity. Rechenberg/Schwefel ES is CMA-ES\'s own historical '
+                . 'predecessor — isotropic mutation with the classic 1/5 success rule, no covariance '
+                . 'matrix. Differential Evolution is simpler still (mutation/crossover/selection only) — '
+                . '"the thing to beat."',
             'choices' => [
                 'CMA-ES' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+                'Rechenberg/Schwefel ES' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES,
                 'Differential Evolution' => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION,
             ],
             'constraints' => [new NotBlank()],

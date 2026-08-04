@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
 use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
 use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
+use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
 use BlackboxOptimizer\Problem\CallableProblem;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -232,13 +233,24 @@ class OptimizationRunner implements OptimizationRunnerInterface
      */
     protected function computeTotalEvaluationCount(string $algorithmName, int $populationSize, int $maxGenerations): int
     {
-        // DifferentialEvolutionAlgorithm evaluates one extra initial-population batch before its
-        // generation loop starts; CmaEsAlgorithm's first generation IS the initial sample.
-        $generationBatches = $algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION
-            ? $maxGenerations + 1
-            : $maxGenerations;
+        // DifferentialEvolutionAlgorithm evaluates one extra initial-population batch (lambda-sized, same
+        // as every later generation) before its generation loop starts; CmaEsAlgorithm's first generation
+        // IS the initial sample, no separate batch. RechenbergSchwefelEsAlgorithm also evaluates an
+        // initial batch first, but a mu-sized one (its parent population), not lambda-sized -- mu is
+        // computed here the same way RechenbergSchwefelEsAlgorithm::resolveParentCount() computes its own
+        // default (mu/lambda ~ 1/7, Schwefel's classic guideline), since this run never calls
+        // setParentCount() to override it.
+        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION) {
+            return $populationSize * ($maxGenerations + 1);
+        }
 
-        return $populationSize * $generationBatches;
+        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES) {
+            $parentCount = max(1, (int)round($populationSize / 7));
+
+            return $parentCount + ($populationSize * $maxGenerations);
+        }
+
+        return $populationSize * $maxGenerations;
     }
 
     /**
@@ -253,6 +265,13 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
 
             return $algorithm;
+        }
+
+        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES) {
+            $rechenbergSchwefelEsAlgorithm = new RechenbergSchwefelEsAlgorithm();
+            $rechenbergSchwefelEsAlgorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
+
+            return $rechenbergSchwefelEsAlgorithm;
         }
 
         $cmaEsAlgorithm = new CmaEsAlgorithm();

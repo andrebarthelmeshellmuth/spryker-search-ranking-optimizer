@@ -152,6 +152,42 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
     }
 
+    /**
+     * Same shape as {@see testRunNextCompletesSuccessfullyAndPersistsAWinningCandidate()}, run against
+     * RechenbergSchwefelEsAlgorithm instead of the default DifferentialEvolutionAlgorithm -- proves
+     * buildAlgorithm()/computeTotalEvaluationCount() actually route the third algorithm choice correctly,
+     * not just that DE and CMA-ES (already exercised elsewhere) still work.
+     */
+    public function testRunNextCompletesSuccessfullyWithTheRechenbergSchwefelEsAlgorithm(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- see the DE test above.
+        $objectiveCallback = fn (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer): float => $configurationTransfer->getRelevanceWeightOrFail();
+        // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturnCallback($objectiveCallback);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->once())->method('startOptimizerRun')->with(1, $this->greaterThan(0), 0.75);
+        $entityManagerMock->expects($this->atLeastOnce())->method('updateOptimizerRunProgress');
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun');
+        $entityManagerMock->expects($this->never())->method('failOptimizerRun');
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+    }
+
     public function testRunNextHoldsANonDeterministicMetricsWeightFixedAndNeverIncludesItInTheSearch(): void
     {
         // Arrange -- "random" (formula calls random()) sits alongside two real metrics. It must keep
@@ -314,13 +350,13 @@ class OptimizationRunnerTest extends Unit
         return $searchRankingFacadeMock;
     }
 
-    protected function createQueuedRunTransfer(): SearchRankingOptimizerRunTransfer
+    protected function createQueuedRunTransfer(?string $algorithm = null): SearchRankingOptimizerRunTransfer
     {
         return (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
             ->setStoreName('DE')
             ->setLocaleName('en_US')
-            ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
+            ->setAlgorithm($algorithm ?? SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
     }
 

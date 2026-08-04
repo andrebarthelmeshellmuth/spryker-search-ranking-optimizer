@@ -479,4 +479,14 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION = 'differential_evolution';
+
+    /**
+     * Specification:
+     * - {@see \BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES = 'rechenberg_schwefel_es';
 }

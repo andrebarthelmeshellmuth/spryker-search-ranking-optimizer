@@ -95,8 +95,8 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 
 **Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
-(CMA-ES/differential evolution against the rank-evaluation score, including `search-ranking`'s
-specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
+(CMA-ES, the Rechenberg/Schwefel ES, or differential evolution against the rank-evaluation score, including
+`search-ranking`'s specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
 The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
 [Roadmap](#roadmap) but not built yet.
 
@@ -412,14 +412,18 @@ a real `require` of this one. `ParameterVectorMapper` and `SimplexSoftmaxReparam
 package's own side of that boundary — the domain-specific glue translating `search-ranking`'s real
 configuration to and from the unconstrained vectors the generic optimizer works with.
 
-Two black-box algorithms ship, selectable per run:
+Three black-box algorithms ship, selectable per run:
 
 - **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) — the default. Adapts both a step size and a
   full covariance matrix from generation to generation, so it learns the search space's actual shape
   (correlated weights, differing sensitivities) rather than searching each dimension independently.
-- **Differential evolution** — deliberately simpler (mutate-crossover-select against the current population,
-  no covariance adaptation at all), included as a baseline "the thing to beat" rather than because it's
-  expected to win.
+- **Rechenberg/Schwefel ES** — CMA-ES's own historical predecessor: isotropic Gaussian mutation and
+  plus-selection, with step size adapted by Rechenberg's classic 1/5 success rule instead of a learned
+  covariance matrix. Meaningfully simpler than CMA-ES, at the cost of not learning correlations between
+  weights.
+- **Differential evolution** — deliberately simpler still (mutate-crossover-select against the current
+  population, no covariance adaptation at all), included as a baseline "the thing to beat" rather than
+  because it's expected to win.
 
 ![The Automated Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-optimization.png)
 
@@ -463,10 +467,10 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
   into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
   auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.0`); not on Packagist, so
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.1`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
-  [Installation](#installation)). Provides the actual CMA-ES/Differential Evolution algorithms the
-  automated weight optimization feature searches with.
+  [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
+  algorithms the automated weight optimization feature searches with.
 - **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
   active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
   shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
@@ -716,9 +720,9 @@ Designed, not yet built:
 - **One store/locale per run.** Weights found optimal for one store/locale combination are never
   cross-checked against any other; a shop running several stores needs a separate run (and separate
   judgment set) per combination it cares about.
-- **Candidate evaluation is serial, not parallel**, within a single run — CMA-ES/differential evolution
-  both evaluate one candidate configuration at a time in the same PHP process ("Run now" in the Zed page or
-  the `optimize` console command), even though every candidate in a generation is independent and could in
+- **Candidate evaluation is serial, not parallel**, within a single run — every shipped algorithm evaluates
+  one candidate configuration at a time in the same PHP process ("Run now" in the Zed page or the
+  `optimize` console command), even though every candidate in a generation is independent and could in
   principle be evaluated concurrently. A run's total wall-clock time is roughly
   `population size × generations × one rank_eval call's own cost`, so it scales directly with both the
   algorithm's own settings and the judgment set's size.
