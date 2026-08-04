@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUselessParamTagRector;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
@@ -27,11 +28,17 @@ return RectorConfig::configure()
         // typed params, which produced 215 "Doc Block params do not match method signature" errors when
         // tried -- same systemic contradiction search-debug hit with this exact rule.
         RemoveUselessParamTagRector::class,
+        // Rewrites plain === null / !== null checks on a nullable single-class type into
+        // instanceof \Fully\Qualified\ClassName -- strictly more verbose for a simple null check, breaks
+        // this codebase's consistent === null idiom used everywhere else, and writes an inline FQCN
+        // instead of a use import, tripping Spryker.Namespaces.UseStatement. Identical finding to
+        // search-debug's.
+        FlipTypeControlToUseExclusiveTypeRector::class,
     ])
     // Picks up the PHP floor (>=8.3) from composer.json.
     ->withPhpSets()
     // Gradual levels (0 = safest rules only). Raising in batches; stop at the first hit that
     // conflicts with established Spryker style rather than applying it automatically.
-    ->withDeadCodeLevel(55)
-    ->withCodeQualityLevel(55)
+    ->withDeadCodeLevel(60)
+    ->withCodeQualityLevel(60)
     ->withoutParallel();

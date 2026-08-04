@@ -66,7 +66,7 @@ class SimplexSoftmaxReparametrization
      */
     public function toFreeZ(array $weights): array
     {
-        if (count($weights) === 0) {
+        if ($weights === []) {
             throw new InvalidArgumentException('weights must contain at least one entry.');
         }
 

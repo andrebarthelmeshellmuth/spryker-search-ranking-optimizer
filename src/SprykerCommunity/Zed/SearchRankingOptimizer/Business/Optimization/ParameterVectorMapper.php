@@ -309,7 +309,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
             $availableBudget = 1.0 - $this->fixedWeightBudget;
         }
 
-        if (count($this->metrics) === 0) {
+        if ($this->metrics === []) {
             return $metricWeightsByName;
         }
 
