@@ -15,6 +15,7 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
@@ -119,8 +120,8 @@ class OptimizationApplierTest extends Unit
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
-                [1, 'DE', 'de_DE', 0.6, true],
-                [2, 'DE', 'de_DE', 0.4, true],
+                [1, 'DE', 'de_DE', 0.6, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY, true],
+                [2, 'DE', 'de_DE', 0.4, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY, true],
             ]);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
@@ -174,7 +175,7 @@ class OptimizationApplierTest extends Unit
             ->willReturn($doneRunTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 'DE', 'de_DE', 1.0)->willReturn(false);
+        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 'DE', 'de_DE', 1.0, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY)->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->method('record')->willReturn(new SearchRankingWeightCheckpointTransfer());

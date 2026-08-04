@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Yves\SearchRankingOptimizerWidget\Dependency\Client;
 
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 
@@ -43,5 +45,14 @@ class SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge implement
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer {
         return $this->searchRankingOptimizerClient->clearProductRelevanceJudgment($requestTransfer);
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
+        return $this->searchRankingOptimizerClient->getProductRelevanceJudgments($requestTransfer);
     }
 }

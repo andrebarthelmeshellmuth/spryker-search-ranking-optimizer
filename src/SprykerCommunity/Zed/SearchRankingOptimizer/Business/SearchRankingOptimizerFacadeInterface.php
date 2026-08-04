@@ -13,6 +13,8 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -107,6 +109,22 @@ interface SearchRankingOptimizerFacadeInterface
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      */
     public function clearProductRelevanceJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void;
+
+    /**
+     * Specification:
+     * - Canonicalizes the request's raw search term, looks up the matching query row (never creates one —
+     *   a query nobody has ever rated has no ratings to return), and returns this customer's own ratings
+     *   for whichever of the requested product-abstract ids they have actually rated. A query that does
+     *   not exist yet, or an empty idProductAbstracts list, both return successfully with an empty ratings
+     *   array — neither is an error, just "nothing to show".
+     * - Caller (the Gateway Controller) is responsible for authorization, same as
+     *   {@see submitProductRelevanceJudgment()}.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 
     /**
      * Specification:

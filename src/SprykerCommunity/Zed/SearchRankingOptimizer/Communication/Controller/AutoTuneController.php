@@ -34,9 +34,18 @@ class AutoTuneController extends AbstractController
     public function indexAction(): array
     {
         $searchRankingFacade = $this->getFactory()->getSearchRankingFacade();
+        $randomMetricName = $searchRankingFacade->getRandomMetricName();
         $rows = [];
 
         foreach ($searchRankingFacade->getActiveMetrics() as $metric) {
+            // The random tie-breaker metric's formula is `random()` by design -- a fresh evaluation never
+            // matches the last one, so its R² is meaningless noise, and there is nothing a refit could
+            // sensibly converge on. Excluded here rather than from getActiveMetrics() itself, since this
+            // page is the only place that reasoning applies.
+            if ($metric['name'] === $randomMetricName) {
+                continue;
+            }
+
             $idSearchRankingMetric = $metric['idSearchRankingMetric'];
             $autoTuneMetricConfigTransfer = $this->getFacade()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric);
 

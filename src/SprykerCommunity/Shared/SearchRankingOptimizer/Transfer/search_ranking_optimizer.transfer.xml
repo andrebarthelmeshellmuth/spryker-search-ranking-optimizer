@@ -97,6 +97,29 @@
         <property name="errorMessage" type="string"/>
     </transfer>
 
+    <!-- Yves -> Zed gateway request: the SRP widget's own batched "what did I already rate on this page"
+         read, fired once per page render (not once per product tile) covering every product currently on
+         the page. searchTerm arrives UN-canonicalized, same reasoning as SearchRankingProductRelevanceJudgmentRequest.
+         customerReference is set server-side by the Yves controller from the authenticated session, never
+         trusted from client input. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentBatchRequest" strict="true">
+        <property name="searchTerm" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="idProductAbstracts" type="int[]" singular="idProductAbstract"/>
+        <property name="customerReference" type="string"/>
+    </transfer>
+
+    <!-- Zed -> Yves gateway response. isSuccess=false covers only an unauthorized caller here - unlike
+         SearchRankingProductRelevanceJudgmentResponse there is no rejected-write case to report, this is a
+         read. An empty ratings array on isSuccess=true is the ordinary/expected result for a query nobody
+         (or not this customer) has rated yet, never an error. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentBatchResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="ratings" type="SearchRankingQueryRating[]" singular="rating"/>
+        <property name="errorMessage" type="string"/>
+    </transfer>
+
     <!-- One rated (query, product) judgment feeding a rank_eval evaluation: the query's own id/searchTerm
          plus the per-product mean gain across every admin who rated that (query, product) pair (see
          SearchRankingEvaluationRequest for how "mean" is computed and why). -->

@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\GroundTruth\SearchRankingOptimizer;
 
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 
 /**
@@ -167,10 +168,11 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      * @param float $weight
+     * @param string $changeSource
      */
-    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight): bool
+    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight, string $changeSource): bool
     {
-        return $this->realFacade->saveMetricWeight($idSearchRankingMetric, $storeName, $localeName, $weight);
+        return $this->realFacade->saveMetricWeight($idSearchRankingMetric, $storeName, $localeName, $weight, $changeSource);
     }
 
     /**
@@ -179,6 +181,11 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     public function getActiveMetrics(): array
     {
         return $this->realFacade->getActiveMetrics();
+    }
+
+    public function getRandomMetricName(): string
+    {
+        return $this->realFacade->getRandomMetricName();
     }
 
     /**
@@ -216,10 +223,11 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $changeSource
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool
+    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool
     {
-        return $this->realFacade->saveMetricFormula($idSearchRankingMetric, $formula);
+        return $this->realFacade->saveMetricFormula($idSearchRankingMetric, $formula, $changeSource);
     }
 
     /**

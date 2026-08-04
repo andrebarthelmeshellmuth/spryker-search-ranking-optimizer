@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer\Zed;
 
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
@@ -46,6 +48,21 @@ class ProductRelevanceJudgmentStub implements ProductRelevanceJudgmentStubInterf
         /** @var \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer $responseTransfer */
         $responseTransfer = $this->zedRequestClient->call(
             '/search-ranking-optimizer/gateway/clear-product-relevance-judgment',
+            $requestTransfer,
+        );
+
+        return $responseTransfer;
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
+        /** @var \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer $responseTransfer */
+        $responseTransfer = $this->zedRequestClient->call(
+            '/search-ranking-optimizer/gateway/get-product-relevance-judgments',
             $requestTransfer,
         );
 

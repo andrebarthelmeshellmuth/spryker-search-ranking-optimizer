@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication;
 
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer;
@@ -24,6 +25,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPoi
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPointCalibrationUploadForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\TestCurrentEvaluationForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\AssessRatedQueryTable;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\RatingTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
@@ -157,6 +159,11 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     public function createQueryTable(): AssessRatedQueryTable
     {
         return new AssessRatedQueryTable(SpySearchRankingQueryQuery::create());
+    }
+
+    public function createRatingTable(): RatingTable
+    {
+        return new RatingTable(SpySearchRankingQueryRatingQuery::create());
     }
 
     /**

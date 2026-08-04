@@ -247,6 +247,36 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
+     * @param int $idSearchRankingQuery
+     * @param string $customerReference
+     * @param array<int> $idProductAbstracts
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryRatingTransfer>
+     */
+    public function findRatingsByQueryCustomerAndProducts(int $idSearchRankingQuery, string $customerReference, array $idProductAbstracts): array
+    {
+        if ($idProductAbstracts === []) {
+            return [];
+        }
+
+        $ratingEntities = $this->getFactory()
+            ->createSearchRankingQueryRatingQuery()
+            ->filterByFkSearchRankingQuery($idSearchRankingQuery)
+            ->filterByCustomerReference($customerReference)
+            ->filterByFkProductAbstract_In($idProductAbstracts)
+            ->find();
+
+        $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
+        $ratingTransfers = [];
+
+        foreach ($ratingEntities as $ratingEntity) {
+            $ratingTransfers[] = $mapper->mapQueryRatingEntityToTransfer($ratingEntity, new SearchRankingQueryRatingTransfer());
+        }
+
+        return $ratingTransfers;
+    }
+
+    /**
      * @param string $storeName
      * @param string $localeName
      */

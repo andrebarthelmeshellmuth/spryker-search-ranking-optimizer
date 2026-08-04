@@ -270,6 +270,37 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
     }
 
+    public function testFindRatingsByQueryCustomerAndProductsReturnsOnlyThatCustomersRatingsForTheGivenProducts(): void
+    {
+        // Arrange — ids 9/10 are real seeded product abstracts, needed to satisfy the rating table's real
+        // FK constraint to spy_product_abstract.
+        $queryEntity = $this->createTestQuery('chair', 'DE-TEST-FIND-BY-QUERY-CUSTOMER', 'en_US');
+
+        $matchingRating = $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-1', 9, 'heart');
+        // Same query, different customer — must not leak into CUST-1's own result.
+        $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-2', 9, 'check');
+        // Same query, same customer, but a product NOT in the requested id list — must be excluded.
+        $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-1', 10, 'x');
+
+        // Act
+        $ratingTransfers = (new SearchRankingOptimizerRepository())
+            ->findRatingsByQueryCustomerAndProducts($queryEntity->getIdSearchRankingQuery(), 'CUST-1', [9]);
+
+        // Assert
+        $this->assertCount(1, $ratingTransfers);
+        $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
+    }
+
+    public function testFindRatingsByQueryCustomerAndProductsReturnsEmptyWithoutQueryingWhenNoProductIdsAreGiven(): void
+    {
+        // Act
+        $ratingTransfers = (new SearchRankingOptimizerRepository())
+            ->findRatingsByQueryCustomerAndProducts(999999, 'CUST-1', []);
+
+        // Assert
+        $this->assertSame([], $ratingTransfers);
+    }
+
     public function testFindLatestEvaluationReturnsTheMostRecentRow(): void
     {
         // Arrange

@@ -11,6 +11,8 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 
@@ -79,6 +81,21 @@ interface SearchRankingOptimizerClientInterface
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer;
+
+    /**
+     * Specification:
+     * - Fetches a Relevance Rater's own previously submitted judgments for a batch of product-abstract ids
+     *   via a synchronous Zed gateway call — backs the widget's "show me what I already rated" pre-fill on
+     *   page load. One call per page render (covering every product on it), not one per product tile. Zed
+     *   independently re-authorizes the caller, same as {@see submitProductRelevanceJudgment()}.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 
     /**
      * Specification:

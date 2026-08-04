@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint;
 
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -63,6 +64,7 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
                 $storeName,
                 $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
+                SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE,
             );
         }
 

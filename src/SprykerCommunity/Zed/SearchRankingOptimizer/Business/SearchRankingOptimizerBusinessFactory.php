@@ -28,6 +28,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\Optimizati
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReader;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReaderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdater;
@@ -109,6 +111,14 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function createQueryImportanceWeightUpdater(): QueryImportanceWeightUpdaterInterface
     {
         return new QueryImportanceWeightUpdater($this->getEntityManager());
+    }
+
+    public function createProductRelevanceJudgmentReader(): ProductRelevanceJudgmentReaderInterface
+    {
+        return new ProductRelevanceJudgmentReader(
+            $this->createSearchTermCanonicalizer(),
+            $this->getRepository(),
+        );
     }
 
     public function createRelevanceJudgmentGainMapper(): RelevanceJudgmentGainMapperInterface

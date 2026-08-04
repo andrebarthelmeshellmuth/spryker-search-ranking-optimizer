@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractGatewayController;
@@ -79,5 +81,28 @@ class GatewayController extends AbstractGatewayController
         $this->getFacade()->clearProductRelevanceJudgment($requestTransfer);
 
         return (new SearchRankingProductRelevanceJudgmentResponseTransfer())->setIsSuccess(true);
+    }
+
+    /**
+     * Backs the widget's "show me what I already rated" pre-fill on page load. Same authorization posture
+     * as {@see submitProductRelevanceJudgmentAction()} — seeing your own past ratings needs the same
+     * permission submitting one does, re-checked here rather than trusted from Yves.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgmentsAction(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
+        $isAuthorized = $this->getFactory()
+            ->createCompanyUserPermissionAuthorizer()
+            ->isAuthorized($requestTransfer->getCustomerReferenceOrFail(), RateSearchRelevancePermissionPlugin::KEY);
+
+        if (!$isAuthorized) {
+            return (new SearchRankingProductRelevanceJudgmentBatchResponseTransfer())
+                ->setIsSuccess(false)
+                ->setErrorMessage('Not authorized to rate search relevance.');
+        }
+
+        return $this->getFacade()->getProductRelevanceJudgments($requestTransfer);
     }
 }

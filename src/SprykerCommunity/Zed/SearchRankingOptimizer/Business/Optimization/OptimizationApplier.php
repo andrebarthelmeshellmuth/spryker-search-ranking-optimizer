@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\MetricNoLongerExistsException;
@@ -102,6 +103,7 @@ class OptimizationApplier implements OptimizationApplierInterface
                 $storeName,
                 $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
+                SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY,
             );
 
             if (!$wasSaved) {

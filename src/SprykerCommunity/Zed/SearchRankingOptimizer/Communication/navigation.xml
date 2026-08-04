@@ -45,6 +45,13 @@
                 <action>edit</action>
                 <visible>0</visible>
             </search-ranking-optimizer-query-edit>
+            <search-ranking-optimizer-rating>
+                <label>Ratings</label>
+                <title>Ratings</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>rating</controller>
+                <action>index</action>
+            </search-ranking-optimizer-rating>
             <search-ranking-optimizer-evaluation>
                 <label>Test Current Evaluation</label>
                 <title>Test Current Evaluation</title>

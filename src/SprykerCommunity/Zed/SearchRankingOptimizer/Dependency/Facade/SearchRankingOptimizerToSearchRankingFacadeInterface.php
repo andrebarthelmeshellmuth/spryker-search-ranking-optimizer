@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+
 interface SearchRankingOptimizerToSearchRankingFacadeInterface
 {
     /**
@@ -119,11 +121,16 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param float $weight
+     * @param string $changeSource One of `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::CHANGE_SOURCE_*`
+     * — no default, since this bridge has no single sensible one: today's two callers
+     * ({@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier} and
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer})
+     * need CHANGE_SOURCE_OPTIMIZER_APPLY and CHANGE_SOURCE_CHECKPOINT_RESTORE respectively.
      *
      * @return bool True if the metric still existed and was updated; false if it no longer exists (a safe
      * no-op — a checkpoint restore may reference a metric deleted since the checkpoint was taken).
      */
-    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight): bool;
+    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight, string $changeSource): bool;
 
     /**
      * Deliberately returns a plain array, not `search-ranking`'s own
@@ -135,6 +142,14 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @return array<int, array{idSearchRankingMetric: int, name: string}>
      */
     public function getActiveMetrics(): array;
+
+    /**
+     * The name of `search-ranking`'s own configured random-tie-breaker metric — lets a consumer here
+     * recognize and exclude it (e.g. from a fit-quality/auto-tune settings list, where a formula that is
+     * `random()` by design has no meaningful R² and nothing to auto-tune) without hardcoding a name that
+     * a project could reconfigure on `search-ranking`'s own side.
+     */
+    public function getRandomMetricName(): string;
 
     /**
      * Evaluates how well $idSearchRankingMetric's OWN CONFIGURED formula fits its digest RIGHT NOW — a
@@ -179,10 +194,13 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      *
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $changeSource One of `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::CHANGE_SOURCE_*`
+     * — defaults to CHANGE_SOURCE_AUTO_TUNE, this bridge method's only caller today
+     * ({@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}).
      *
      * @return bool True if the metric still existed and was updated; false if it no longer exists.
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool;
+    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool;
 
     /**
      * Appends an `isChange=false` audit row for $idSearchRankingMetric's CURRENT (unmodified) config,

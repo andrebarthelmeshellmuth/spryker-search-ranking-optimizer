@@ -103,6 +103,19 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findRatingsByStoreLocale(string $storeName, string $localeName): array;
 
     /**
+     * One customer's own ratings for a given query, restricted to the given product-abstract ids — the
+     * batched read backing the SRP widget's "show me what I already rated" pre-fill, one call per page
+     * render covering every product on it rather than one call per tile.
+     *
+     * @param int $idSearchRankingQuery
+     * @param string $customerReference
+     * @param array<int> $idProductAbstracts
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryRatingTransfer>
+     */
+    public function findRatingsByQueryCustomerAndProducts(int $idSearchRankingQuery, string $customerReference, array $idProductAbstracts): array;
+
+    /**
      * The most recently persisted rank_eval evaluation run for a given store/locale, or null when none has
      * ever run.
      *

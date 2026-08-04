@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Checkpoint;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
@@ -86,8 +87,8 @@ class WeightCheckpointRestorerTest extends Unit
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
-                [1, 'DE', 'de_DE', 0.4, true],
-                [2, 'DE', 'de_DE', 0.6, true],
+                [1, 'DE', 'de_DE', 0.4, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE, true],
+                [2, 'DE', 'de_DE', 0.6, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE, true],
             ]);
         $searchRankingFacadeMock->expects($this->never())->method('isSpecificityWeightingEnabled');
 
@@ -128,7 +129,7 @@ class WeightCheckpointRestorerTest extends Unit
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->expects($this->once())
             ->method('saveMetricWeight')
-            ->with(999, 'DE', 'de_DE', 1.0)
+            ->with(999, 'DE', 'de_DE', 1.0, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE)
             ->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);

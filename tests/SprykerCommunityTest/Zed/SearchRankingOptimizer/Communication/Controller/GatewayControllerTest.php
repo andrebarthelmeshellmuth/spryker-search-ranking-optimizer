@@ -15,6 +15,7 @@ use Generated\Shared\Transfer\CompanyUserTransfer;
 use Generated\Shared\Transfer\CustomerTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use LogicException;
@@ -164,6 +165,48 @@ class GatewayControllerTest extends Unit
         $this->assertNull($this->findPersistedRating('DE', 'en_US'), 'The rating must be gone from the DB after clearing, not merely from the response.');
     }
 
+    /**
+     * The batched read backing the SRP widget's pre-fill: submit one real rating through the same gateway,
+     * then fetch it back through {@see GatewayController::getProductRelevanceJudgmentsAction()} to prove
+     * the whole round trip (canonicalization, query lookup, customer-scoped read), not just the writer.
+     */
+    public function testGetProductRelevanceJudgmentsReturnsThePreviouslySubmittedRating(): void
+    {
+        // Arrange
+        $this->stubAuthorization(true);
+        $this->stubSearchRankingClient();
+        $submitRequestTransfer = $this->createRequestTransfer('chair', SearchRankingOptimizerConfig::RATING_TYPE_CHECK);
+        (new GatewayController())->submitProductRelevanceJudgmentAction($submitRequestTransfer);
+
+        $batchRequestTransfer = $this->createBatchRequestTransfer('chair', [static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL, 999999]);
+
+        // Act
+        $responseTransfer = (new GatewayController())->getProductRelevanceJudgmentsAction($batchRequestTransfer);
+
+        // Assert
+        $this->assertTrue($responseTransfer->getIsSuccess());
+        $this->assertCount(1, $responseTransfer->getRatings());
+        $this->assertSame(SearchRankingOptimizerConfig::RATING_TYPE_CHECK, $responseTransfer->getRatings()[0]->getRatingTypeOrFail());
+        $this->assertSame(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL, $responseTransfer->getRatings()[0]->getFkProductAbstractOrFail());
+    }
+
+    /**
+     * The authorization gate must actually block the read, same posture as the write actions.
+     */
+    public function testGetProductRelevanceJudgmentsRefusesWhenNotAuthorized(): void
+    {
+        // Arrange
+        $this->stubAuthorization(false);
+        $batchRequestTransfer = $this->createBatchRequestTransfer('chair', [static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL]);
+
+        // Act
+        $responseTransfer = (new GatewayController())->getProductRelevanceJudgmentsAction($batchRequestTransfer);
+
+        // Assert
+        $this->assertFalse($responseTransfer->getIsSuccess());
+        $this->assertSame('Not authorized to rate search relevance.', $responseTransfer->getErrorMessage());
+    }
+
     protected function findPersistedRating(string $storeName, string $localeName): ?SearchRankingQueryRatingTransfer
     {
         foreach ((new SearchRankingOptimizerRepository())->findRatingsByStoreLocale($storeName, $localeName) as $ratingTransfer) {
@@ -186,6 +229,19 @@ class GatewayControllerTest extends Unit
             ->setLocaleName('en_US')
             ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL)
             ->setRatingType($ratingType)
+            ->setCustomerReference(static::CUSTOMER_REFERENCE);
+    }
+
+    /**
+     * @param array<int> $idProductAbstracts
+     */
+    protected function createBatchRequestTransfer(string $searchTerm, array $idProductAbstracts): SearchRankingProductRelevanceJudgmentBatchRequestTransfer
+    {
+        return (new SearchRankingProductRelevanceJudgmentBatchRequestTransfer())
+            ->setSearchTerm($searchTerm)
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setIdProductAbstracts($idProductAbstracts)
             ->setCustomerReference(static::CUSTOMER_REFERENCE);
     }
 

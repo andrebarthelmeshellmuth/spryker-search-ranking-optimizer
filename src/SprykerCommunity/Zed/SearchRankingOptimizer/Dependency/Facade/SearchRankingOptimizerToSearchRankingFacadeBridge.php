@@ -171,8 +171,9 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      * @param float $weight
+     * @param string $changeSource
      */
-    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight): bool
+    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight, string $changeSource): bool
     {
         $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
@@ -180,7 +181,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             return false;
         }
 
-        $this->searchRankingFacade->saveMetricWeight($idSearchRankingMetric, $storeName, $localeName, $weight);
+        $this->searchRankingFacade->saveMetricWeight($idSearchRankingMetric, $storeName, $localeName, $weight, $changeSource);
 
         return true;
     }
@@ -205,6 +206,11 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
         }
 
         return $metrics;
+    }
+
+    public function getRandomMetricName(): string
+    {
+        return $this->searchRankingFacade->getRandomMetricName();
     }
 
     /**
@@ -283,8 +289,9 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $changeSource
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool
+    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool
     {
         $metricTransfer = $this->searchRankingFacade->findMetricById(
             $idSearchRankingMetric,
@@ -296,7 +303,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             return false;
         }
 
-        $this->searchRankingFacade->saveMetric($metricTransfer->setFormula($formula));
+        $this->searchRankingFacade->saveMetric($metricTransfer->setFormula($formula)->setChangeSource($changeSource));
 
         return true;
     }
