@@ -39,6 +39,6 @@ return RectorConfig::configure()
     ->withPhpSets()
     // Gradual levels (0 = safest rules only). Raising in batches; stop at the first hit that
     // conflicts with established Spryker style rather than applying it automatically.
-    ->withDeadCodeLevel(65)
-    ->withCodeQualityLevel(65)
+    ->withDeadCodeLevel(70)
+    ->withCodeQualityLevel(70)
     ->withoutParallel();
