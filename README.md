@@ -761,7 +761,7 @@ composer check-floors
 
 ### Test suite
 
-**214 tests, 739 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**234 tests, 788 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
