@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <database xmlns="spryker:schema-01" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="zed" namespace="Orm\Zed\SearchRankingOptimizer\Persistence" package="src.Orm.Zed.SearchRankingOptimizer.Persistence" xsi:schemaLocation="spryker:schema-01 https://static.spryker.com/schema-01.xsd">
 
-    <table name="spy_search_ranking_calibration" idMethod="native" identifierQuoting="true">
-        <column name="id_search_ranking_calibration" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+    <table name="spy_search_ranking_saturation_point_calibration" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_saturation_point_calibration" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
         <column name="calibration_type" type="VARCHAR" size="32" required="true" defaultValue="relevance_score" description="SearchRankingOptimizerConfig::CALIBRATION_TYPE_* — relevance_score (samples real per-product text-relevance scores) or specificity (samples one per-query raw specificity value, no catalog query)."/>
         <column name="relevant_product_count" type="INTEGER" required="true" description="X: number of top-ranked products per search term assumed relevant, e.g. 6. Ignored (always 1 result per term) for calibration_type=specificity."/>
         <column name="store_name" type="VARCHAR" size="64" required="true" description="Store the calibration query runs against, e.g. DE — picked by the admin at upload time, since Zed has no implicit current store."/>
@@ -22,29 +22,29 @@
         <column name="processed_count" type="INTEGER" required="true" defaultValue="0" description="Search terms fired so far in the current/last run — incremented one at a time inside ScoreCalibrator::calculate()'s own per-term loop, the numerator for the live progress counter."/>
 
         <behavior name="timestampable"/>
-        <id-method-parameter value="spy_search_ranking_calibration_pk_seq"/>
+        <id-method-parameter value="spy_search_ranking_saturation_point_calibration_pk_seq"/>
 
-        <index name="index-spy_src-status">
+        <index name="index-spy_srspc-status">
             <index-column name="status"/>
         </index>
     </table>
 
-    <table name="spy_search_ranking_calibration_search_term" idMethod="native" identifierQuoting="true">
-        <column name="id_search_ranking_calibration_search_term" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
-        <column name="fk_search_ranking_calibration" type="INTEGER" required="true"/>
+    <table name="spy_search_ranking_saturation_point_calibration_search_term" idMethod="native" identifierQuoting="true">
+        <column name="id_search_ranking_saturation_point_calibration_search_term" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="fk_search_ranking_saturation_point_calibration" type="INTEGER" required="true"/>
         <column name="search_term" type="VARCHAR" size="255" required="true"/>
         <column name="products_found" type="INTEGER" required="false" description="Null until calculated; may be less than the run's relevant_product_count. Always 1 (or 0 on failure) for calibration_type=specificity."/>
         <column name="values" type="LONGVARCHAR" required="false" description="Comma-separated raw sampled values — one per found product for calibration_type=relevance_score, exactly one raw specificity value for calibration_type=specificity. Null until calculated."/>
 
         <behavior name="timestampable"/>
-        <id-method-parameter value="spy_search_ranking_calibration_search_term_pk_seq"/>
+        <id-method-parameter value="spy_search_ranking_saturation_point_calibration_search_term_pk_seq"/>
 
-        <foreign-key name="spy_src_search_term-fk_calibration" foreignTable="spy_search_ranking_calibration" phpName="SearchRankingCalibration" refPhpName="SearchRankingCalibrationSearchTerm" onDelete="CASCADE">
-            <reference local="fk_search_ranking_calibration" foreign="id_search_ranking_calibration"/>
+        <foreign-key name="spy_srspc_search_term-fk_calibration" foreignTable="spy_search_ranking_saturation_point_calibration" phpName="SearchRankingSaturationPointCalibration" refPhpName="SearchRankingSaturationPointCalibrationSearchTerm" onDelete="CASCADE">
+            <reference local="fk_search_ranking_saturation_point_calibration" foreign="id_search_ranking_saturation_point_calibration"/>
         </foreign-key>
 
-        <index name="index-spy_src_search_term-fk_calibration">
-            <index-column name="fk_search_ranking_calibration"/>
+        <index name="index-spy_srspc_search_term-fk_calibration">
+            <index-column name="fk_search_ranking_saturation_point_calibration"/>
         </index>
     </table>
 

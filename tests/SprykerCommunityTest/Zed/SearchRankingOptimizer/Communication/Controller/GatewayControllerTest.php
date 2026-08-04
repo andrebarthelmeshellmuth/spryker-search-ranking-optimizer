@@ -50,7 +50,7 @@ use SprykerCommunityTest\Zed\SearchRankingOptimizer\SearchRankingOptimizerZedTes
  * {@see \SprykerCommunityTest\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerTest} —
  * here only ITS RESULT needs to be controllable), and the one Client dependency that cannot run from Zed
  * at all (`Client\SearchRankingOptimizer::productMatchesSearch()`, resolved the normal way via the real
- * Client Locator, crashes from Zed for the same reason documented on `CalibrationSearcher`) — swapped for
+ * Client Locator, crashes from Zed for the same reason documented on `SaturationPointCalibrationSearcher`) — swapped for
  * the exact same real-Elastica, Zed-safe composition {@see CalibrationSearcherTest}/
  * {@see ProductSearchMatchVerifierTest} already use directly. Every write is verified independently by
  * re-reading it back from a fresh {@see SearchRankingOptimizerRepository} query, not by trusting the

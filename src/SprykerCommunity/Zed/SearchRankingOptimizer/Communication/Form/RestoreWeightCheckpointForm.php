@@ -46,7 +46,7 @@ class RestoreWeightCheckpointForm extends AbstractType
         ]);
 
         // Not user-editable — the TARGET scope to restore into, carried through as hidden fields from
-        // whichever scope is currently selected on the page (same discipline CalibrationApplyForm already
+        // whichever scope is currently selected on the page (same discipline SaturationPointCalibrationApplyForm already
         // follows for its own hidden store/locale fields).
         $builder->add(static::FIELD_STORE_NAME, HiddenType::class, [
             'constraints' => [new NotBlank()],

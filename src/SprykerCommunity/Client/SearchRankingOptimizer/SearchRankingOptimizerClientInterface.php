@@ -21,7 +21,7 @@ interface SearchRankingOptimizerClientInterface
      * - Used only by the calibration feature. Fires the calibration query for $searchTerm directly
      *   against Elasticsearch (bypassing `Client\Catalog`/`Client\Search`, which are unusable from Zed in
      *   this shop — see
-     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface} for
+     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcherInterface} for
      *   why), and returns each matched product's raw text-relevance score, up to $limit.
      *
      * @api

@@ -81,7 +81,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * already index-wide (this shop's `page` index is one-per-store-multiple-locales, see this package's
      * README on that approximation) regardless of which locale's live query happens to be running.
      *
-     * NOT actually console-only, though: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\EvaluationController::indexAction()}
+     * NOT actually console-only, though: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\TestCurrentEvaluationController::indexAction()}
      * calls straight into `evaluate()` from a normal Zed HTTP request, which under PHP-FPM reuses worker
      * processes across many unrelated requests — this `static` property does NOT reset between them.
      * `IDF_CACHE_TTL_SECONDS` bounds the resulting staleness to a short window (still long enough for one

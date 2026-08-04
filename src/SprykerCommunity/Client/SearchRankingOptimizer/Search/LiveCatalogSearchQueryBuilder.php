@@ -18,7 +18,7 @@ use Spryker\Client\SearchElasticsearch\Plugin\QueryExpander\IsActiveInDateRangeQ
 use Spryker\Client\SearchElasticsearch\Plugin\QueryExpander\IsActiveQueryExpanderPlugin;
 
 /**
- * Extracted from {@see CalibrationSearcher}'s own original `buildQuery()` — see
+ * Extracted from {@see SaturationPointCalibrationSearcher}'s own original `buildQuery()` — see
  * {@see LiveCatalogSearchQueryBuilderInterface} for why this exists as its own component (shared by
  * Calibration and rank_eval evaluation) rather than living on one or the other, and for why this is a
  * deliberate SUBSET of the real live query (store/locale/is_active/is_active_in_date_range only), not a

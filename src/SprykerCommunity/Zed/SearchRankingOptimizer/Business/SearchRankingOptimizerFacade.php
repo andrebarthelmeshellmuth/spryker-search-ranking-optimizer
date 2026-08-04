@@ -11,12 +11,12 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
@@ -44,7 +44,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
         string $storeName,
         string $localeName,
         ?string $csvContent = null,
-    ): SearchRankingCalibrationTransfer {
+    ): SearchRankingSaturationPointCalibrationTransfer {
         return $this->getFactory()->createCalibrationUploadHandler()->createCalibration($calibrationType, $relevantProductCount, $storeName, $localeName, $csvContent);
     }
 
@@ -53,7 +53,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      */
-    public function runNextCalibration(): ?SearchRankingCalibrationTransfer
+    public function runNextCalibration(): ?SearchRankingSaturationPointCalibrationTransfer
     {
         return $this->getFactory()->createScoreCalibrator()->runNextCalibration();
     }
@@ -63,7 +63,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer
+    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer
     {
         return $this->getRepository()->findLatestCalculatedCalibration();
     }
@@ -73,7 +73,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      */
-    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer
+    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer
     {
         return $this->getRepository()->findCalibrationInProgress();
     }

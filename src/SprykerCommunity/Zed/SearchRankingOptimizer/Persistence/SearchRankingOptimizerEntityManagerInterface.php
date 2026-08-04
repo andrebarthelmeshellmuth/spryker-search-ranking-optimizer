@@ -10,11 +10,11 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 
@@ -32,47 +32,50 @@ interface SearchRankingOptimizerEntityManagerInterface
      * Creates a calibration run in status=uploaded together with one child row per
      * `$calibrationTransfer->getSearchTerms()` entry (search term text only, no scores yet).
      *
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
-    public function createCalibration(SearchRankingCalibrationTransfer $calibrationTransfer): SearchRankingCalibrationTransfer;
+    public function createCalibration(SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $status
      */
-    public function updateCalibrationStatus(int $idSearchRankingCalibration, string $status): void;
+    public function updateCalibrationStatus(int $idSearchRankingSaturationPointCalibration, string $status): void;
 
     /**
-     * @param int $idSearchRankingCalibrationSearchTerm
+     * @param int $idSearchRankingSaturationPointCalibrationSearchTerm
      * @param int $productsFound
      * @param array<float> $scores
      */
-    public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $scores): void;
+    public function saveCalibrationSearchTermResult(int $idSearchRankingSaturationPointCalibrationSearchTerm, int $productsFound, array $scores): void;
 
     /**
      * Adds 1 to the calibration's `processedCount` — called once per search term as the calculation loop
      * works through them, the numerator half of the live progress counter. A safe no-op if the id no
      * longer exists.
      *
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void;
+    public function incrementCalibrationProcessedCount(int $idSearchRankingSaturationPointCalibration): void;
 
     /**
      * Persists the pooled statistics onto the calibration row and sets status=calculated.
      *
-     * @param int $idSearchRankingCalibration
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $statisticsTransfer
+     * @param int $idSearchRankingSaturationPointCalibration
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer
      */
-    public function saveCalibrationStatistics(int $idSearchRankingCalibration, SearchRankingCalibrationTransfer $statisticsTransfer): void;
+    public function saveCalibrationStatistics(
+        int $idSearchRankingSaturationPointCalibration,
+        SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer,
+    ): void;
 
     /**
      * Sets status=failed with an explanatory error message.
      *
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $errorMessage
      */
-    public function markCalibrationFailed(int $idSearchRankingCalibration, string $errorMessage): void;
+    public function markCalibrationFailed(int $idSearchRankingSaturationPointCalibration, string $errorMessage): void;
 
     /**
      * Creates a new query row. `$queryTransfer` must already carry a CANONICAL `searchTerm` — canonicalize

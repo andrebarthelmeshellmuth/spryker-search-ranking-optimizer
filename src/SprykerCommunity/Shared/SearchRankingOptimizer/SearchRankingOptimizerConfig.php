@@ -94,7 +94,7 @@ class SearchRankingOptimizerConfig
      * Specification:
      * - Elasticsearch page-index source identifier passed to `IndexNameResolver::resolve()` when
      *   calibration resolves an index name directly (bypassing Client\Catalog/Client\Search — see
-     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher}). A local copy
+     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcher}). A local copy
      *   of the base package's identically-valued constant, kept here so this package resolves the page
      *   index without a compile-time reference back into spryker-community/search-ranking's config.
      *

@@ -62,7 +62,7 @@ class SearchRankingOptimizerCalibrateConsole extends Console
 
         $output->writeln(sprintf(
             'Calibration #%d done: sampled %d value(s) across %d search term(s), computed k = %.4f.',
-            $calibrationTransfer->getIdSearchRankingCalibrationOrFail(),
+            $calibrationTransfer->getIdSearchRankingSaturationPointCalibrationOrFail(),
             $calibrationTransfer->getSampleCountOrFail(),
             count($calibrationTransfer->getSearchTerms()),
             $calibrationTransfer->getComputedKOrFail(),

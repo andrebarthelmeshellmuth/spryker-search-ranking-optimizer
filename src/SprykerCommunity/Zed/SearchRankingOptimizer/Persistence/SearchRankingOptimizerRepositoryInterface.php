@@ -10,10 +10,10 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
 interface SearchRankingOptimizerRepositoryInterface
@@ -22,25 +22,25 @@ interface SearchRankingOptimizerRepositoryInterface
      * Returns every calibration run with status=uploaded, newest first (by id) — search terms are NOT
      * loaded (use {@see findCalibrationWithSearchTerms()} for that).
      *
-     * @return array<\Generated\Shared\Transfer\SearchRankingCalibrationTransfer>
+     * @return array<\Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer>
      */
     public function getUploadedCalibrations(): array;
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    public function findCalibrationWithSearchTerms(int $idSearchRankingCalibration): ?SearchRankingCalibrationTransfer;
+    public function findCalibrationWithSearchTerms(int $idSearchRankingSaturationPointCalibration): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * The most recent calibration run with status=calculated, or null when none has ever finished.
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
+    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * The run currently in status=calculating, if any — at most one at a time by design. Backs the
      * Calibration page's live progress counter.
      */
-    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
+    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * Looks up a query by its exact canonical (searchTerm, storeName, localeName) key — the same key
@@ -68,7 +68,7 @@ interface SearchRankingOptimizerRepositoryInterface
     /**
      * The distinct, already-canonical search terms organically collected via the SRP rating widget for a
      * given store/locale — the default calibration term source once real ratings exist (see
-     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface::createCalibration()}).
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\SaturationPointCalibrationUploadHandlerInterface::createCalibration()}).
      *
      * @param string $storeName
      * @param string $localeName

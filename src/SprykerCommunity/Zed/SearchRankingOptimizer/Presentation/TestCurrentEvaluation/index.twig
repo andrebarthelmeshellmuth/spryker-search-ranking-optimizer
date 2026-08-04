@@ -1,0 +1,77 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Test Current Evaluation' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Test Current Evaluation' } %}
+        {% block widget_content %}
+            <p>
+                Groups every individual relevance rating into a mean gain per (query, product) pair, fires
+                one batched <code>_rank_eval</code> request against the live catalog, and persists a
+                query-importance-weighted nDCG@10 aggregate — a real objective score in place of averaged
+                admin opinion.
+            </p>
+            {{ form_start(evaluationForm, { action: url('/search-ranking-optimizer/test-current-evaluation'), method: 'POST' }) }}
+            {{ form_widget(evaluationForm) }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Evaluate now' | trans }}</button>
+            </div>
+            {{ form_end(evaluationForm) }}
+        {% endblock %}
+    {% endembed %}
+
+    {% if storeName and localeName %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Latest Result — ' ~ storeName ~ ' / ' ~ localeName } %}
+            {% block widget_content %}
+                {% if latestEvaluation %}
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th>Weighted nDCG aggregate</th>
+                                <td><strong>{{ latestEvaluation.metricScore }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Rated queries evaluated</th>
+                                <td>{{ latestEvaluation.queryCount }}</td>
+                            </tr>
+                            <tr>
+                                <th>Evaluated at</th>
+                                <td>{{ latestEvaluation.createdAt }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No evaluation has run yet for this store/locale.</p>
+                {% endif %}
+            {% endblock %}
+        {% endembed %}
+
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
+            {% block widget_content %}
+                {% if evaluationHistory %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Evaluated at</th>
+                                <th>Weighted nDCG aggregate</th>
+                                <th>Rated queries</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for evaluation in evaluationHistory %}
+                                <tr>
+                                    <td>{{ evaluation.createdAt }}</td>
+                                    <td>{{ evaluation.metricScore }}</td>
+                                    <td>{{ evaluation.queryCount }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No evaluation history yet.</p>
+                {% endif %}
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+{% endblock %}

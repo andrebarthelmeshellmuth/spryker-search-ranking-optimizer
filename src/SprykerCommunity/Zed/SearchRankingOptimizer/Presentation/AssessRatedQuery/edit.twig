@@ -1,0 +1,34 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Edit Importance: %term%' %}
+{% block section_title %}{{ widget_title | trans({'%term%': query.searchTerm}) }}{% endblock %}
+
+{% block action %}
+    {{ backActionButton('/search-ranking-optimizer/assess-rated-query', 'Back to Assess Rated Queries' | trans) }}
+{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Query Importance' } %}
+        {% block widget_content %}
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>Search term</th>
+                        <td>{{ query.searchTerm }}</td>
+                    </tr>
+                    <tr>
+                        <th>Store / Locale</th>
+                        <td>{{ query.storeName }} / {{ query.localeName }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {{ form_start(importanceWeightForm) }}
+            {{ form_row(importanceWeightForm.importanceWeight) }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Save' | trans }}</button>
+            </div>
+            {{ form_end(importanceWeightForm) }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

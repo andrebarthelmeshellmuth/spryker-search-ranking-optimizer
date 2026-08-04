@@ -10,26 +10,26 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use Spryker\Zed\Kernel\Persistence\AbstractPersistenceFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
 class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactory
 {
-    public function createSearchRankingCalibrationQuery(): SpySearchRankingCalibrationQuery
+    public function createSearchRankingSaturationPointCalibrationQuery(): SpySearchRankingSaturationPointCalibrationQuery
     {
-        return SpySearchRankingCalibrationQuery::create();
+        return SpySearchRankingSaturationPointCalibrationQuery::create();
     }
 
-    public function createSearchRankingCalibrationSearchTermQuery(): SpySearchRankingCalibrationSearchTermQuery
+    public function createSearchRankingSaturationPointCalibrationSearchTermQuery(): SpySearchRankingSaturationPointCalibrationSearchTermQuery
     {
-        return SpySearchRankingCalibrationSearchTermQuery::create();
+        return SpySearchRankingSaturationPointCalibrationSearchTermQuery::create();
     }
 
     public function createSearchRankingQueryQuery(): SpySearchRankingQueryQuery

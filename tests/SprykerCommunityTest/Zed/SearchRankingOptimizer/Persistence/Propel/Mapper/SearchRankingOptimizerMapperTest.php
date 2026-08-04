@@ -11,15 +11,15 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence\Propel\Map
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
@@ -40,8 +40,8 @@ class SearchRankingOptimizerMapperTest extends Unit
     public function testMapsCalibrationEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
-        $calibrationEntity = new SpySearchRankingCalibration();
-        $calibrationEntity->setIdSearchRankingCalibration(4);
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
+        $calibrationEntity->setIdSearchRankingSaturationPointCalibration(4);
         $calibrationEntity->setRelevantProductCount(20);
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('de_DE');
@@ -63,11 +63,11 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $calibrationTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationEntityToTransfer(
             $calibrationEntity,
-            new SearchRankingCalibrationTransfer(),
+            new SearchRankingSaturationPointCalibrationTransfer(),
         );
 
         // Assert
-        $this->assertSame(4, $calibrationTransfer->getIdSearchRankingCalibration());
+        $this->assertSame(4, $calibrationTransfer->getIdSearchRankingSaturationPointCalibration());
         $this->assertSame(20, $calibrationTransfer->getRelevantProductCount());
         $this->assertSame('DE', $calibrationTransfer->getStoreName());
         $this->assertSame('de_DE', $calibrationTransfer->getLocaleName());
@@ -92,7 +92,7 @@ class SearchRankingOptimizerMapperTest extends Unit
     public function testMapsCalibrationEntityWithNoTimestampsToNullDates(): void
     {
         // Arrange
-        $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('de_DE');
         $calibrationEntity->setStatus('running');
@@ -101,7 +101,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $calibrationTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationEntityToTransfer(
             $calibrationEntity,
-            new SearchRankingCalibrationTransfer(),
+            new SearchRankingSaturationPointCalibrationTransfer(),
         );
 
         // Assert
@@ -112,9 +112,9 @@ class SearchRankingOptimizerMapperTest extends Unit
     public function testMapsCalibrationSearchTermEntityFieldsOntoTheTransferIncludingExplodedValues(): void
     {
         // Arrange
-        $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $searchTermEntity->setIdSearchRankingCalibrationSearchTerm(9);
-        $searchTermEntity->setFkSearchRankingCalibration(4);
+        $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $searchTermEntity->setIdSearchRankingSaturationPointCalibrationSearchTerm(9);
+        $searchTermEntity->setFkSearchRankingSaturationPointCalibration(4);
         $searchTermEntity->setSearchTerm('cable tie');
         $searchTermEntity->setProductsFound(12);
         $searchTermEntity->setValues('1.5,2.5,3.5');
@@ -122,12 +122,12 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $searchTermTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationSearchTermEntityToTransfer(
             $searchTermEntity,
-            new SearchRankingCalibrationSearchTermTransfer(),
+            new SearchRankingSaturationPointCalibrationSearchTermTransfer(),
         );
 
         // Assert
-        $this->assertSame(9, $searchTermTransfer->getIdSearchRankingCalibrationSearchTerm());
-        $this->assertSame(4, $searchTermTransfer->getFkSearchRankingCalibration());
+        $this->assertSame(9, $searchTermTransfer->getIdSearchRankingSaturationPointCalibrationSearchTerm());
+        $this->assertSame(4, $searchTermTransfer->getFkSearchRankingSaturationPointCalibration());
         $this->assertSame('cable tie', $searchTermTransfer->getSearchTerm());
         $this->assertSame(12, $searchTermTransfer->getProductsFound());
         $this->assertSame([1.5, 2.5, 3.5], $searchTermTransfer->getValues());
@@ -140,7 +140,7 @@ class SearchRankingOptimizerMapperTest extends Unit
     public function testMapsACalibrationSearchTermWithNoValuesToAnEmptyArray(): void
     {
         // Arrange
-        $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
+        $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
         $searchTermEntity->setSearchTerm('no results yet');
         $searchTermEntity->setProductsFound(0);
         $searchTermEntity->setValues(null);
@@ -148,7 +148,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $searchTermTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationSearchTermEntityToTransfer(
             $searchTermEntity,
-            new SearchRankingCalibrationSearchTermTransfer(),
+            new SearchRankingSaturationPointCalibrationSearchTermTransfer(),
         );
 
         // Assert

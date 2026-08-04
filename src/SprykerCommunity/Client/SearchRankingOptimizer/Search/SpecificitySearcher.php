@@ -18,11 +18,11 @@ use Throwable;
 
 /**
  * Fires the `_termvectors` probe DIRECTLY against Elasticsearch, the same reasoning as
- * {@see CalibrationSearcher}'s own docblock for why: `Client\Catalog`/`Client\Search`, and even
+ * {@see SaturationPointCalibrationSearcher}'s own docblock for why: `Client\Catalog`/`Client\Search`, and even
  * `search-ranking`'s own `QueryTermFrequencyFetcher` (which resolves its index via
  * `Client\Store::getCurrentStore()`), are unusable from Zed/console execution — no HTTP-request-scoped
  * "current store" exists there. $storeName is passed in explicitly instead (picked by the admin at upload
- * time), resolved via the same {@see IndexNameResolverInterface} `CalibrationSearcher` uses. Only the IO is
+ * time), resolved via the same {@see IndexNameResolverInterface} `SaturationPointCalibrationSearcher` uses. Only the IO is
  * reimplemented; the blend/normalize math itself reuses `QuerySpecificityCalculatorInterface` directly —
  * that class has no Store dependency at all.
  */

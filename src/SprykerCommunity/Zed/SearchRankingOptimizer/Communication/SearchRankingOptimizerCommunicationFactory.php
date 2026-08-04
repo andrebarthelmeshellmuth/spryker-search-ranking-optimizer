@@ -14,16 +14,16 @@ use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationApplyForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationApplyForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\CalibrationUploadForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\EvaluationForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\OptimizationApplyForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\OptimizeRunForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\QueryImportanceWeightForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RecordWeightCheckpointForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\RestoreWeightCheckpointForm;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\QueryTable;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPointCalibrationApplyForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPointCalibrationUploadForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\TestCurrentEvaluationForm;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\AssessRatedQueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
@@ -47,9 +47,9 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
             $localeChoices[$localeName] = $localeName;
         }
 
-        return $this->getFormFactory()->create(CalibrationUploadForm::class, null, [
-            CalibrationUploadForm::OPTION_STORE_CHOICES => $storeChoices,
-            CalibrationUploadForm::OPTION_LOCALE_CHOICES => $localeChoices,
+        return $this->getFormFactory()->create(SaturationPointCalibrationUploadForm::class, null, [
+            SaturationPointCalibrationUploadForm::OPTION_STORE_CHOICES => $storeChoices,
+            SaturationPointCalibrationUploadForm::OPTION_LOCALE_CHOICES => $localeChoices,
         ]);
     }
 
@@ -68,9 +68,9 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
             $localeChoices[$localeName] = $localeName;
         }
 
-        return $this->getFormFactory()->create(EvaluationForm::class, $data, [
-            EvaluationForm::OPTION_STORE_CHOICES => $storeChoices,
-            EvaluationForm::OPTION_LOCALE_CHOICES => $localeChoices,
+        return $this->getFormFactory()->create(TestCurrentEvaluationForm::class, $data, [
+            TestCurrentEvaluationForm::OPTION_STORE_CHOICES => $storeChoices,
+            TestCurrentEvaluationForm::OPTION_LOCALE_CHOICES => $localeChoices,
         ]);
     }
 
@@ -86,11 +86,11 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         string $localeName,
         string $calibrationType = SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
     ): FormInterface {
-        return $this->getFormFactory()->create(CalibrationApplyForm::class, [
-            CalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT => $saturationPointValue,
-            CalibrationApplyForm::FIELD_STORE_NAME => $storeName,
-            CalibrationApplyForm::FIELD_LOCALE_NAME => $localeName,
-            CalibrationApplyForm::FIELD_CALIBRATION_TYPE => $calibrationType,
+        return $this->getFormFactory()->create(SaturationPointCalibrationApplyForm::class, [
+            SaturationPointCalibrationApplyForm::FIELD_RELEVANCE_SATURATION_POINT => $saturationPointValue,
+            SaturationPointCalibrationApplyForm::FIELD_STORE_NAME => $storeName,
+            SaturationPointCalibrationApplyForm::FIELD_LOCALE_NAME => $localeName,
+            SaturationPointCalibrationApplyForm::FIELD_CALIBRATION_TYPE => $calibrationType,
         ]);
     }
 
@@ -154,9 +154,9 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         );
     }
 
-    public function createQueryTable(): QueryTable
+    public function createQueryTable(): AssessRatedQueryTable
     {
-        return new QueryTable(SpySearchRankingQueryQuery::create());
+        return new AssessRatedQueryTable(SpySearchRankingQueryQuery::create());
     }
 
     /**
@@ -223,9 +223,9 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
             $localeChoices[$localeName] = $localeName;
         }
 
-        return $this->getFormFactory()->create(OptimizeRunForm::class, null, [
-            OptimizeRunForm::OPTION_STORE_CHOICES => $storeChoices,
-            OptimizeRunForm::OPTION_LOCALE_CHOICES => $localeChoices,
+        return $this->getFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
+            AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => $storeChoices,
+            AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => $localeChoices,
         ]);
     }
 
@@ -234,8 +234,8 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
      */
     public function createOptimizationApplyForm(int $idSearchRankingOptimizerRun): FormInterface
     {
-        return $this->getFormFactory()->create(OptimizationApplyForm::class, [
-            OptimizationApplyForm::FIELD_ID_SEARCH_RANKING_OPTIMIZER_RUN => $idSearchRankingOptimizerRun,
+        return $this->getFormFactory()->create(AutomatedWeightOptimizationApplyForm::class, [
+            AutomatedWeightOptimizationApplyForm::FIELD_ID_SEARCH_RANKING_OPTIMIZER_RUN => $idSearchRankingOptimizerRun,
         ]);
     }
 }

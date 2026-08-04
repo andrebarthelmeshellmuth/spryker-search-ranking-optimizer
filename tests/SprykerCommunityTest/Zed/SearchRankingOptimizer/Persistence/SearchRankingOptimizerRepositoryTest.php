@@ -11,12 +11,12 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 
 use Codeception\Test\Unit;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -39,7 +39,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 class SearchRankingOptimizerRepositoryTest extends Unit
 {
     /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration>
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration>
      */
     protected array $calibrationEntities = [];
 
@@ -115,11 +115,11 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         // Act
         $calibrationTransfers = (new SearchRankingOptimizerRepository())->getUploadedCalibrations();
-        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingCalibration(), $calibrationTransfers);
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingSaturationPointCalibration(), $calibrationTransfers);
 
         // Assert — both uploaded rows present, newest first, calculated row excluded
-        $newerPosition = array_search($newer->getIdSearchRankingCalibration(), $returnedIds, true);
-        $olderPosition = array_search($older->getIdSearchRankingCalibration(), $returnedIds, true);
+        $newerPosition = array_search($newer->getIdSearchRankingSaturationPointCalibration(), $returnedIds, true);
+        $olderPosition = array_search($older->getIdSearchRankingSaturationPointCalibration(), $returnedIds, true);
 
         $this->assertNotFalse($newerPosition);
         $this->assertNotFalse($olderPosition);
@@ -131,19 +131,19 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         // Arrange
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
 
-        $firstSearchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $firstSearchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+        $firstSearchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $firstSearchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         $firstSearchTermEntity->setSearchTerm('chair');
         $firstSearchTermEntity->save();
 
-        $secondSearchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $secondSearchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+        $secondSearchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $secondSearchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         $secondSearchTermEntity->setSearchTerm('desk');
         $secondSearchTermEntity->save();
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationWithSearchTerms(
-            $calibrationEntity->getIdSearchRankingCalibration(),
+            $calibrationEntity->getIdSearchRankingSaturationPointCalibration(),
         );
 
         // Assert
@@ -183,7 +183,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         // Assert
         $this->assertNotNull($resultTransfer);
-        $this->assertSame($newer->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame($newer->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
     }
 
     public function testFindCalibrationInProgressReturnsTheCalculatingRowWithItsProgressCounts(): void
@@ -199,7 +199,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         // Assert
         $this->assertNotNull($resultTransfer);
-        $this->assertSame($inProgress->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame($inProgress->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
         $this->assertSame(8, $resultTransfer->getTotalCount());
         $this->assertSame(3, $resultTransfer->getProcessedCount());
     }
@@ -409,9 +409,9 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     /**
      * @param string $status
      */
-    protected function createTestCalibration(string $status): SpySearchRankingCalibration
+    protected function createTestCalibration(string $status): SpySearchRankingSaturationPointCalibration
     {
-        $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setRelevantProductCount(6);
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('en_US');

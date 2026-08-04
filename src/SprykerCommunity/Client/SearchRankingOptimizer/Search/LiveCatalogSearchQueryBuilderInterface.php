@@ -17,7 +17,7 @@ interface LiveCatalogSearchQueryBuilderInterface
      * Specification:
      * - Builds the CORE catalog search-string query shape the live storefront uses for $searchTerm (base
      *   product full-text query + store/locale/is_active/is_active_in_date_range filters) — the shared
-     *   building block behind both {@see CalibrationSearcherInterface} (which additionally sets
+     *   building block behind both {@see SaturationPointCalibrationSearcherInterface} (which additionally sets
      *   `explain`/`size`) and the rank_eval evaluation runner (which needs the bare query clause, no
      *   result-set concerns at all).
      * - Deliberately a SUBSET of the real live query, not a byte-for-byte reproduction: further narrowing a

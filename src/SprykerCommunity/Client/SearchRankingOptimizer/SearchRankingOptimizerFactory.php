@@ -22,8 +22,6 @@ use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInter
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
-use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher;
-use SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
@@ -33,6 +31,8 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcher;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcherInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcherInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStub;
@@ -40,9 +40,9 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentS
 
 class SearchRankingOptimizerFactory extends AbstractFactory
 {
-    public function createCalibrationSearcher(): CalibrationSearcherInterface
+    public function createCalibrationSearcher(): SaturationPointCalibrationSearcherInterface
     {
-        return new CalibrationSearcher(
+        return new SaturationPointCalibrationSearcher(
             $this->getElasticaClient(),
             $this->createIndexNameResolver(),
             $this->createRawRelevanceScoreExtractor(),

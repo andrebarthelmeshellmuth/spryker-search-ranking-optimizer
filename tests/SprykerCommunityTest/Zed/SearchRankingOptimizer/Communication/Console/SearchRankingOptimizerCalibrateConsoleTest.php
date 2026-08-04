@@ -11,8 +11,8 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Communication\Console;
 
 use ArrayObject;
 use Codeception\Test\Unit;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCalibrateConsole;
@@ -50,8 +50,8 @@ class SearchRankingOptimizerCalibrateConsoleTest extends Unit
     public function testExitsWithAnErrorAndTheMessageWhenTheCalibrationFailed(): void
     {
         // Arrange
-        $calibrationTransfer = (new SearchRankingCalibrationTransfer())
-            ->setIdSearchRankingCalibrationOrFail(3)
+        $calibrationTransfer = (new SearchRankingSaturationPointCalibrationTransfer())
+            ->setIdSearchRankingSaturationPointCalibrationOrFail(3)
             ->setStatusOrFail(SearchRankingOptimizerConfig::CALIBRATION_STATUS_FAILED)
             ->setErrorMessageOrFail('search engine unreachable');
 
@@ -68,14 +68,14 @@ class SearchRankingOptimizerCalibrateConsoleTest extends Unit
     public function testReportsTheComputedKAndSampleCountsWhenCalibrationSucceeds(): void
     {
         // Arrange
-        $calibrationTransfer = (new SearchRankingCalibrationTransfer())
-            ->setIdSearchRankingCalibrationOrFail(7)
+        $calibrationTransfer = (new SearchRankingSaturationPointCalibrationTransfer())
+            ->setIdSearchRankingSaturationPointCalibrationOrFail(7)
             ->setStatusOrFail('done')
             ->setSampleCountOrFail(150)
             ->setSearchTerms(new ArrayObject([
-                (new SearchRankingCalibrationSearchTermTransfer())->setSearchTermOrFail('chair'),
-                (new SearchRankingCalibrationSearchTermTransfer())->setSearchTermOrFail('office chair'),
-                (new SearchRankingCalibrationSearchTermTransfer())->setSearchTermOrFail('topstar'),
+                (new SearchRankingSaturationPointCalibrationSearchTermTransfer())->setSearchTermOrFail('chair'),
+                (new SearchRankingSaturationPointCalibrationSearchTermTransfer())->setSearchTermOrFail('office chair'),
+                (new SearchRankingSaturationPointCalibrationSearchTermTransfer())->setSearchTermOrFail('topstar'),
             ]))
             ->setComputedKOrFail(4.2318);
 
@@ -89,7 +89,7 @@ class SearchRankingOptimizerCalibrateConsoleTest extends Unit
         $this->assertStringContainsString('Calibration #7 done: sampled 150 value(s) across 3 search term(s), computed k = 4.2318.', $commandTester->getDisplay());
     }
 
-    protected function createCommandTester(?SearchRankingCalibrationTransfer $calibrationTransfer): CommandTester
+    protected function createCommandTester(?SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): CommandTester
     {
         $facadeMock = $this->getMockBuilder(SearchRankingOptimizerFacade::class)
             ->onlyMethods(['runNextCalibration'])

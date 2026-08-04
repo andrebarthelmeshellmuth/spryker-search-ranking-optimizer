@@ -10,35 +10,35 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 
 class SearchRankingOptimizerMapper
 {
     /**
-     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration $calibrationEntity
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration $calibrationEntity
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
     public function mapCalibrationEntityToTransfer(
-        SpySearchRankingCalibration $calibrationEntity,
-        SearchRankingCalibrationTransfer $calibrationTransfer,
-    ): SearchRankingCalibrationTransfer {
+        SpySearchRankingSaturationPointCalibration $calibrationEntity,
+        SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer,
+    ): SearchRankingSaturationPointCalibrationTransfer {
         return $calibrationTransfer
-            ->setIdSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration())
+            ->setIdSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration())
             ->setCalibrationType($calibrationEntity->getCalibrationType())
             ->setRelevantProductCount($calibrationEntity->getRelevantProductCount())
             ->setStoreName($calibrationEntity->getStoreName())
@@ -60,16 +60,16 @@ class SearchRankingOptimizerMapper
     }
 
     /**
-     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm $searchTermEntity
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer $searchTermTransfer
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm $searchTermEntity
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer $searchTermTransfer
      */
     public function mapCalibrationSearchTermEntityToTransfer(
-        SpySearchRankingCalibrationSearchTerm $searchTermEntity,
-        SearchRankingCalibrationSearchTermTransfer $searchTermTransfer,
-    ): SearchRankingCalibrationSearchTermTransfer {
+        SpySearchRankingSaturationPointCalibrationSearchTerm $searchTermEntity,
+        SearchRankingSaturationPointCalibrationSearchTermTransfer $searchTermTransfer,
+    ): SearchRankingSaturationPointCalibrationSearchTermTransfer {
         return $searchTermTransfer
-            ->setIdSearchRankingCalibrationSearchTerm($searchTermEntity->getIdSearchRankingCalibrationSearchTerm())
-            ->setFkSearchRankingCalibration($searchTermEntity->getFkSearchRankingCalibration())
+            ->setIdSearchRankingSaturationPointCalibrationSearchTerm($searchTermEntity->getIdSearchRankingSaturationPointCalibrationSearchTerm())
+            ->setFkSearchRankingSaturationPointCalibration($searchTermEntity->getFkSearchRankingSaturationPointCalibration())
             ->setSearchTerm($searchTermEntity->getSearchTerm())
             ->setProductsFound($searchTermEntity->getProductsFound())
             ->setValues($this->explodeValues($searchTermEntity->getValues()));

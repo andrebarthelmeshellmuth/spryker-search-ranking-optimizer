@@ -11,24 +11,24 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager;
@@ -51,7 +51,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 class SearchRankingOptimizerEntityManagerTest extends Unit
 {
     /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration>
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration>
      */
     protected array $calibrationEntities = [];
 
@@ -113,31 +113,31 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     public function testCreateCalibrationPersistsTheCalibrationAndItsSearchTermsWithCorrectForeignKeys(): void
     {
         // Arrange
-        $calibrationTransfer = (new SearchRankingCalibrationTransfer())
+        $calibrationTransfer = (new SearchRankingSaturationPointCalibrationTransfer())
             ->setRelevantProductCount(6)
             ->setStoreName('DE')
             ->setLocaleName('en_US')
             ->setStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED)
-            ->addSearchTerm((new SearchRankingCalibrationSearchTermTransfer())->setSearchTerm('chair'))
-            ->addSearchTerm((new SearchRankingCalibrationSearchTermTransfer())->setSearchTerm('desk'));
+            ->addSearchTerm((new SearchRankingSaturationPointCalibrationSearchTermTransfer())->setSearchTerm('chair'))
+            ->addSearchTerm((new SearchRankingSaturationPointCalibrationSearchTermTransfer())->setSearchTerm('desk'));
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createCalibration($calibrationTransfer);
-        $this->trackForCleanup((int)$resultTransfer->getIdSearchRankingCalibrationOrFail());
+        $this->trackForCleanup((int)$resultTransfer->getIdSearchRankingSaturationPointCalibrationOrFail());
 
         // Assert
-        $this->assertNotNull($resultTransfer->getIdSearchRankingCalibration());
+        $this->assertNotNull($resultTransfer->getIdSearchRankingSaturationPointCalibration());
         $this->assertSame(2, $resultTransfer->getTotalCount(), 'totalCount is set from the search term count at creation time.');
         $this->assertSame(0, $resultTransfer->getProcessedCount());
 
-        $searchTermEntities = SpySearchRankingCalibrationSearchTermQuery::create()
-            ->filterByFkSearchRankingCalibration($resultTransfer->getIdSearchRankingCalibrationOrFail())
+        $searchTermEntities = SpySearchRankingSaturationPointCalibrationSearchTermQuery::create()
+            ->filterByFkSearchRankingSaturationPointCalibration($resultTransfer->getIdSearchRankingSaturationPointCalibrationOrFail())
             ->find();
 
         $this->assertCount(2, $searchTermEntities);
         $this->assertEqualsCanonicalizing(
             ['chair', 'desk'],
-            array_map(fn (SpySearchRankingCalibrationSearchTerm $entity): string => $entity->getSearchTerm(), iterator_to_array($searchTermEntities)),
+            array_map(fn (SpySearchRankingSaturationPointCalibrationSearchTerm $entity): string => $entity->getSearchTerm(), iterator_to_array($searchTermEntities)),
         );
     }
 
@@ -148,7 +148,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         (new SearchRankingOptimizerEntityManager())->updateCalibrationStatus(
-            $calibrationEntity->getIdSearchRankingCalibration(),
+            $calibrationEntity->getIdSearchRankingSaturationPointCalibration(),
             SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED,
         );
 
@@ -170,8 +170,8 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $entityManager = new SearchRankingOptimizerEntityManager();
 
         // Act
-        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingCalibration());
-        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingCalibration());
+        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
+        $entityManager->incrementCalibrationProcessedCount($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
 
         // Assert
         $calibrationEntity->reload();
@@ -188,14 +188,14 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     {
         // Arrange
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
-        $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $searchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+        $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $searchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         $searchTermEntity->setSearchTerm('chair');
         $searchTermEntity->save();
 
         // Act
         (new SearchRankingOptimizerEntityManager())->saveCalibrationSearchTermResult(
-            $searchTermEntity->getIdSearchRankingCalibrationSearchTerm(),
+            $searchTermEntity->getIdSearchRankingSaturationPointCalibrationSearchTerm(),
             3,
             [12.5, 13.5],
         );
@@ -216,7 +216,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     {
         // Arrange
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
-        $statisticsTransfer = (new SearchRankingCalibrationTransfer())
+        $statisticsTransfer = (new SearchRankingSaturationPointCalibrationTransfer())
             ->setComputedK(18.5)
             ->setValueMin(10.0)
             ->setValueMax(28.0)
@@ -228,7 +228,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         (new SearchRankingOptimizerEntityManager())->saveCalibrationStatistics(
-            $calibrationEntity->getIdSearchRankingCalibration(),
+            $calibrationEntity->getIdSearchRankingSaturationPointCalibration(),
             $statisticsTransfer,
         );
 
@@ -245,7 +245,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     public function testSaveCalibrationStatisticsIsASafeNoOpForANonExistentId(): void
     {
         // Act & Assert (must not throw)
-        (new SearchRankingOptimizerEntityManager())->saveCalibrationStatistics(-1, new SearchRankingCalibrationTransfer());
+        (new SearchRankingOptimizerEntityManager())->saveCalibrationStatistics(-1, new SearchRankingSaturationPointCalibrationTransfer());
     }
 
     public function testMarkCalibrationFailedPersistsTheErrorMessageAndFlipsStatusToFailed(): void
@@ -255,7 +255,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         (new SearchRankingOptimizerEntityManager())->markCalibrationFailed(
-            $calibrationEntity->getIdSearchRankingCalibration(),
+            $calibrationEntity->getIdSearchRankingSaturationPointCalibration(),
             'No search term produced any score.',
         );
 
@@ -351,9 +351,9 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     /**
      * @param string $status
      */
-    protected function createTestCalibration(string $status): SpySearchRankingCalibration
+    protected function createTestCalibration(string $status): SpySearchRankingSaturationPointCalibration
     {
-        $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setRelevantProductCount(6);
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('en_US');
@@ -366,11 +366,11 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
     }
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    protected function trackForCleanup(int $idSearchRankingCalibration): void
+    protected function trackForCleanup(int $idSearchRankingSaturationPointCalibration): void
     {
-        $calibrationEntity = SpySearchRankingCalibrationQuery::create()->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+        $calibrationEntity = SpySearchRankingSaturationPointCalibrationQuery::create()->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
 
         if ($calibrationEntity === null) {
             return;

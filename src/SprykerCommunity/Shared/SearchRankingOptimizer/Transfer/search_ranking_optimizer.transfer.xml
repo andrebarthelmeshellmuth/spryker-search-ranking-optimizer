@@ -11,8 +11,8 @@
          catalog query at all) for CALIBRATION_TYPE_SPECIFICITY. status is one of the
          SearchRankingOptimizerConfig::CALIBRATION_STATUS_* constants; the value*/sampleCount/computedK/
          calculatedAt fields are null until status=calculated, errorMessage is set only on status=failed. -->
-    <transfer name="SearchRankingCalibration" strict="true">
-        <property name="idSearchRankingCalibration" type="int"/>
+    <transfer name="SearchRankingSaturationPointCalibration" strict="true">
+        <property name="idSearchRankingSaturationPointCalibration" type="int"/>
         <property name="calibrationType" type="string"/>
         <property name="relevantProductCount" type="int"/>
         <property name="storeName" type="string"/>
@@ -31,7 +31,7 @@
         <property name="createdAt" type="string"/>
         <property name="totalCount" type="int"/>
         <property name="processedCount" type="int"/>
-        <property name="searchTerms" type="SearchRankingCalibrationSearchTerm[]" singular="searchTerm"/>
+        <property name="searchTerms" type="SearchRankingSaturationPointCalibrationSearchTerm[]" singular="searchTerm"/>
     </transfer>
 
     <!-- One uploaded search term of a calibration run. values is populated by the calibration cron: for
@@ -39,9 +39,9 @@
          for this term (up to the run's relevantProductCount, fewer when the term matched fewer products);
          for CALIBRATION_TYPE_SPECIFICITY, exactly one raw specificity value for the term itself (no
          per-product query at all). Null until calculated. -->
-    <transfer name="SearchRankingCalibrationSearchTerm" strict="true">
-        <property name="idSearchRankingCalibrationSearchTerm" type="int"/>
-        <property name="fkSearchRankingCalibration" type="int"/>
+    <transfer name="SearchRankingSaturationPointCalibrationSearchTerm" strict="true">
+        <property name="idSearchRankingSaturationPointCalibrationSearchTerm" type="int"/>
+        <property name="fkSearchRankingSaturationPointCalibration" type="int"/>
         <property name="searchTerm" type="string"/>
         <property name="productsFound" type="int"/>
         <property name="values" type="float[]" singular="value"/>
@@ -115,7 +115,7 @@
     </transfer>
 
     <!-- Zed business layer -> Client bridge request: fire one _rank_eval call covering every rated query
-         for a single (storeName, localeName) — mirrors Calibration's own store/locale scoping. cutoff is
+         for a single (storeName, localeName) — mirrors Saturation Point Calibration's own store/locale scoping. cutoff is
          the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). rankingConfiguration is
          OPTIONAL: when null, RankEvalRunner fetches the LIVE synced search-ranking configuration (the
          normal Evaluation-page path — "how good is our currently-configured ranking formula, really?").
@@ -171,7 +171,7 @@
     <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
          reproduce: the relevanceWeight blend, every metric's own weight, and the 3 specificity-weighting
          knobs (blend weight/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
-         which already have their own versioning story via Calibration and stay out of checkpoint scope
+         which already have their own versioning story via Saturation Point Calibration and stay out of checkpoint scope
          deliberately. The specificity knobs ARE included: they directly shape the live ranking formula's
          behavior the same way relevanceWeight/metric weights do, so a checkpoint that omitted them
          wouldn't actually reproduce a past ranking behavior, only part of it. isSpecificityWeightingEnabled
@@ -269,7 +269,7 @@
         <property name="autoTuneAnyApplied" type="bool"/>
     </transfer>
 
-    <!-- Phase O6: one automated weight-optimization run, mirroring Calibration's own queue-then-process
+    <!-- Phase O6: one automated weight-optimization run, mirroring Saturation Point Calibration's own queue-then-process
          lifecycle (status starts at 'queued', a console command picks up the oldest queued run and moves
          it through 'running' to 'done'/'failed') and its progress-counter shape (totalCount/processedCount).
          Reuses SearchRankingWeightCheckpointMetricWeight for bestMetricWeights, identical shape, no need

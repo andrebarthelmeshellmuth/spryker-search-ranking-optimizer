@@ -14,7 +14,7 @@ interface SpecificitySearcherInterface
     /**
      * Specification:
      * - Fires ONE `_termvectors` probe for $searchTerm directly against Elasticsearch — NOT a real catalog
-     *   query at all, unlike {@see CalibrationSearcherInterface::searchScores()} — and returns the SAME
+     *   query at all, unlike {@see SaturationPointCalibrationSearcherInterface::searchScores()} — and returns the SAME
      *   blended raw specificity value {@see \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator}
      *   would compute live, using this project's own field/analyzer map (see
      *   {@see \SprykerCommunity\Client\SearchRanking\SearchRankingClientInterface::getSpecificityProbeFieldSearchAnalyzers()}).

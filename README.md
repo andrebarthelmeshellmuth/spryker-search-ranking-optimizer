@@ -16,7 +16,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 - [Terminology](#terminology)
 - [Status](#status)
 - [What it does today](#what-it-does-today)
-  - [Calibration — empirically sampling `relevanceSaturationPoint` (k)](#calibration--empirically-sampling-relevancesaturationpoint-k)
+  - [Saturation Point Calibration — empirically sampling `relevanceSaturationPoint` (k)](#saturation-point-calibration--empirically-sampling-relevancesaturationpoint-k)
   - [SRP relevance rating — capturing real (query, product) judgments](#srp-relevance-rating--capturing-real-query-product-judgments)
   - [Rank evaluation — a real objective score, not averaged opinion](#rank-evaluation--a-real-objective-score-not-averaged-opinion)
   - [Weight checkpoints — a way back before changing anything by hand](#weight-checkpoints--a-way-back-before-changing-anything-by-hand)
@@ -93,7 +93,7 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 
 ## Status
 
-**Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
+**Saturation Point Calibration, the SRP relevance-rating widget, the Zed Assess Rated Queries page, offline `rank_eval`
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
 (CMA-ES, the Rechenberg/Schwefel ES, or differential evolution against the rank-evaluation score, including
 `search-ranking`'s specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
@@ -109,7 +109,7 @@ permission re-check, and lands correctly in the database.
 
 ## What it does today
 
-### Calibration — empirically sampling `relevanceSaturationPoint`/`specificitySaturationPoint` (k)
+### Saturation Point Calibration — empirically sampling `relevanceSaturationPoint`/`specificitySaturationPoint` (k)
 
 `search-ranking` blends text relevance with business signals using a saturating transform of an unbounded
 raw value: `raw / (raw + k)`, where `k` is the raw value at which the normalized result contributes
@@ -125,11 +125,11 @@ data, not guessed:
   cheaper than the `relevance_score` path.
 
 Both constants have no universal correct value — they depend entirely on a shop's own field boosts, catalog
-size, and typical query shapes. Calibration is the one tool, with a type selector, that samples either.
+size, and typical query shapes. Saturation Point Calibration is the one tool, with a type selector, that samples either.
 
-![The Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/calibration.png)
+![The Saturation Point Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/saturation-point-calibration.png)
 
-The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page:
+The workflow, all from the **Search Ranking Optimizer → Saturation Point Calibration** Zed page:
 
 1. **Start a run.** Pick the **calibration type** (`Relevance score` or `Specificity`), the store and
    locale to run against (Zed has no implicit current store, so both are picked explicitly), and the
@@ -144,11 +144,11 @@ The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page
    run's own `calibrationType` — either fires the **live catalog search-string query** for each term
    (`relevance_score`) or a single lightweight `_termvectors` probe per term (`specificity`), pools the
    sampled values across all terms, and computes a suggested `k` from that pool. The run moves to
-   `calculated` (or `failed`, with a stored error message). While it's running, the Calibration page shows
+   `calculated` (or `failed`, with a stored error message). While it's running, the Saturation Point Calibration page shows
    a live "X / Y search terms processed" counter (a small `progressAction()` JSON endpoint the page polls
    once a second) — no fake/indeterminate spinner, since the console command's own per-term loop is a
    genuinely trackable count.
-3. **Apply.** Back on the Calibration page, review the suggested `k` against the current live value and
+3. **Apply.** Back on the Saturation Point Calibration page, review the suggested `k` against the current live value and
    click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` or
    `specificitySaturationPoint` setting (routed by the run's own `calibrationType`) — through
    `search-ranking`'s own facade, which republishes the ranking configuration exactly as a manual edit on
@@ -158,7 +158,7 @@ The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page
 The console prints, e.g.:
 
 ```
-Calibration #7 done: sampled 214 value(s) across 12 search term(s), computed k = 6.4180.
+Saturation Point Calibration #7 done: sampled 214 value(s) across 12 search term(s), computed k = 6.4180.
 ```
 
 Firing the `relevance_score` query (or the `specificity` probe) from Zed reuses `search-ranking`'s solved
@@ -168,7 +168,7 @@ component.
 
 ### SRP relevance rating — capturing real (query, product) judgments
 
-Calibration answers "what should `relevanceSaturationPoint` be" from a *sample* of search terms. Longer
+Saturation Point Calibration answers "what should `relevanceSaturationPoint` be" from a *sample* of search terms. Longer
 term, tuning any part of the ranking formula needs a real, organically-grown judgment set — actual people
 saying "this product was/wasn't a good result for this query." The rating widget is how that judgment set
 gets built, one click at a time, directly on the storefront search results page (SRP).
@@ -202,7 +202,7 @@ gets built, one click at a time, directly on the storefront search results page 
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
   persisting anything.
 - **Rejects fabricated (query, product) pairs.** Before persisting a submitted judgment,
-  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Calibration/rank_eval use
+  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Saturation Point Calibration/rank_eval use
   (`ProductSearchMatchVerifier`, narrowed to the one candidate document) and confirms the product is
   actually among the *current* real search results for that term — a request claiming an unrelated product
   matched some search term is rejected outright, never silently trusted from the client.
@@ -214,7 +214,7 @@ gets built, one click at a time, directly on the storefront search results page 
   non-Form AJAX actions), rendered onto the widget as a data attribute, and sent back with every submit/
   clear request — re-validated server-side before anything else runs.
 
-This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
+This is also Saturation Point Calibration's default search-term source (see above) — accumulated ratings feed straight into
 the next calibration run with no export/import step. The ratings are also the direct input to rank_eval
 evaluation, below.
 
@@ -226,18 +226,18 @@ already collects into a real nDCG (Normalized Discounted Cumulative Gain) score 
 Elasticsearch's `_rank_eval` API — a genuine information-retrieval metric, not human opinion averaged
 together.
 
-![The Evaluation page: a store/locale picker with an "Evaluate now" button, the latest weighted nDCG@10 result, and a history of past evaluations for that store/locale](docs/screenshots/evaluation.png)
+![The Test Current Evaluation page: a store/locale picker with an "Evaluate now" button, the latest weighted nDCG@10 result, and a history of past evaluations for that store/locale](docs/screenshots/test-current-evaluation.png)
 
-The workflow, from the **Search Ranking Optimizer → Evaluation** Zed page:
+The workflow, from the **Search Ranking Optimizer → Test Current Evaluation** Zed page:
 
-1. **Pick a store and locale** and click **Evaluate now**. Unlike Calibration's upload-then-cron-then-poll
+1. **Pick a store and locale** and click **Evaluate now**. Unlike Saturation Point Calibration's upload-then-cron-then-poll
    flow, `_rank_eval` fires as a single batched HTTP request covering every rated query at once — fast
    enough to run synchronously, so there's no progress counter or polling needed here.
 2. Every individual rating for that store/locale is grouped into a mean gain per (query, product) pair
    (heart/check/x → a configurable numeric gain, default 3/1/0 —
    `SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()`; a query rated by multiple admins is
    averaged, never overwritten, the same disagreement-preserving design the rating widget itself uses).
-3. One `_rank_eval` request per query is built from the exact same live catalog query Calibration fires
+3. One `_rank_eval` request per query is built from the exact same live catalog query Saturation Point Calibration fires
    (shared via `LiveCatalogSearchQueryBuilder`), paired with that query's rated products as judgments.
    `metric.dcg.normalize=true` computes nDCG@10 (cutoff configurable —
    `SearchRankingOptimizerConfig::getRankEvalCutoff()`).
@@ -250,7 +250,7 @@ The workflow, from the **Search Ranking Optimizer → Evaluation** Zed page:
 Evaluated 12 rated queries: weighted nDCG@10 = 0.7123.
 ```
 
-Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Calibration
+Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Saturation Point Calibration
 established (`Client\SearchRankingOptimizer\Search` component), verified live against this shop's real
 OpenSearch index and real catalog products.
 
@@ -270,7 +270,7 @@ in this package — has its own **Store + Locale selector** at the top:
    read live off its own facade: `relevanceWeight`, every metric's own weight, the 3 specificity-weighting
    knobs (blend weight, weight exponent, weight shift magnitude), and whether specificity weighting is
    currently enabled at the code level. Deliberately excluded: `relevanceSaturationPoint`/
-   `specificitySaturationPoint` (k), which already have their own versioning story via Calibration and
+   `specificitySaturationPoint` (k), which already have their own versioning story via Saturation Point Calibration and
    stay out of checkpoint scope.
 2. **Take checkpoint now** persists that current state as a new row **tagged with the selected (store,
    locale)** — a manual snapshot, before hand-editing anything.
@@ -381,7 +381,7 @@ these do: shifting `relevanceWeight` per query based on how specific that query'
 term like a SKU vs. only common words). Each gets its own independent trust region around its current live
 value, the same "can't wander off in one shot" shape as `relevanceWeight`'s own trust region.
 `specificitySaturationPoint` is deliberately NOT one of these dimensions — like `relevanceSaturationPoint`,
-it's Calibration-tunable only, the same precedent `ParameterVectorMapper`'s own docblock already documents
+it's Saturation-Point-Calibration-tunable only, the same precedent `ParameterVectorMapper`'s own docblock already documents
 for the text-relevance side. This closes what would otherwise be a real gap: `search-ranking`'s evaluation
 path builds its own `function_score` query directly rather than going through the live storefront's
 query-expander plugin stack, so without this, a candidate's specificity settings would silently never be
@@ -433,9 +433,9 @@ fixed `getOptimizationMaxGenerations()` budget (150) as its own stopping point; 
 `trustTerminationCriteria()` as a run option is a natural, still-open follow-up, not done as part of this
 bump.
 
-![The Automated Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-optimization.png)
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-weight-optimization.png)
 
-The workflow, from the **Search Ranking Optimizer → Automated Optimization** Zed page:
+The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
 1. **Run now.** Pick the store, locale, and algorithm. This queues a run and immediately processes it
    in-request (small population/generation counts keep a run to a handful of seconds against this demoshop's
@@ -622,7 +622,7 @@ vendor/bin/console navigation:build-cache
 
 ### 5. Translations
 
-**Zed GUI** (Calibration page): like its siblings, this package ships its Zed strings as
+**Zed GUI** (Saturation Point Calibration page): like its siblings, this package ships its Zed strings as
 `spryker/translator` CSV catalogs under [`data/translation/Zed/`](data/translation/Zed/) (Zed's `trans`
 filter does **not** use the Yves-facing Glossary module). If your project already extended
 `Pyz\Zed\Translator\TranslatorConfig::getCoreTranslationFilePathPatterns()` with the
@@ -643,8 +643,8 @@ vendor/bin/console data:import glossary
 
 ### 6. Build (transfers, Propel tables, caches)
 
-This package ships a Propel schema for **eight** tables: `spy_search_ranking_calibration` +
-`spy_search_ranking_calibration_search_term` (Calibration), `spy_search_ranking_query` +
+This package ships a Propel schema for **eight** tables: `spy_search_ranking_saturation_point_calibration` +
+`spy_search_ranking_saturation_point_calibration_search_term` (Saturation Point Calibration), `spy_search_ranking_query` +
 `spy_search_ranking_query_rating` (the SRP rating widget), `spy_search_ranking_evaluation` (rank
 evaluation), `spy_search_ranking_weight_checkpoint` (weight checkpoints),
 `spy_search_ranking_auto_tune_metric_config` (auto-tune), and `spy_search_ranking_optimizer_run`
@@ -695,9 +695,9 @@ other way.
 
 - **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, weight
   checkpoint/rollback, monthly auto-tune, and automated weight optimization business logic, persistence,
-  console commands, Zed GUI (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight
-  Checkpoints, Auto-Tune Settings, and Automated Optimization + Apply controllers), the raw-Elastica search
-  components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model,
+  console commands, Zed GUI (Saturation Point Calibration + Apply, Assess Rated Queries listing/edit-importance, Test Current Evaluation, Weight
+  Checkpoints, Auto-tune metrics settings, and Automated Weight Optimization + Apply controllers), the raw-Elastica search
+  components (shared query builder, saturation point calibration searcher, rank_eval runner), the rated-query data model,
   the simplex softmax reparametrization bridging this package's own weight-simplex constraint to the
   generic optimizer (see below), and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
@@ -705,7 +705,7 @@ other way.
 
 ## Roadmap
 
-Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
+Saturation Point Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
 rollback, the monthly auto-tune job, and automated weight optimization are the tuning layer built so far.
 Designed, not yet built:
 
@@ -738,7 +738,7 @@ Designed, not yet built:
   production-scale one. A shop with hundreds or thousands of rated queries would need to retune
   `SearchRankingOptimizerConfig::getOptimizationMaxGenerations()` and each algorithm's own population size
   — and, given the previous point, budget proportionally more wall-clock time per run.
-- **Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
+- **Saturation Point Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
   `LiveCatalogSearchQueryBuilder` reproduces the CORE catalog search-string query shape (base full-text
   query + store/locale/is_active/is_active_in_date_range filters) — real customer-facing search may layer
   further scope narrowing on top of that (customer-group visibility, price-list scoping, pinned category/
@@ -747,7 +747,7 @@ Designed, not yet built:
   for tuning purposes, and closer parity would mean executing the real query expander stack from a Zed/
   console process, which — like `Client\Catalog`/`Client\Search` themselves — isn't reliably possible
   outside a real Yves request context in this shop (see the raw-Elastica-bypass reasoning documented on
-  `CalibrationSearcher`/`RankEvalRunner`).
+  `SaturationPointCalibrationSearcher`/`RankEvalRunner`).
 
 ## Testing and CI
 
@@ -875,18 +875,18 @@ right methods were called but never that. This includes the per-metric auto-tune
 second save updates the existing row rather than creating a duplicate) and its threshold-set filtering.
 One case (`findLatestCalculatedCalibration` returning `null`
 when nothing is calculated yet) is exempted from this shop's own suite: this demoshop always has at least
-one real calculated calibration already, so the "nothing calculated yet" branch can't be reached without
+one real calculated saturation point calibration already, so the "nothing calculated yet" branch can't be reached without
 deleting real data — covered by inspection instead (a two-line early-return, same shape as the four
 sibling not-found guards that *are* exercised).
 
 The `Client/SearchRankingOptimizer` suite lives at `tests/SprykerCommunityTest/Client/SearchRankingOptimizer`.
-`CalibrationSearcherTest` is a real integration test, not a unit test: it builds the exact query
+`SaturationPointCalibrationSearcherTest` is a real integration test, not a unit test: it builds the exact query
 `SearchRankingOptimizerFactory::createCalibrationSearcher()` builds in production and fires it at this
 shop's own real product-page index (a throwaway fixture index would prove nothing here — this class exists
 specifically to sample real relevance scores from the real catalog), asserting a known search term returns
 real positive scores and an unmatched term returns none. `RawRelevanceScoreExtractorTest` covers the
 explanation-parsing logic itself as a pure unit test against all four known `_explanation` shapes
-(function-score-wrapped, unwrapped, nested, the zero-value guard) — `CalibrationSearcher` never wraps its
+(function-score-wrapped, unwrapped, nested, the zero-value guard) — `SaturationPointCalibrationSearcher` never wraps its
 query in `function_score` (unlike search-ranking's live serving path), so the unwrapped-fallback shape
 those unit tests assume is the same shape confirmed live against this shop's real OpenSearch 1.3.4.
 `NeverInvokedStoreClient` is the one class with no test: a `LogicException`-throwing stub that structurally

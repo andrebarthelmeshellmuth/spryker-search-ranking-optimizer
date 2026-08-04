@@ -11,19 +11,19 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use DateTime;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
@@ -52,9 +52,9 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * term list) can never match its real child row count, permanently stuck looking "in progress" with no
      * way to ever finish or be flagged failed.
      *
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
-    public function createCalibration(SearchRankingCalibrationTransfer $calibrationTransfer): SearchRankingCalibrationTransfer
+    public function createCalibration(SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): SearchRankingSaturationPointCalibrationTransfer
     {
         return $this->getTransactionHandler()->handleTransaction(
             fn () => $this->createCalibrationWithinTransaction($calibrationTransfer),
@@ -62,12 +62,12 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
     protected function createCalibrationWithinTransaction(
-        SearchRankingCalibrationTransfer $calibrationTransfer,
-    ): SearchRankingCalibrationTransfer {
-        $calibrationEntity = new SpySearchRankingCalibration();
+        SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer,
+    ): SearchRankingSaturationPointCalibrationTransfer {
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setCalibrationType(
             $calibrationTransfer->getCalibrationType() ?? SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
         );
@@ -81,14 +81,14 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $calibrationEntity->save();
 
         foreach ($calibrationTransfer->getSearchTerms() as $searchTermTransfer) {
-            $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-            $searchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+            $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+            $searchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
             $searchTermEntity->setSearchTerm($searchTermTransfer->getSearchTermOrFail());
             $searchTermEntity->save();
 
             $searchTermTransfer
-                ->setIdSearchRankingCalibrationSearchTerm($searchTermEntity->getIdSearchRankingCalibrationSearchTerm())
-                ->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+                ->setIdSearchRankingSaturationPointCalibrationSearchTerm($searchTermEntity->getIdSearchRankingSaturationPointCalibrationSearchTerm())
+                ->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         }
 
         return $this->getFactory()
@@ -97,14 +97,14 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $status
      */
-    public function updateCalibrationStatus(int $idSearchRankingCalibration, string $status): void
+    public function updateCalibrationStatus(int $idSearchRankingSaturationPointCalibration, string $status): void
     {
         $calibrationEntity = $this->getFactory()
-            ->createSearchRankingCalibrationQuery()
-            ->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+            ->createSearchRankingSaturationPointCalibrationQuery()
+            ->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
 
         if ($calibrationEntity === null) {
             return;
@@ -115,15 +115,15 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * @param int $idSearchRankingCalibrationSearchTerm
+     * @param int $idSearchRankingSaturationPointCalibrationSearchTerm
      * @param int $productsFound
      * @param array<float> $values
      */
-    public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $values): void
+    public function saveCalibrationSearchTermResult(int $idSearchRankingSaturationPointCalibrationSearchTerm, int $productsFound, array $values): void
     {
         $searchTermEntity = $this->getFactory()
-            ->createSearchRankingCalibrationSearchTermQuery()
-            ->findOneByIdSearchRankingCalibrationSearchTerm($idSearchRankingCalibrationSearchTerm);
+            ->createSearchRankingSaturationPointCalibrationSearchTermQuery()
+            ->findOneByIdSearchRankingSaturationPointCalibrationSearchTerm($idSearchRankingSaturationPointCalibrationSearchTerm);
 
         if ($searchTermEntity === null) {
             return;
@@ -135,17 +135,17 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * Called once per search term inside {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibrator::calculate()}'s
+     * Called once per search term inside {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\ScoreCalibrator::calculate()}'s
      * own loop — the calculation run is a single sequential process, so a plain read-modify-write (same
      * pattern every other method here uses) needs no extra locking.
      *
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void
+    public function incrementCalibrationProcessedCount(int $idSearchRankingSaturationPointCalibration): void
     {
         $calibrationEntity = $this->getFactory()
-            ->createSearchRankingCalibrationQuery()
-            ->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+            ->createSearchRankingSaturationPointCalibrationQuery()
+            ->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
 
         if ($calibrationEntity === null) {
             return;
@@ -156,14 +156,16 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * @param int $idSearchRankingCalibration
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $statisticsTransfer
+     * @param int $idSearchRankingSaturationPointCalibration
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer
      */
-    public function saveCalibrationStatistics(int $idSearchRankingCalibration, SearchRankingCalibrationTransfer $statisticsTransfer): void
-    {
+    public function saveCalibrationStatistics(
+        int $idSearchRankingSaturationPointCalibration,
+        SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer,
+    ): void {
         $calibrationEntity = $this->getFactory()
-            ->createSearchRankingCalibrationQuery()
-            ->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+            ->createSearchRankingSaturationPointCalibrationQuery()
+            ->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
 
         if ($calibrationEntity === null) {
             return;
@@ -183,14 +185,14 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $errorMessage
      */
-    public function markCalibrationFailed(int $idSearchRankingCalibration, string $errorMessage): void
+    public function markCalibrationFailed(int $idSearchRankingSaturationPointCalibration, string $errorMessage): void
     {
         $calibrationEntity = $this->getFactory()
-            ->createSearchRankingCalibrationQuery()
-            ->findOneByIdSearchRankingCalibration($idSearchRankingCalibration);
+            ->createSearchRankingSaturationPointCalibrationQuery()
+            ->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
 
         if ($calibrationEntity === null) {
             return;
