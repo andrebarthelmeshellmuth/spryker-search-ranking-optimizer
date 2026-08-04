@@ -14,7 +14,13 @@ return RectorConfig::configure()
         __DIR__ . '/tools',
     ])
     ->withSkip([
+        // The bare directory pattern alone doesn't reliably skip the FILES inside it -- fnmatch() needs
+        // an exact string match, and a per-file path has a filename trailing the directory this pattern
+        // matches. Confirmed empirically on the sibling search-ranking package: this let
+        // RemoveUselessReturnTagRector reach into regenerated *TesterActions.php files there. Both forms
+        // kept since which one actually matches depends on how the caller passes the path.
         __DIR__ . '/tests/*/_support/_generated',
+        __DIR__ . '/tests/*/_support/_generated/*',
         __DIR__ . '/tests/*/_output',
         __DIR__ . '/tests/*/_data',
         // Spryker.Commenting.DocBlockVar (active in this project's phpcs.xml) requires a @var doc block
