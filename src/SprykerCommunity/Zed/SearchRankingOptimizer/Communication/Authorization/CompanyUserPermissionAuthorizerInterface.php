@@ -9,7 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization;
 
-interface RelevanceJudgmentAuthorizerInterface
+interface CompanyUserPermissionAuthorizerInterface
 {
     /**
      * Independently re-resolves `$customerReference` to its active company user(s) via

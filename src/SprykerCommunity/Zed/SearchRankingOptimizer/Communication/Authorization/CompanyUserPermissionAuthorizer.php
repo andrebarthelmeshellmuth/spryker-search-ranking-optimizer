@@ -13,7 +13,7 @@ use Generated\Shared\Transfer\CustomerTransfer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
 
-class RelevanceJudgmentAuthorizer implements RelevanceJudgmentAuthorizerInterface
+class CompanyUserPermissionAuthorizer implements CompanyUserPermissionAuthorizerInterface
 {
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface $companyUserFacade

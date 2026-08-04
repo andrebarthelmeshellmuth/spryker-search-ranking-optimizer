@@ -13,7 +13,7 @@ use Codeception\Test\Unit;
 use Generated\Shared\Transfer\CompanyUserCollectionTransfer;
 use Generated\Shared\Transfer\CompanyUserTransfer;
 use Generated\Shared\Transfer\CustomerTransfer;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
 
@@ -25,10 +25,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  * @group SearchRankingOptimizer
  * @group Communication
  * @group Authorization
- * @group RelevanceJudgmentAuthorizerTest
+ * @group CompanyUserPermissionAuthorizerTest
  * Add your own group annotations below this line
  */
-class RelevanceJudgmentAuthorizerTest extends Unit
+class CompanyUserPermissionAuthorizerTest extends Unit
 {
     public function testIsAuthorizedNeverTrustsAnIdentifierFromTheRequestItselfAndAlwaysResolvesViaCompanyUserFacade(): void
     {
@@ -44,7 +44,7 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $permissionFacadeMock = $this->createMock(SearchRankingOptimizerToPermissionFacadeInterface::class);
         $permissionFacadeMock->expects($this->once())->method('can')->with('SomePermission', 42)->willReturn(true);
 
-        $authorizer = new RelevanceJudgmentAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
+        $authorizer = new CompanyUserPermissionAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
 
         // Act
         $result = $authorizer->isAuthorized('CUST-1', 'SomePermission');
@@ -69,7 +69,7 @@ class RelevanceJudgmentAuthorizerTest extends Unit
             ['SomePermission', 2, true],
         ]);
 
-        $authorizer = new RelevanceJudgmentAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
+        $authorizer = new CompanyUserPermissionAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
 
         // Act
         $result = $authorizer->isAuthorized('CUST-1', 'SomePermission');
@@ -87,7 +87,7 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $permissionFacadeMock = $this->createMock(SearchRankingOptimizerToPermissionFacadeInterface::class);
         $permissionFacadeMock->expects($this->never())->method('can');
 
-        $authorizer = new RelevanceJudgmentAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
+        $authorizer = new CompanyUserPermissionAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
 
         // Act
         $result = $authorizer->isAuthorized('CUST-1', 'SomePermission');
@@ -107,7 +107,7 @@ class RelevanceJudgmentAuthorizerTest extends Unit
         $permissionFacadeMock = $this->createMock(SearchRankingOptimizerToPermissionFacadeInterface::class);
         $permissionFacadeMock->method('can')->willReturn(false);
 
-        $authorizer = new RelevanceJudgmentAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
+        $authorizer = new CompanyUserPermissionAuthorizer($companyUserFacadeMock, $permissionFacadeMock);
 
         // Act
         $result = $authorizer->isAuthorized('CUST-1', 'SomePermission');
