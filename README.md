@@ -793,7 +793,7 @@ The CSV search-term parser, the score calibrator (skip-older-uploads, failing-te
 fail-when-nothing-scored, the vanished-row race), the statistics calculator, the persistence mapper, the
 search-term canonicalizer, `ProductRelevanceJudgmentWriter` (canonicalization-before-lookup, creating a
 query on first rating, rejecting an unknown rating type before touching persistence), and
-`RelevanceJudgmentAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
+`CompanyUserPermissionAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
 the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission),
 `AutoTuneNotificationRecipientResolver` (no role yet vs. de-duplicating usernames across multiple ACL
 groups), `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
@@ -902,7 +902,7 @@ Coverage (Codeception + pcov): 100% of methods/lines on every business-logic cla
 documented exemptions above (`NeverInvokedStoreClient`, and the one unreachable-in-this-shop branch in
 `SearchRankingOptimizerRepository`). `GatewayController::submitProductRelevanceJudgmentAction()` itself is
 the one further exemption, same class as those two: it is a thin pass-through to
-`RelevanceJudgmentAuthorizer` and `SearchRankingOptimizerFacade` (both independently unit-tested above) and
+`CompanyUserPermissionAuthorizer` and `SearchRankingOptimizerFacade` (both independently unit-tested above) and
 needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
 verification in [Status](#status) instead of a unit test.
 

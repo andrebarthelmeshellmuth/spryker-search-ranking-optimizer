@@ -34,7 +34,7 @@ class GatewayController extends AbstractGatewayController
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer {
         $isAuthorized = $this->getFactory()
-            ->createRelevanceJudgmentAuthorizer()
+            ->createCompanyUserPermissionAuthorizer()
             ->isAuthorized($requestTransfer->getCustomerReferenceOrFail(), RateSearchRelevancePermissionPlugin::KEY);
 
         if (!$isAuthorized) {
@@ -67,7 +67,7 @@ class GatewayController extends AbstractGatewayController
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer {
         $isAuthorized = $this->getFactory()
-            ->createRelevanceJudgmentAuthorizer()
+            ->createCompanyUserPermissionAuthorizer()
             ->isAuthorized($requestTransfer->getCustomerReferenceOrFail(), RateSearchRelevancePermissionPlugin::KEY);
 
         if (!$isAuthorized) {

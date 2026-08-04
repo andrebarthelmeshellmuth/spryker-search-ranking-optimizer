@@ -42,12 +42,12 @@ use SprykerCommunityTest\Zed\SearchRankingOptimizer\SearchRankingOptimizerZedTes
  * plumbing of that hop itself is Spryker core's own `zed-request` package's concern, not this one's).
  *
  * Everything on THIS side of that hop is real and resolved through the REAL Locator — a real
- * `GatewayController`, real `SearchRankingOptimizerFacade`/`BusinessFactory`/`RelevanceJudgmentAuthorizer`
+ * `GatewayController`, real `SearchRankingOptimizerFacade`/`BusinessFactory`/`CompanyUserPermissionAuthorizer`
  * chain — via `DependencyHelper::setDependency()`, the standard way to swap ONE bundle dependency without
  * touching anything else the container wires up (see the project's own testing-conventions notes). Only
- * two boundaries are swapped: the CompanyUser/Permission facades behind `RelevanceJudgmentAuthorizer`
+ * two boundaries are swapped: the CompanyUser/Permission facades behind `CompanyUserPermissionAuthorizer`
  * (that class's own CompanyUser/Permission logic already has full, dedicated coverage in
- * {@see \SprykerCommunityTest\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerTest} —
+ * {@see \SprykerCommunityTest\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizerTest} —
  * here only ITS RESULT needs to be controllable), and the one Client dependency that cannot run from Zed
  * at all (`Client\SearchRankingOptimizer::productMatchesSearch()`, resolved the normal way via the real
  * Client Locator, crashes from Zed for the same reason documented on `SaturationPointCalibrationSearcher`) — swapped for
@@ -190,9 +190,9 @@ class GatewayControllerTest extends Unit
     }
 
     /**
-     * Swaps the CompanyUser/Permission facades `RelevanceJudgmentAuthorizer` depends on, globally for this
+     * Swaps the CompanyUser/Permission facades `CompanyUserPermissionAuthorizer` depends on, globally for this
      * test, via `DependencyHelper` -- the real Locator resolves the real `GatewayController`, real
-     * `SearchRankingOptimizerFacade`, and the real (unmodified) `RelevanceJudgmentAuthorizer`, all of which
+     * `SearchRankingOptimizerFacade`, and the real (unmodified) `CompanyUserPermissionAuthorizer`, all of which
      * end up seeing only this controlled authorization outcome.
      *
      * @param bool $isAuthorized

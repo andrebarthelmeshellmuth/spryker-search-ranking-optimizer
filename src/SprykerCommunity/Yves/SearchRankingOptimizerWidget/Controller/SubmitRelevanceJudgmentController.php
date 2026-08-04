@@ -67,7 +67,7 @@ class SubmitRelevanceJudgmentController extends AbstractController
     /**
      * UX-level gate only — the real, unbypassable check happens server-side in Zed's GatewayController,
      * which independently re-resolves the customer's permission rather than trusting anything asserted
-     * here (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer}).
+     * here (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer}).
      * This check only avoids a pointless round-trip for a customer the widget should never have rendered
      * the buttons for in the first place.
      *

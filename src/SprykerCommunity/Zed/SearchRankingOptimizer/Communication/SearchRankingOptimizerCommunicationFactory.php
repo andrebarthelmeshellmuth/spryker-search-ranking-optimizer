@@ -12,8 +12,8 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationApplyForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm;
@@ -146,9 +146,9 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_PERMISSION);
     }
 
-    public function createRelevanceJudgmentAuthorizer(): RelevanceJudgmentAuthorizerInterface
+    public function createCompanyUserPermissionAuthorizer(): CompanyUserPermissionAuthorizerInterface
     {
-        return new RelevanceJudgmentAuthorizer(
+        return new CompanyUserPermissionAuthorizer(
             $this->getCompanyUserFacade(),
             $this->getPermissionFacade(),
         );
