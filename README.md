@@ -425,6 +425,14 @@ Three black-box algorithms ship, selectable per run:
   population, no covariance adaptation at all), included as a baseline "the thing to beat" rather than
   because it's expected to win.
 
+As of `blackbox-optimizer` 1.2, all three also stop before `maxGenerations` on their own once they've
+converged, diverged, or plateaued (each algorithm's own criteria — see that package's own README for the
+per-algorithm detail), and expose a `trustTerminationCriteria()` escape hatch to trust that over an
+arbitrary generation-count guess. `OptimizationRunner` doesn't call it yet — every run here still uses the
+fixed `getOptimizationMaxGenerations()` budget (150) as its own stopping point; wiring up
+`trustTerminationCriteria()` as a run option is a natural, still-open follow-up, not done as part of this
+bump.
+
 ![The Automated Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-optimization.png)
 
 The workflow, from the **Search Ranking Optimizer → Automated Optimization** Zed page:
@@ -467,7 +475,7 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
   into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
   auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.1`); not on Packagist, so
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.2`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
   [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
   algorithms the automated weight optimization feature searches with.
