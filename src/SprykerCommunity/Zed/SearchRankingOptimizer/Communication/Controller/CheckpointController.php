@@ -152,11 +152,6 @@ class CheckpointController extends AbstractController
         if ($newWeightCheckpointTransfer === null) {
             $this->addErrorMessage(sprintf('Checkpoint #%d no longer exists.', $idSearchRankingWeightCheckpoint));
         } else {
-            // Without this, the restore only ever reaches search-ranking's own Zed-side settings — the
-            // live storefront reads the SYNCED key-value copy, which a plain facade save never touches
-            // (same discipline SaturationPointCalibrationApplyController already follows for its own apply action).
-            $this->getFactory()->getSearchRankingStorageFacade()->publishRankingConfiguration();
-
             $this->addSuccessMessage(sprintf(
                 'Restored checkpoint #%d into %s/%s — recorded as new checkpoint #%d.',
                 $idSearchRankingWeightCheckpoint,

@@ -30,7 +30,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 use Symfony\Component\Form\FormInterface;
@@ -102,11 +101,6 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     public function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
-    }
-
-    public function getSearchRankingStorageFacade(): SearchRankingOptimizerToSearchRankingStorageFacadeInterface
-    {
-        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING_STORAGE);
     }
 
     public function getStoreFacade(): SearchRankingOptimizerToStoreFacadeInterface

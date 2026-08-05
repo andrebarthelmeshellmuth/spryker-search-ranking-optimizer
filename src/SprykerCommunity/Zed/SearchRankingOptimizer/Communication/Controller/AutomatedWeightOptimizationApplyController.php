@@ -50,11 +50,6 @@ class AutomatedWeightOptimizationApplyController extends AbstractController
             return $this->redirectResponse(static::URL_OPTIMIZATION);
         }
 
-        // Without this, the applied values only ever reach search-ranking's own Zed-side settings — the
-        // live storefront reads the SYNCED key-value copy, which a plain facade save never touches (same
-        // discipline SaturationPointCalibrationApplyController and CheckpointController::restoreAction() both follow).
-        $this->getFactory()->getSearchRankingStorageFacade()->publishRankingConfiguration();
-
         $this->addSuccessMessage(sprintf(
             'Run #%d applied — relevanceWeight and every active metric weight were updated and republished.',
             $idSearchRankingOptimizerRun,

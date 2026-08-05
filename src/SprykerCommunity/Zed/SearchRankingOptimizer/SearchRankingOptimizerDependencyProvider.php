@@ -17,7 +17,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingStorageFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerBridge;
@@ -41,14 +40,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      * @var string
      */
     public const FACADE_SEARCH_RANKING = 'FACADE_SEARCH_RANKING';
-
-    /**
-     * The base package's storage facade — used to republish the ranking configuration after the applied
-     * `k` was persisted, so the live storefront query picks it up.
-     *
-     * @var string
-     */
-    public const FACADE_SEARCH_RANKING_STORAGE = 'FACADE_SEARCH_RANKING_STORAGE';
 
     /**
      * @var string
@@ -133,7 +124,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = parent::provideCommunicationLayerDependencies($container);
         $container = $this->addSearchRankingClient($container);
         $container = $this->addSearchRankingFacade($container);
-        $container = $this->addSearchRankingStorageFacade($container);
         $container = $this->addStoreFacade($container);
         $container = $this->addLocaleFacade($container);
         $container = $this->addCompanyUserFacade($container);
@@ -161,18 +151,6 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     {
         $container->set(static::FACADE_SEARCH_RANKING, fn (Container $container) => new SearchRankingOptimizerToSearchRankingFacadeBridge(
             $container->getLocator()->searchRanking()->facade(),
-        ));
-
-        return $container;
-    }
-
-    /**
-     * @param \Spryker\Zed\Kernel\Container $container
-     */
-    protected function addSearchRankingStorageFacade(Container $container): Container
-    {
-        $container->set(static::FACADE_SEARCH_RANKING_STORAGE, fn (Container $container) => new SearchRankingOptimizerToSearchRankingStorageFacadeBridge(
-            $container->getLocator()->searchRankingStorage()->facade(),
         ));
 
         return $container;

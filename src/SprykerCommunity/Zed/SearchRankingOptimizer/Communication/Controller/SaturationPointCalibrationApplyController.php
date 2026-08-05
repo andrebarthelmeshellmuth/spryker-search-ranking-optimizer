@@ -59,8 +59,6 @@ class SaturationPointCalibrationApplyController extends AbstractController
             $this->addSuccessMessage('Relevance saturation point (k) was updated.');
         }
 
-        $this->getFactory()->getSearchRankingStorageFacade()->publishRankingConfiguration();
-
         return $this->redirectResponse(static::URL_CALIBRATION);
     }
 }
