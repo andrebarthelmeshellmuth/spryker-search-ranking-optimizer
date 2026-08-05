@@ -131,10 +131,10 @@ class RatingTable extends AbstractTable
         $labelsByRatingType = [
             'heart' => ['Heart', 'label-danger'],
             'check' => ['Check', 'label-success'],
-            'x' => ['X', 'label-default'],
+            'x' => ['X', 'label-warning'],
         ];
 
-        [$label, $cssClass] = $labelsByRatingType[$ratingEntity->getRatingType()] ?? [$ratingEntity->getRatingType(), 'label-default'];
+        [$label, $cssClass] = $labelsByRatingType[$ratingEntity->getRatingType()] ?? [$ratingEntity->getRatingType(), 'label-warning'];
 
         return $this->generateLabel($label, $cssClass);
     }

@@ -40,7 +40,7 @@
                                 {% elseif latestOptimizerRun.status == 'failed' %}
                                     <span class="label label-danger">Failed</span>
                                 {% else %}
-                                    <span class="label label-default">{{ latestOptimizerRun.status }}</span>
+                                    {{ latestOptimizerRun.status }}
                                 {% endif %}
                             </td>
                         </tr>
@@ -64,7 +64,7 @@
                                     {% if latestOptimizerRun.bestScore > latestOptimizerRun.baselineScore %}
                                         <span class="label label-success">improved</span>
                                     {% else %}
-                                        <span class="label label-default">no improvement</span>
+                                        no improvement
                                     {% endif %}
                                 </td>
                             </tr>
