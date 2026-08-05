@@ -906,8 +906,45 @@ fixture grant what the code expects) can only be confirmed with a real browser a
 This is not hypothetical: exactly that class of bug (a wrapper-CSS interaction hiding the widget, a
 class-naming mismatch between the Twig and the SCSS/JS, a missing permission fixture row) shipped
 undetected in this package's own history despite every automated check passing throughout, and was only
-caught by a manual click-through. A real WebDriver-based Presentation/Cest suite would close this gap; not
-built yet.
+caught by a manual click-through. The Browser (Presentation) suite below closes this gap.
+
+### Browser (Presentation) suite
+
+> **This suite is a development tool for this package's own reference demoshop — it is not something
+> to install or run against YOUR shop.** It logs in as `admin@spryker.com` (Zed) and
+> `search-admin@test-company.example` (Yves, the one account this demoshop's fixtures grant
+> `RateSearchRelevancePermissionPlugin` to), drives the real Zed GUI through a store/locale scope this
+> demoshop seeds (`DE`/`de_DE`), and — for the tests that exercise a full calibrate/optimize cycle — runs
+> the real `search-ranking-optimizer:calibrate`/`:optimize` console commands directly (this test process
+> and `vendor/bin/console` share one working directory), the same commands this shop's own cron ticks
+> would run. Point it at a different shop and most of it will simply fail on missing data, not on a real
+> defect. It exists to catch UI regressions while developing this package, not as something adopters are
+> expected to run.
+
+Two suites, split by layer:
+
+- `tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation/` — all 7 Zed pages (Calibration,
+  Queries, Ratings, Evaluation, Weight Checkpoints, Auto-Tune Settings, Automated Optimization). Every
+  test that mutates live `search-ranking` config (relevanceWeight, metric weights, relevanceSaturationPoint)
+  is fully self-contained — it captures the real value first, mutates, verifies, and restores it again
+  before finishing (via a checkpoint restore where checkpoints cover the field, or a direct Settings edit
+  for `relevanceSaturationPoint`, which checkpoints deliberately exclude — see [Weight
+  Checkpoints](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)) —
+  so test order never matters and the suite leaves the environment exactly as it found it.
+- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` — the SRP heart/check/X
+  rating widget: renders, colorizes, persists across reload, only one button active per product, un-rating
+  removes the row rather than just deselecting it, coexists with search-debug's own overlay on the same
+  tile, and the permission gate (two negative-test accounts).
+
+```bash
+vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation
+vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation
+vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation
+vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation
+```
+
+Like the rest of the test suite, neither is part of CI — both need a real running shop plus the Selenium/
+chromedriver service already provisioned in this demoshop's `docker-compose.yml`.
 
 ### Opt-in ground-truth suite (not part of the default test run)
 
