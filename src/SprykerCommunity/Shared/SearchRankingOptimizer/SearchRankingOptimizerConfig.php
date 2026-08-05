@@ -418,6 +418,23 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - Shown only as the Auto-Tune Settings form field's greyed `placeholder` — never written as an
+     *   actual value. A metric with no threshold set is deliberately opted OUT of auto-tune entirely (see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm}), so
+     *   this must never be auto-filled into a real, saved value: that would silently opt every existing
+     *   metric in the moment this constant shipped. 0.85 is a reasonable general-purpose starting point
+     *   for "this fit is good enough, don't bother refitting" — adjust per metric based on its own
+     *   Current fit (R²) column once real data is in.
+     *
+     * @api
+     */
+    public static function getAutoTuneThresholdSuggestedDefault(): float
+    {
+        return 0.85;
+    }
+
+    /**
+     * Specification:
      * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
      *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
      *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.

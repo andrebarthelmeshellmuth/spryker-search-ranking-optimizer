@@ -62,9 +62,15 @@ class AutoTuneMetricConfigForm extends AbstractType
 
         $builder->add(static::FIELD_AUTO_TUNE_THRESHOLD, NumberType::class, [
             'label' => 'Auto-tune threshold (R²)',
+            'help' => 'A floor, not a target: a refit is only attempted when the Current fit (R²) column '
+                . 'is BELOW this. Set it at or below the current fit and the fit already "passes" — nothing '
+                . 'will ever update.',
             'html5' => true,
             'scale' => 4,
             'required' => false,
+            'attr' => [
+                'placeholder' => (string)SearchRankingOptimizerConfig::getAutoTuneThresholdSuggestedDefault(),
+            ],
             'constraints' => [
                 new GreaterThan(0),
                 new LessThanOrEqual(1),
