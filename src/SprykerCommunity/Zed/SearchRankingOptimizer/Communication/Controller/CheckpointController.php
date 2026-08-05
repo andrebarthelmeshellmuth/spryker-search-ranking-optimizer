@@ -50,12 +50,24 @@ class CheckpointController extends AbstractController
         $weightCheckpointHistory = $this->getFacade()->findWeightCheckpointHistory();
 
         $restoreForms = [];
+        $metricNameSet = [];
+        $metricWeightsByCheckpointId = [];
+
         foreach ($weightCheckpointHistory as $weightCheckpointTransfer) {
             $idSearchRankingWeightCheckpoint = $weightCheckpointTransfer->getIdSearchRankingWeightCheckpointOrFail();
             $restoreForms[$idSearchRankingWeightCheckpoint] = $this->getFactory()
                 ->createRestoreWeightCheckpointForm($idSearchRankingWeightCheckpoint, $storeName, $localeName)
                 ->createView();
+
+            foreach ($weightCheckpointTransfer->getMetricWeights() as $metricWeightTransfer) {
+                $metricName = $metricWeightTransfer->getNameOrFail();
+                $metricNameSet[$metricName] = true;
+                $metricWeightsByCheckpointId[$idSearchRankingWeightCheckpoint][$metricName] = $metricWeightTransfer->getWeightOrFail();
+            }
         }
+
+        $metricNames = array_keys($metricNameSet);
+        sort($metricNames);
 
         return $this->viewResponse([
             'recordForm' => $this->getFactory()->createRecordWeightCheckpointForm()->createView(),
@@ -74,6 +86,8 @@ class CheckpointController extends AbstractController
             'metricWeights' => $searchRankingFacade->getMetricWeights($storeName, $localeName),
             'weightCheckpointHistory' => $weightCheckpointHistory,
             'restoreForms' => $restoreForms,
+            'metricNames' => $metricNames,
+            'metricWeightsByCheckpointId' => $metricWeightsByCheckpointId,
             'stores' => $this->getFactory()->getAllStoreNames(),
             'locales' => $this->getFactory()->getAllLocaleNames(),
             'selectedStoreName' => $storeName,

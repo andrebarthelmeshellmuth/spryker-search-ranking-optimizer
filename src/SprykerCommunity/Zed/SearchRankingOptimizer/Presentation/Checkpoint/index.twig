@@ -92,38 +92,46 @@
     {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
         {% block widget_content %}
             {% if weightCheckpointHistory %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Recorded at</th>
-                            <th>Store</th>
-                            <th>Locale</th>
-                            <th>Source</th>
-                            <th>Relevance weight</th>
-                            <th>Specificity enabled?</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for weightCheckpoint in weightCheckpointHistory %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <td>{{ weightCheckpoint.createdAt }}</td>
-                                <td>{{ weightCheckpoint.storeName }}</td>
-                                <td>{{ weightCheckpoint.localeName }}</td>
-                                <td>{{ weightCheckpoint.source }}</td>
-                                <td>{{ weightCheckpoint.relevanceWeight }}</td>
-                                <td>{{ weightCheckpoint.isSpecificityWeightingEnabled ? 'Yes' : 'No' }}</td>
-                                <td>
-                                    {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
-                                    {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
-                                    {{ form_widget(restoreForm) }}
-                                    <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Restore' | trans }}</button>
-                                    {{ form_end(restoreForm) }}
-                                </td>
+                                <th>Recorded at</th>
+                                <th>Store</th>
+                                <th>Actions</th>
+                                <th>Locale</th>
+                                <th>Source</th>
+                                <th>Relevance weight</th>
+                                <th>Specificity enabled?</th>
+                                {% for metricName in metricNames %}
+                                    <th>{{ metricName }}</th>
+                                {% endfor %}
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for weightCheckpoint in weightCheckpointHistory %}
+                                <tr>
+                                    <td>{{ weightCheckpoint.createdAt }}</td>
+                                    <td>{{ weightCheckpoint.storeName }}</td>
+                                    <td>
+                                        {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
+                                        {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
+                                        {{ form_widget(restoreForm) }}
+                                        <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Restore' | trans }}</button>
+                                        {{ form_end(restoreForm) }}
+                                    </td>
+                                    <td>{{ weightCheckpoint.localeName }}</td>
+                                    <td>{{ weightCheckpoint.source }}</td>
+                                    <td>{{ weightCheckpoint.relevanceWeight }}</td>
+                                    <td>{{ weightCheckpoint.isSpecificityWeightingEnabled ? 'Yes' : 'No' }}</td>
+                                    {% for metricName in metricNames %}
+                                        <td>{{ metricWeightsByCheckpointId[weightCheckpoint.idSearchRankingWeightCheckpoint][metricName] ?? '—' }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
                 <p>No checkpoint has been recorded yet.</p>
             {% endif %}
