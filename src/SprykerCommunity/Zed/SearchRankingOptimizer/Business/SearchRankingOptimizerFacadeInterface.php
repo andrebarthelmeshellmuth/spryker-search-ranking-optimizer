@@ -303,6 +303,18 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
+     * - One unconfigured instance per known `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*` value,
+     *   keyed by that value — metadata only (`getName()`/`getDescription()`), never `optimize()`d. Used to
+     *   render algorithm choices/help text; {@see queueOptimizationRun()} is what actually runs one.
+     *
+     * @api
+     *
+     * @return array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface>
+     */
+    public function getOptimizationAlgorithms(): array;
+
+    /**
+     * Specification:
      * - Picks up and fully processes the oldest still-queued optimization run — see
      *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface::runNext()}
      *   for the full specification. Returns null when nothing is queued.

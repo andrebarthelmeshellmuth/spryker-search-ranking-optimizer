@@ -303,6 +303,18 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
+     *
+     * @return array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface>
+     */
+    public function getOptimizationAlgorithms(): array
+    {
+        return $this->getFactory()->createAlgorithmFactory()->createAll();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
      */
     public function runNextOptimization(): ?SearchRankingOptimizerRunTransfer
     {

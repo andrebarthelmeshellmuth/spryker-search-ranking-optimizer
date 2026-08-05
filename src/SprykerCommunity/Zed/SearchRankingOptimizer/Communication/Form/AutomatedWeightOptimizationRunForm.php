@@ -9,9 +9,6 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form;
 
-use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
-use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
-use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
 use Spryker\Zed\Kernel\Communication\Form\AbstractType;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -50,6 +47,11 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
     public const OPTION_LOCALE_CHOICES = 'locale_choices';
 
     /**
+     * @var string
+     */
+    public const OPTION_ALGORITHMS = 'algorithms';
+
+    /**
      * @param \Symfony\Component\Form\FormBuilderInterface $builder
      * @param array<string, mixed> $options
      */
@@ -73,8 +75,8 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
 
         $builder->add(static::FIELD_ALGORITHM, ChoiceType::class, [
             'label' => 'Algorithm',
-            'help' => $this->buildAlgorithmHelp(),
-            'choices' => $this->buildAlgorithmChoices(),
+            'help' => $this->buildAlgorithmHelp($options[static::OPTION_ALGORITHMS]),
+            'choices' => $this->buildAlgorithmChoices($options[static::OPTION_ALGORITHMS]),
             'constraints' => [new NotBlank()],
         ]);
     }
@@ -89,33 +91,22 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
         $resolver->setDefaults([
             static::OPTION_STORE_CHOICES => [],
             static::OPTION_LOCALE_CHOICES => [],
+            static::OPTION_ALGORITHMS => [],
         ]);
     }
 
     /**
-     * One instance per `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*` value, purely to read
-     * their {@see OptimizerAlgorithmInterface::getName()}/`getDescription()` metadata below — never
-     * `optimize()`d. Mirrors how `OptimizationRunner::buildAlgorithm()` instantiates each one.
+     * @param array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface> $algorithms Keyed by
+     *   `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*`, as returned by
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacadeInterface::getOptimizationAlgorithms()}.
      *
-     * @return array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface>
-     */
-    private function getAlgorithms(): array
-    {
-        return [
-            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
-            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES => new RechenbergSchwefelEsAlgorithm(),
-            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION => new DifferentialEvolutionAlgorithm(),
-        ];
-    }
-
-    /**
      * @return array<string, string>
      */
-    private function buildAlgorithmChoices(): array
+    private function buildAlgorithmChoices(array $algorithms): array
     {
         $choices = [];
 
-        foreach ($this->getAlgorithms() as $algorithmName => $algorithm) {
+        foreach ($algorithms as $algorithmName => $algorithm) {
             $choices[$algorithm->getName()] = $algorithmName;
         }
 
@@ -127,9 +118,12 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
      * own comparative framing (which algorithm to prefer and why) -- framing that stays here rather than
      * traveling into `blackbox-optimizer`, which is deliberately unopinionated about that.
      *
+     * @param array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface> $algorithms Keyed by
+     *   `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*`.
+     *
      * @return string
      */
-    private function buildAlgorithmHelp(): string
+    private function buildAlgorithmHelp(array $algorithms): string
     {
         $recommendations = [
             SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => 'Generally the stronger choice, at some extra complexity.',
@@ -139,8 +133,8 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
 
         $sentences = [];
 
-        foreach ($this->getAlgorithms() as $algorithmName => $algorithm) {
-            $sentences[] = sprintf('%s — %s %s', $algorithm->getName(), $algorithm->getDescription(), $recommendations[$algorithmName]);
+        foreach ($algorithms as $algorithmName => $algorithm) {
+            $sentences[] = sprintf('%s — %s %s', $algorithm->getName(), $algorithm->getDescription(), $recommendations[$algorithmName] ?? '');
         }
 
         return implode(' ', $sentences);

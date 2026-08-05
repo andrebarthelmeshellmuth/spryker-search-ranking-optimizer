@@ -16,6 +16,7 @@ use RuntimeException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
@@ -320,6 +321,7 @@ class OptimizationRunnerTest extends Unit
             $searchRankingFacade ?? $this->createBasicSearchRankingFacadeMock(),
             $rankEvaluationRunner,
             new FormulaDeterminismChecker(),
+            new AlgorithmFactory(),
             // Deliberately tiny -- these tests verify orchestration, not optimization quality (already
             // covered by CmaEsAlgorithmTest's own benchmark-function tests).
             maxGenerations: 2,

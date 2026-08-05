@@ -9,10 +9,6 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 
-use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
-use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
-use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
-use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
 use BlackboxOptimizer\Problem\CallableProblem;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -37,6 +33,8 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
     protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker;
 
+    protected AlgorithmFactoryInterface $algorithmFactory;
+
     protected ?int $maxGenerations;
 
     /**
@@ -45,6 +43,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface $rankEvaluationRunner
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface $algorithmFactory
      * @param int|null $maxGenerations Null uses SearchRankingOptimizerConfig::getOptimizationMaxGenerations() --
      *   overridable only to keep tests fast (a real run doesn't need hundreds of generations to verify this
      *   class's own orchestration logic), never exposed via SearchRankingOptimizerBusinessFactory.
@@ -55,6 +54,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         RankEvaluationRunnerInterface $rankEvaluationRunner,
         FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
+        AlgorithmFactoryInterface $algorithmFactory,
         ?int $maxGenerations = null,
     ) {
         $this->repository = $repository;
@@ -62,6 +62,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $this->searchRankingFacade = $searchRankingFacade;
         $this->rankEvaluationRunner = $rankEvaluationRunner;
         $this->formulaDeterminismChecker = $formulaDeterminismChecker;
+        $this->algorithmFactory = $algorithmFactory;
         $this->maxGenerations = $maxGenerations;
     }
 
@@ -136,7 +137,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $baselineScore,
         );
 
-        $algorithm = $this->buildAlgorithm($algorithmName, $populationSize, $maxGenerations);
+        $algorithm = $this->algorithmFactory->create($algorithmName, $populationSize, $maxGenerations);
         $objectiveFunction = $this->buildObjectiveFunction($mapper, $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(), $storeName, $localeName, $idOptimizerRun);
         $problem = new CallableProblem($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
         $result = $algorithm->optimize($problem);
@@ -251,33 +252,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
         }
 
         return $populationSize * $maxGenerations;
-    }
-
-    /**
-     * @param string $algorithmName
-     * @param int $populationSize
-     * @param int $maxGenerations
-     */
-    protected function buildAlgorithm(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface
-    {
-        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION) {
-            $algorithm = new DifferentialEvolutionAlgorithm();
-            $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-            return $algorithm;
-        }
-
-        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES) {
-            $rechenbergSchwefelEsAlgorithm = new RechenbergSchwefelEsAlgorithm();
-            $rechenbergSchwefelEsAlgorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-            return $rechenbergSchwefelEsAlgorithm;
-        }
-
-        $cmaEsAlgorithm = new CmaEsAlgorithm();
-        $cmaEsAlgorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-        return $cmaEsAlgorithm;
     }
 
     /**

@@ -35,6 +35,9 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 use Symfony\Component\Form\FormInterface;
 
+/**
+ * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacadeInterface getFacade()
+ */
 class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFactory
 {
     public function createCalibrationUploadForm(): FormInterface
@@ -233,6 +236,7 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return $this->getFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
             AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => $storeChoices,
             AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => $localeChoices,
+            AutomatedWeightOptimizationRunForm::OPTION_ALGORITHMS => $this->getFacade()->getOptimizationAlgorithms(),
         ]);
     }
 

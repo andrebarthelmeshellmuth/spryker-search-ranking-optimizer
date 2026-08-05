@@ -24,6 +24,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJud
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
@@ -205,7 +207,13 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingFacade(),
             $this->createRankEvaluationRunner(),
             $this->createFormulaDeterminismChecker(),
+            $this->createAlgorithmFactory(),
         );
+    }
+
+    public function createAlgorithmFactory(): AlgorithmFactoryInterface
+    {
+        return new AlgorithmFactory();
     }
 
     public function createOptimizationApplier(): OptimizationApplierInterface
