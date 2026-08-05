@@ -476,7 +476,7 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
 - **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
   into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
   auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.2`); not on Packagist, so
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^3.0.0`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
   [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
   algorithms the automated weight optimization feature searches with.
@@ -838,7 +838,7 @@ composer check-floors
 
 ### Test suite
 
-**234 tests, 788 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**252 tests, 843 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
@@ -873,7 +873,12 @@ the algorithms minimize but a higher rank-evaluation score is better, always pro
 non-deterministic-formula metric excluded from the search end-to-end, the live specificity knobs seeding the
 run's baseline candidate and every subsequent candidate staying within its own trust region), and
 `OptimizationApplier` (null when the run doesn't exist or isn't done yet, writing the winning candidate and
-specificity knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied) are
+specificity knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied),
+`AlgorithmFactory` (the single place `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*` values map to
+concrete `BlackboxOptimizer\Algorithm\*` classes, including the fallback to CMA-ES for an unrecognized name),
+and `AutomatedWeightOptimizationRunForm`'s own `buildAlgorithmChoices()`/`buildAlgorithmHelp()` (invoked
+directly via reflection, same approach `RankEvalRunnerTest` already uses for this package's own protected
+methods, rather than standing up a full Symfony `FormFactory` for two pure string/array transformations) are
 covered as pure unit tests — no database needed.
 
 Real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove the
