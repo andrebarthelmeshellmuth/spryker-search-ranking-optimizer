@@ -35,6 +35,16 @@ class AssessRatedQueryTable extends AbstractTable
      */
     protected const COL_ACTIONS = 'actions';
 
+    /**
+     * @var string
+     */
+    protected const COL_ADMIN_COUNT = 'adminCount';
+
+    /**
+     * @var string
+     */
+    protected const COL_RATING_COUNT = 'ratingCount';
+
     protected SpySearchRankingQueryQuery $queryQuery;
 
     /**
@@ -56,6 +66,8 @@ class AssessRatedQueryTable extends AbstractTable
             SpySearchRankingQueryTableMap::COL_STORE_NAME => 'Store',
             SpySearchRankingQueryTableMap::COL_LOCALE_NAME => 'Locale',
             SpySearchRankingQueryTableMap::COL_IMPORTANCE_WEIGHT => 'Importance weight',
+            static::COL_ADMIN_COUNT => 'Admins rated',
+            static::COL_RATING_COUNT => 'Total ratings',
             SpySearchRankingQueryTableMap::COL_UPDATED_AT => 'Last activity',
             static::COL_ACTIONS => 'Actions',
         ]);
@@ -66,6 +78,8 @@ class AssessRatedQueryTable extends AbstractTable
             SpySearchRankingQueryTableMap::COL_STORE_NAME,
             SpySearchRankingQueryTableMap::COL_LOCALE_NAME,
             SpySearchRankingQueryTableMap::COL_IMPORTANCE_WEIGHT,
+            static::COL_ADMIN_COUNT,
+            static::COL_RATING_COUNT,
             SpySearchRankingQueryTableMap::COL_UPDATED_AT,
         ]);
 
@@ -91,6 +105,8 @@ class AssessRatedQueryTable extends AbstractTable
      */
     protected function prepareData(TableConfiguration $config): array
     {
+        $this->addAdminAndRatingCountColumns();
+
         $queryEntities = $this->runQuery($this->queryQuery, $config, true);
         $rows = [];
 
@@ -102,12 +118,33 @@ class AssessRatedQueryTable extends AbstractTable
                 SpySearchRankingQueryTableMap::COL_STORE_NAME => $queryEntity->getStoreName(),
                 SpySearchRankingQueryTableMap::COL_LOCALE_NAME => $queryEntity->getLocaleName(),
                 SpySearchRankingQueryTableMap::COL_IMPORTANCE_WEIGHT => $queryEntity->getImportanceWeight(),
+                static::COL_ADMIN_COUNT => (int)$queryEntity->getVirtualColumn(static::COL_ADMIN_COUNT),
+                static::COL_RATING_COUNT => (int)$queryEntity->getVirtualColumn(static::COL_RATING_COUNT),
                 SpySearchRankingQueryTableMap::COL_UPDATED_AT => $queryEntity->getUpdatedAt()?->format('Y-m-d H:i:s'),
                 static::COL_ACTIONS => $this->createEditButton($queryEntity),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * Correlated subqueries (not a join + GROUP BY) so the table's own pagination/sorting/search — all
+     * built on top of the plain, ungrouped {@see SpySearchRankingQueryQuery} — keep working unmodified;
+     * a join would multiply query rows per rating and break both the row count and every other column.
+     */
+    protected function addAdminAndRatingCountColumns(): void
+    {
+        $this->queryQuery->withColumn(
+            '(SELECT COUNT(DISTINCT customer_reference) FROM spy_search_ranking_query_rating'
+                . ' WHERE spy_search_ranking_query_rating.fk_search_ranking_query = spy_search_ranking_query.id_search_ranking_query)',
+            static::COL_ADMIN_COUNT,
+        );
+        $this->queryQuery->withColumn(
+            '(SELECT COUNT(*) FROM spy_search_ranking_query_rating'
+                . ' WHERE spy_search_ranking_query_rating.fk_search_ranking_query = spy_search_ranking_query.id_search_ranking_query)',
+            static::COL_RATING_COUNT,
+        );
     }
 
     /**
