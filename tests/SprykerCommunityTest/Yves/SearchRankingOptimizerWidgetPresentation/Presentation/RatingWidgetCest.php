@@ -31,8 +31,6 @@ class RatingWidgetCest
 {
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -42,8 +40,6 @@ class RatingWidgetCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function clickingHeartColorizesAndPersistsAcrossReload(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -70,8 +66,6 @@ class RatingWidgetCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function onlyOneButtonStaysActivePerProduct(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -97,8 +91,6 @@ class RatingWidgetCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function coexistsWithTheSearchDebugOverlayOnTheSameTile(SearchRankingOptimizerWidgetPresentationTester $i): void
     {

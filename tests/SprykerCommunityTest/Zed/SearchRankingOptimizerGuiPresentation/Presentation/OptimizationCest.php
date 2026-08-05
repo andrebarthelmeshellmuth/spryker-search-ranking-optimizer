@@ -36,8 +36,6 @@ class OptimizationCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -47,8 +45,6 @@ class OptimizationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function queueingARunNeverSilentlyAppliesLive(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -67,8 +63,6 @@ class OptimizationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function processingAndApplyingWritesThroughAndAutoCheckpoints(SearchRankingOptimizerGuiPresentationTester $i): void
     {

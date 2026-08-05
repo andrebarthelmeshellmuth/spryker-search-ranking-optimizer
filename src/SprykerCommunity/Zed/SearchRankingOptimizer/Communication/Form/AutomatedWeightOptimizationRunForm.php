@@ -120,8 +120,6 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
      *
      * @param array<string, \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface> $algorithms Keyed by
      *   `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*`.
-     *
-     * @return string
      */
     private function buildAlgorithmHelp(array $algorithms): string
     {

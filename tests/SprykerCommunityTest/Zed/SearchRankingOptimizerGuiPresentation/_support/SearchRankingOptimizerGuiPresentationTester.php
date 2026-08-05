@@ -44,8 +44,6 @@ class SearchRankingOptimizerGuiPresentationTester extends Actor
 
     /**
      * @param string $selector
-     *
-     * @return bool
      */
     public function tryToSeeElement(string $selector): bool
     {
@@ -53,7 +51,7 @@ class SearchRankingOptimizerGuiPresentationTester extends Actor
             $this->seeElement($selector);
 
             return true;
-        } catch (Exception $exception) {
+        } catch (Exception) {
             return false;
         }
     }

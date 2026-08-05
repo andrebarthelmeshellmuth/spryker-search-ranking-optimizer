@@ -63,8 +63,6 @@ class AutoTunePage
 
     /**
      * @param string $metricName
-     *
-     * @return string
      */
     public static function saveButtonXpath(string $metricName): string
     {

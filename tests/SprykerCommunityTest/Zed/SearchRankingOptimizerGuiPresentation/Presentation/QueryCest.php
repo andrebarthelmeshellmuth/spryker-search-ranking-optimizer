@@ -31,8 +31,6 @@ class QueryCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -42,8 +40,6 @@ class QueryCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function editingImportanceWeightRoundTripsCorrectly(SearchRankingOptimizerGuiPresentationTester $i): void
     {

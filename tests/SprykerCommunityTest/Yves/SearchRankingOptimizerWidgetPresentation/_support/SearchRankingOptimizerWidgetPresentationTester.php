@@ -58,8 +58,6 @@ class SearchRankingOptimizerWidgetPresentationTester extends Actor
 
     /**
      * @param string $email
-     *
-     * @return void
      */
     public function loginAsCustomer(string $email): void
     {
@@ -72,8 +70,6 @@ class SearchRankingOptimizerWidgetPresentationTester extends Actor
 
     /**
      * @param string $selector
-     *
-     * @return bool
      */
     public function tryToSeeElement(string $selector): bool
     {
@@ -81,7 +77,7 @@ class SearchRankingOptimizerWidgetPresentationTester extends Actor
             $this->seeElement($selector);
 
             return true;
-        } catch (Exception $exception) {
+        } catch (Exception) {
             return false;
         }
     }

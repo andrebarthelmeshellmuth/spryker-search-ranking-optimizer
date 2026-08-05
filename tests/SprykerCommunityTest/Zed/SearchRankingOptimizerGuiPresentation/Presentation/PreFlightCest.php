@@ -35,8 +35,6 @@ class PreFlightCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -46,8 +44,6 @@ class PreFlightCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function allSevenPagesLoadWithoutError(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -75,8 +71,6 @@ class PreFlightCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function sidebarListsAllSevenPages(SearchRankingOptimizerGuiPresentationTester $i): void
     {

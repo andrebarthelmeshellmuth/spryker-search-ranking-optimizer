@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
 use Rector\Config\RectorConfig;
+use Rector\DeadCode\Rector\ClassMethod\RemoveMixedDocblockOverruledByNativeTypeRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUselessParamTagRector;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 
@@ -34,6 +35,10 @@ return RectorConfig::configure()
         // typed params, which produced 215 "Doc Block params do not match method signature" errors when
         // tried -- same systemic contradiction search-debug hit with this exact rule.
         RemoveUselessParamTagRector::class,
+        // Same DocBlockParam contradiction as above, narrower trigger: strips a single @param mixed
+        // when the parameter is natively typed mixed, still breaking the required 1:1 count. Same rule,
+        // same reasoning, already skipped in the sibling search-debug package.
+        RemoveMixedDocblockOverruledByNativeTypeRector::class,
         // Rewrites plain === null / !== null checks on a nullable single-class type into
         // instanceof \Fully\Qualified\ClassName -- strictly more verbose for a simple null check, breaks
         // this codebase's consistent === null idiom used everywhere else, and writes an inline FQCN
@@ -43,11 +48,6 @@ return RectorConfig::configure()
     ])
     // Picks up the PHP floor (>=8.3) from composer.json.
     ->withPhpSets()
-    // Both at the real ceiling for the installed rector/rector version (2.0.0, older than the sibling
-    // packages' 2.5.8 — smaller rule sets): DeadCodeLevel::RULES has 46 entries (max index 45) and
-    // CodeQualityLevel::RULES has 75 (max index 74) — level numbers above either ceiling are silently
-    // clamped to it by Rector's own LevelRulesResolver, so writing a higher number here would just be
-    // inaccurate, not more aggressive.
-    ->withDeadCodeLevel(45)
-    ->withCodeQualityLevel(74)
+    ->withDeadCodeLevel(69)
+    ->withCodeQualityLevel(75)
     ->withoutParallel();

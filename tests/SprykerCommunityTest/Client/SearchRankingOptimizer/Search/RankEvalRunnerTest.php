@@ -217,7 +217,6 @@ class RankEvalRunnerTest extends Unit
         $fetchIdfByTerm->invoke($runner, $indexName, 'chair');
 
         $cacheProperty = new ReflectionProperty(RankEvalRunner::class, 'idfCache');
-        $cacheProperty->setAccessible(true);
         $cache = $cacheProperty->getValue();
 
         // Assert

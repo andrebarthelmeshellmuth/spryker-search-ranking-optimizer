@@ -30,8 +30,6 @@ class EvaluationCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -41,8 +39,6 @@ class EvaluationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function evaluateNowReturnsASynchronousResult(SearchRankingOptimizerGuiPresentationTester $i): void
     {

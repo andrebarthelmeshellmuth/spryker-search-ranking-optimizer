@@ -328,9 +328,6 @@ class OptimizationRunnerTest extends Unit
         );
     }
 
-    /**
-     * @return \PHPUnit\Framework\MockObject\MockObject|\SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected function createBasicSearchRankingFacadeMock(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);

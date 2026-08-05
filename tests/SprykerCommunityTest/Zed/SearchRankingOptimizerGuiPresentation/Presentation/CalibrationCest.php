@@ -37,8 +37,6 @@ class CalibrationCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -48,8 +46,6 @@ class CalibrationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function startingARunQueuesItWithoutTouchingLiveConfig(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -71,8 +67,6 @@ class CalibrationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function calculatingAndApplyingWritesKIntoSearchRanking(SearchRankingOptimizerGuiPresentationTester $i): void
     {

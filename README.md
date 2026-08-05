@@ -825,6 +825,7 @@ Designed, not yet built:
 | `composer validate` | the manifest stays well-formed |
 | `phpcs` (PHP 8.3, 8.4) | coding standard, via this package's own `phpcs.xml` |
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
+| `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | complexity / method- and class-length limits, run as two separate invocations (PHPMD merges every ruleset's `exclude-pattern` into one global list per run, and only the public-method-count rule should skip Facades/Factories) |
 
 `check-floors` resolves every declared constraint to its **oldest** allowed version

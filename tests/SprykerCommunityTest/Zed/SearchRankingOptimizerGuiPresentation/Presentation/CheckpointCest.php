@@ -32,8 +32,6 @@ class CheckpointCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -43,8 +41,6 @@ class CheckpointCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function takingACheckpointRecordsCurrentState(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -60,8 +56,6 @@ class CheckpointCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function restoringACheckpointRevertsWeightsAndRecordsANewOne(SearchRankingOptimizerGuiPresentationTester $i): void
     {

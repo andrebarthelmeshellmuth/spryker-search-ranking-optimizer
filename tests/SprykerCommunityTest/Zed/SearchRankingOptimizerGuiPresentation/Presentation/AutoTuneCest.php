@@ -30,8 +30,6 @@ class AutoTuneCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -41,8 +39,6 @@ class AutoTuneCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function randomMetricNeverGetsItsOwnRow(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -52,8 +48,6 @@ class AutoTuneCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function runningWithNoThresholdsSetIsASafeNoOp(SearchRankingOptimizerGuiPresentationTester $i): void
     {
@@ -66,8 +60,6 @@ class AutoTuneCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
-     *
-     * @return void
      */
     public function settingAThresholdPersistsAndCanBeClearedAgain(SearchRankingOptimizerGuiPresentationTester $i): void
     {

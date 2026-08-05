@@ -29,8 +29,6 @@ class PermissionGateCest
 {
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -39,8 +37,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function anonymousShopperSeesNoRatingButtons(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -52,8 +48,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function loggedInCustomerWithoutTheRoleSeesNoRatingButtons(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
@@ -64,8 +58,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation\SearchRankingOptimizerWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function permittedCustomerDoesSeeIt(SearchRankingOptimizerWidgetPresentationTester $i): void
     {
