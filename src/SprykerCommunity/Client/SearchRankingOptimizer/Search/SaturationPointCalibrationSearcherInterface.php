@@ -20,9 +20,9 @@ interface SaturationPointCalibrationSearcherInterface
      * - Both of those modules are unusable from Zed in this shop: their query-building/index-resolution
      *   internally requires an HTTP-request-scoped "current store" (`Client\Store::getCurrentStore()`,
      *   backed by `SPRYKER_DYNAMIC_STORE_MODE`) that plain Zed console/controller execution never has —
-     *   confirmed live: both throw a `TypeError` before any calibration-specific code even runs. $storeName
-     *   and $localeName are passed in explicitly instead (picked by the admin at upload time, since Zed
-     *   has no implicit "current store" to fall back on).
+     *   both throw a `TypeError` before any calibration-specific code even runs. $storeName and
+     *   $localeName are passed in explicitly instead (picked by the admin at upload time, since Zed has
+     *   no implicit "current store" to fall back on).
      * - Returns each hit's raw text-relevance score — BEFORE any `function_score` wrapper, regardless of
      *   whether one happens to be wired in — via {@see RawRelevanceScoreExtractorInterface}.
      * - Returns fewer than $limit scores when the term matched fewer products; an empty array when it

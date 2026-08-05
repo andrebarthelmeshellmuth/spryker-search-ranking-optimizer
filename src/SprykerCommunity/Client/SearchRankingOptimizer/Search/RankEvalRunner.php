@@ -418,9 +418,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * correctly Locator-resolved, genuinely project-override-aware answer, matching exactly what
      * `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before firing the live probe. Falls
      * back to `Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` — a hardcoded
-     * `return false;` with no project-override path of its own — only when no bridge was given at all
-     * (a caller constructing this class directly with the older argument signature), so this method never
-     * hard-fails; it just can't honor a project override without the bridge.
+     * `return false;` with no project-override path of its own — only when no bridge was given at all.
+     * The bridge parameter is optional, so this method never hard-fails when it's omitted; it just can't
+     * honor a project override without it.
      */
     protected function isSpecificityWeightingEnabled(): bool
     {
@@ -432,7 +432,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * The `page` index's own document id format, confirmed live against this shop's real OpenSearch index
+     * The `page` index's own document id format, matching this shop's real OpenSearch index
      * (`product_abstract:{store}:{locale}:{idProductAbstract}`, store/locale lowercased) — computed
      * directly rather than looked up, since the id_product_abstract is already exactly what
      * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface}

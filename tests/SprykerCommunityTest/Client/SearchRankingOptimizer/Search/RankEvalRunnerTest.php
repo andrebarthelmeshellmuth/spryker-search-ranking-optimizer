@@ -101,14 +101,15 @@ class RankEvalRunnerTest extends Unit
      * signal to a uniform 0 — turning ranking into an effectively arbitrary tie order — which must produce
      * a DIFFERENT score than the real, text-relevance-driven baseline for the exact same rated pair.
      *
-     * Cutoff deliberately set well above this shop's total "chair" match count (58, confirmed live) rather
-     * than the realistic top-10 window {@see testEvaluateReturnsAScoreForARealRatedQueryWithRealCatalogMatches}
-     * uses: this test's whole point is comparing two DIFFERENT rankings of the SAME candidate set, and with
-     * an all-tied degenerate override, the ES-internal tie-break order for a top-10 window is not
-     * meaningfully correlated with the live baseline's window — both windows can (and, confirmed live, do)
-     * miss both rated documents entirely, giving a false-negative 0.0-vs-0.0 regardless of whether the
-     * override actually applied. A cutoff covering every possible match makes both rated documents' presence
-     * (and therefore the assertion) independent of that ES tie-break/window-boundary noise.
+     * Cutoff deliberately set well above this shop's total "chair" match count (58 in this shop's real
+     * catalog) rather than the realistic top-10 window
+     * {@see testEvaluateReturnsAScoreForARealRatedQueryWithRealCatalogMatches} uses: this test's whole
+     * point is comparing two DIFFERENT rankings of the SAME candidate set, and with an all-tied degenerate
+     * override, the ES-internal tie-break order for a top-10 window is not meaningfully correlated with the
+     * live baseline's window — both windows can (and, in practice, do) miss both rated documents entirely,
+     * giving a false-negative 0.0-vs-0.0 regardless of whether the override actually applied. A cutoff
+     * covering every possible match makes both rated documents' presence (and therefore the assertion)
+     * independent of that ES tie-break/window-boundary noise.
      */
     public function testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne(): void
     {
@@ -164,8 +165,8 @@ class RankEvalRunnerTest extends Unit
      * and real catalog data, rather than asserting on the downstream `rank_eval` nDCG score -- same
      * reasoning `testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne()`'s docblock
      * gives for why a direct assertion on the adjusted value is the non-flaky way to prove a shift is real.
-     * A saturation point far below "chair"'s own real specificity (confirmed live, see this package's
-     * README) guarantees normalized specificity lands well above the neutral 0.5 point, so a non-zero
+     * A saturation point far below "chair"'s own real specificity (see this package's README) guarantees
+     * normalized specificity lands well above the neutral 0.5 point, so a non-zero
      * `specificityWeightShiftMagnitude` must produce a `relevanceWeight` different from the configured one.
      */
     public function testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm(): void

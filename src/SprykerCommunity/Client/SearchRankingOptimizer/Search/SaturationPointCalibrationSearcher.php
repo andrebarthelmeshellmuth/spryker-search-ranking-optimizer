@@ -16,7 +16,7 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 /**
  * Fires the calibration query DIRECTLY against Elasticsearch. The query itself (the exact same building
  * blocks the live storefront query is built from, NOT the real `StoreQueryExpanderPlugin`/
- * `LocalizedQueryExpanderPlugin` — confirmed live those, and `Client\Catalog`/`Client\Search` entirely,
+ * `LocalizedQueryExpanderPlugin` — both of those, and `Client\Catalog`/`Client\Search` entirely,
  * throw when called from Zed in this shop: their query/index resolution requires
  * `Client\Store::getCurrentStore()`, which needs HTTP-request-scoped "current store" state that plain Zed
  * execution never has) is built by {@see LiveCatalogSearchQueryBuilderInterface}, shared with the rank_eval

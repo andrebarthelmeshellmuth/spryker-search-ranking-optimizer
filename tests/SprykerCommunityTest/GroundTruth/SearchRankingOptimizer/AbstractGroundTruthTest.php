@@ -165,7 +165,7 @@ abstract class AbstractGroundTruthTest extends Unit
 
     /**
      * Same id format {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::buildProductDocumentId()}
-     * uses, confirmed live against this shop's real index.
+     * uses, matching this shop's real index.
      *
      * @param int $idProductAbstract
      */
@@ -265,9 +265,8 @@ abstract class AbstractGroundTruthTest extends Unit
      * deliberately reuses a real, already-existing query's own search term (to guarantee it actually returns
      * both discovered products) -- so a literal duplicate would collide. Appending " ." (a punctuation-only
      * token most analyzers strip as noise, not merely trailing whitespace MySQL's own PAD SPACE collation
-     * comparison would silently treat as equal) sidesteps the DB constraint without meaningfully changing
-     * what Elasticsearch actually matches -- confirmed live (see this suite's own commit history / manual
-     * verification) that appending it does not change which real products the query returns.
+     * comparison would silently treat as equal) sidesteps the DB constraint without changing which real
+     * products the query returns.
      *
      * @param string $searchTerm
      */

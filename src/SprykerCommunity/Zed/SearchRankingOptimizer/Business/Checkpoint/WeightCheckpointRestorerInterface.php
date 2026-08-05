@@ -24,8 +24,8 @@ interface WeightCheckpointRestorerInterface
      *   corresponding save method on `search-ranking`'s facade, captured on checkpoints only for
      *   historical transparency.
      * - Records a NEW checkpoint (source `SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL`) of the
-     *   resulting state and returns it — restoring IS applying, per the roadmap's own finding, so it gets
-     *   its own checkpoint like any other applied change.
+     *   resulting state and returns it — restoring IS applying, so it gets its own checkpoint like any
+     *   other applied change.
      * - Returns null (writes nothing) when the given id doesn't exist.
      *
      * @param int $idSearchRankingWeightCheckpoint

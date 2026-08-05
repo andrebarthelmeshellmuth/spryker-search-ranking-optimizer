@@ -64,9 +64,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      * of whatever the Yves side already gated — the single gate for these writes, same posture as
      * search-debug's own SearchDebugAccessChecker. Zed's own "Query Curator" page (editing a query's
      * importance weight) is gated by standard Zed ACL only, like every other Zed controller in this
-     * package — there is no separate fine-grained Permission-system check for it (a `SetSearchQueryImportancePermissionPlugin`
-     * used to exist for this but was never actually wired to any enforcement point; removed rather than
-     * left as misleading dead code).
+     * package — there is no separate fine-grained Permission-system check for it.
      *
      * @var string
      */

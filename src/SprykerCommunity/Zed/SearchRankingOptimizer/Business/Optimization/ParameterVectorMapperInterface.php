@@ -37,9 +37,9 @@ interface ParameterVectorMapperInterface
     /**
      * @param array<int, float> $vector A vector of {@see getDimensionCount()} values, as an
      *   OptimizerAlgorithmInterface implementation would produce it.
-     * @param float $relevanceSaturationPoint Passed through unchanged — Phase O6 never touches this
-     *   (Calibration's own concern), but the resulting configuration transfer needs a real value to be
-     *   usable as a rank_eval override.
+     * @param float $relevanceSaturationPoint Passed through unchanged — the optimizer loop never touches
+     *   this (Calibration's own concern), but the resulting configuration transfer needs a real value to
+     *   be usable as a rank_eval override.
      */
     public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer;
 

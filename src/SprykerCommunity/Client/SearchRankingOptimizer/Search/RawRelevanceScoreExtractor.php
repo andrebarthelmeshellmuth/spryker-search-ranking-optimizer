@@ -42,8 +42,8 @@ class RawRelevanceScoreExtractor implements RawRelevanceScoreExtractorInterface
     /**
      * A zero-valued node contributes nothing and its children are internal filter-clause noise (Lucene
      * explains those for transparency even though they never scored) — mirrors the same guard
-     * search-debug's own `ExplanationParser::walkNode()` uses, so this stays correct against the exact
-     * tree shapes that class was already confirmed live against.
+     * search-debug's own `ExplanationParser::walkNode()` uses, so this stays correct against the same
+     * real explanation tree shapes that class handles.
      *
      * @param array<string, mixed> $node
      */

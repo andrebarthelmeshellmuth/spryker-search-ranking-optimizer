@@ -37,8 +37,9 @@ interface RankEvaluationRunnerInterface
      * Same underlying pipeline as {@see evaluate()} (rating aggregation, batched `_rank_eval` call,
      * PHP-side importance-weighted aggregate) but scored against an EXPLICIT candidate configuration
      * instead of the live one, and NEVER persists anything to `spy_search_ranking_evaluation` — built for
-     * Phase O6's optimizer loop, which may call this hundreds or thousands of times in a single run and
-     * would otherwise flood that table with entries that were never real, human-triggered evaluations.
+     * the automated weight-optimization loop, which may call this hundreds or thousands of times in a
+     * single run and would otherwise flood that table with entries that were never real, human-triggered
+     * evaluations.
      *
      * @param string $storeName
      * @param string $localeName

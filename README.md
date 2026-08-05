@@ -221,7 +221,7 @@ evaluation, below.
 
 ### Rank evaluation — a real objective score, not averaged opinion
 
-Phases like a weight-slider preview or a propose/review/apply workflow can't answer "did that change make
+A weight-slider preview or a propose/review/apply workflow alone can't answer "did that change make
 search better?" without something to measure against. Rank evaluation turns the ratings the widget above
 already collects into a real nDCG (Normalized Discounted Cumulative Gain) score via OpenSearch/
 Elasticsearch's `_rank_eval` API — a genuine information-retrieval metric, not human opinion averaged
@@ -953,7 +953,7 @@ real positive scores and an unmatched term returns none. `RawRelevanceScoreExtra
 explanation-parsing logic itself as a pure unit test against all four known `_explanation` shapes
 (function-score-wrapped, unwrapped, nested, the zero-value guard) — `SaturationPointCalibrationSearcher` never wraps its
 query in `function_score` (unlike search-ranking's live serving path), so the unwrapped-fallback shape
-those unit tests assume is the same shape confirmed live against this shop's real OpenSearch 1.3.4.
+those unit tests assume is the same shape this shop's real OpenSearch 1.3.4 actually returns.
 `NeverInvokedStoreClient` is the one class with no test: a `LogicException`-throwing stub that structurally
 satisfies an interface but is documented, by construction, to never actually be called — the same
 exemption this project's own audit convention already grants exception/boilerplate classes.

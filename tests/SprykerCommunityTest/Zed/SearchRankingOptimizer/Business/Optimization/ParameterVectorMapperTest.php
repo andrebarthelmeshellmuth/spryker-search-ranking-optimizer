@@ -76,7 +76,7 @@ class ParameterVectorMapperTest extends Unit
     {
         // Arrange -- both CmaEsAlgorithm (needs a finite midpoint for its default initial mean) and
         // DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given
-        // bounds) need real, finite bounds to even start a run -- confirmed live.
+        // bounds) need real, finite bounds to even start a run -- a real constraint, not a hypothetical one.
         $mapper = $this->buildMapper($this->buildThreeMetrics());
         $zSpaceBound = SearchRankingOptimizerConfig::getMetricWeightZSpaceBound();
 

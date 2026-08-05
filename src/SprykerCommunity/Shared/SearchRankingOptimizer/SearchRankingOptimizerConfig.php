@@ -171,9 +171,8 @@ class SearchRankingOptimizerConfig
      * Specification:
      * - A weight checkpoint taken directly by a Query Curator — either an explicit "take checkpoint now",
      *   or the checkpoint a restore itself writes to record the resulting state (restore is "apply",
-     *   same as any other weight change).
-     * - Later phases add further values here as new checkpoint producers get built (a monthly auto-tune
-     *   job, an eventual automated weight optimizer) — "one harness, three producers," per the roadmap.
+     *   same as any other weight change). Distinct from `CHECKPOINT_SOURCE_OPTIMIZER`, which records
+     *   checkpoints for automated optimizer runs instead.
      *
      * @api
      *
@@ -184,7 +183,7 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - The checkpoint recorded automatically when a human clicks Apply on an automated optimization
-     *   run's (Phase O6) winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
+     *   run's winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
      *   history honestly shows which changes came from an optimizer run rather than a direct manual edit
      *   or restore.
      *
@@ -236,7 +235,7 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - How far a single automated weight-optimization run (Phase O6) may push relevanceWeight away from
+     * - How far a single automated weight-optimization run may push relevanceWeight away from
      *   its OWN value at the moment the run started, in either direction, before clipping back to [0;1]
      *   at either edge -- a trust-region safety limit, not a general-purpose bound on relevanceWeight
      *   itself (which is always [0;1] regardless of this setting). Deliberately conservative by default:
@@ -381,7 +380,7 @@ class SearchRankingOptimizerConfig
      *   alone would allow. Both CmaEsAlgorithm (needs a finite midpoint to default its initial mean to) and
      *   DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given bounds,
      *   which is undefined arithmetic against an infinite range) need real, finite bounds to even start a
-     *   run — confirmed live, not a hypothetical. 10.0 is already an extreme corner of the simplex (a
+     *   run — a real constraint, not a hypothetical one. 10.0 is already an extreme corner of the simplex (a
      *   softmax ratio of e^10 =~ 22000:1 against the other metrics), so this is not a meaningful
      *   restriction on what the optimizer can actually reach in practice.
      *
