@@ -130,14 +130,14 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
+        $algorithm = $this->algorithmFactory->create($algorithmName, $populationSize, $maxGenerations);
 
         $this->entityManager->startOptimizerRun(
             $idOptimizerRun,
-            $this->computeTotalEvaluationCount($algorithmName, $populationSize, $maxGenerations),
+            $algorithm->estimateEvaluationCount(),
             $baselineScore,
         );
 
-        $algorithm = $this->algorithmFactory->create($algorithmName, $populationSize, $maxGenerations);
         $objectiveFunction = $this->buildObjectiveFunction($mapper, $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(), $storeName, $localeName, $idOptimizerRun);
         $problem = new CallableProblem($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
         $result = $algorithm->optimize($problem);
@@ -225,33 +225,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
     protected function computePopulationSize(int $dimensionCount): int
     {
         return max(4, (int)(4 + floor(3 * log(max($dimensionCount, 2)))));
-    }
-
-    /**
-     * @param string $algorithmName
-     * @param int $populationSize
-     * @param int $maxGenerations
-     */
-    protected function computeTotalEvaluationCount(string $algorithmName, int $populationSize, int $maxGenerations): int
-    {
-        // DifferentialEvolutionAlgorithm evaluates one extra initial-population batch (lambda-sized, same
-        // as every later generation) before its generation loop starts; CmaEsAlgorithm's first generation
-        // IS the initial sample, no separate batch. RechenbergSchwefelEsAlgorithm also evaluates an
-        // initial batch first, but a mu-sized one (its parent population), not lambda-sized -- mu is
-        // computed here the same way RechenbergSchwefelEsAlgorithm::resolveParentCount() computes its own
-        // default (mu/lambda ~ 1/7, Schwefel's classic guideline), since this run never calls
-        // setParentCount() to override it.
-        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION) {
-            return $populationSize * ($maxGenerations + 1);
-        }
-
-        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES) {
-            $parentCount = max(1, (int)round($populationSize / 7));
-
-            return $parentCount + ($populationSize * $maxGenerations);
-        }
-
-        return $populationSize * $maxGenerations;
     }
 
     /**

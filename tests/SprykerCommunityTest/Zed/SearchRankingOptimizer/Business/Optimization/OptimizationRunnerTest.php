@@ -156,8 +156,8 @@ class OptimizationRunnerTest extends Unit
     /**
      * Same shape as {@see testRunNextCompletesSuccessfullyAndPersistsAWinningCandidate()}, run against
      * RechenbergSchwefelEsAlgorithm instead of the default DifferentialEvolutionAlgorithm -- proves
-     * buildAlgorithm()/computeTotalEvaluationCount() actually route the third algorithm choice correctly,
-     * not just that DE and CMA-ES (already exercised elsewhere) still work.
+     * AlgorithmFactory::create() actually routes the third algorithm choice correctly, not just that DE and
+     * CMA-ES (already exercised elsewhere) still work.
      */
     public function testRunNextCompletesSuccessfullyWithTheRechenbergSchwefelEsAlgorithm(): void
     {
