@@ -43,8 +43,11 @@ return RectorConfig::configure()
     ])
     // Picks up the PHP floor (>=8.3) from composer.json.
     ->withPhpSets()
-    // Gradual levels (0 = safest rules only). Raising in batches; stop at the first hit that
-    // conflicts with established Spryker style rather than applying it automatically.
-    ->withDeadCodeLevel(74)
+    // Both at the real ceiling for the installed rector/rector version (2.0.0, older than the sibling
+    // packages' 2.5.8 — smaller rule sets): DeadCodeLevel::RULES has 46 entries (max index 45) and
+    // CodeQualityLevel::RULES has 75 (max index 74) — level numbers above either ceiling are silently
+    // clamped to it by Rector's own LevelRulesResolver, so writing a higher number here would just be
+    // inaccurate, not more aggressive.
+    ->withDeadCodeLevel(45)
     ->withCodeQualityLevel(74)
     ->withoutParallel();
