@@ -47,6 +47,7 @@ use SprykerCommunity\Zed\SearchRanking\Business\SearchRankingFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
@@ -662,6 +663,7 @@ abstract class AbstractGroundTruthTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+            new QuerySpecificityCalculator(),
         ) extends RankEvalRunner {
             protected function isSpecificityWeightingEnabled(): bool
             {
@@ -746,6 +748,7 @@ abstract class AbstractGroundTruthTest extends Unit
             $forcedEnabledFacade,
             new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper()),
             new FormulaDeterminismChecker(),
+            new AlgorithmFactory(),
         );
 
         $queuedRunTransfer = $this->getEntityManager()->createOptimizerRun(
