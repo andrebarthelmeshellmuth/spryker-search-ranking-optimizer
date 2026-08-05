@@ -340,7 +340,7 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            null,
+            new QuerySpecificityCalculator(),
             new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
         );
     }
@@ -393,7 +393,7 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            null,
+            new QuerySpecificityCalculator(),
             $specificityWeightingForcedEnabledClient,
         );
     }
@@ -443,7 +443,7 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            null,
+            new QuerySpecificityCalculator(),
             $specificityWeightingForcedDisabledClient,
         );
     }

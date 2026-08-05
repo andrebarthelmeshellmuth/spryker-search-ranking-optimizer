@@ -90,7 +90,7 @@ class SearchRankingOptimizerFactory extends AbstractFactory
             $this->createLiveCatalogSearchQueryBuilder(),
             $this->createFunctionScoreBuilder(),
             $this->getSearchRankingStorageClient(),
-            null,
+            $this->createQuerySpecificityCalculator(),
             $this->getSearchRankingClient(),
         );
     }

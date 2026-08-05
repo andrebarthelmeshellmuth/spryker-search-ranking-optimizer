@@ -18,7 +18,6 @@ use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
-use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
@@ -106,7 +105,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder,
         FunctionScoreBuilderInterface $functionScoreBuilder,
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
-        protected QuerySpecificityCalculatorInterface $querySpecificityCalculator = new QuerySpecificityCalculator(),
+        protected QuerySpecificityCalculatorInterface $querySpecificityCalculator,
         ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
     ) {
         $this->elasticaClient = $elasticaClient;
