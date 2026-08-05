@@ -126,6 +126,10 @@ class SaturationPointCalibrationUploadForm extends AbstractType
 
         $builder->add(static::FIELD_FILE, FileType::class, [
             'label' => 'Search terms (CSV, one term per line)',
+            'help' => 'Single-column CSV, one search term per line, e.g. one line reading apple juice and '
+                . 'another reading "orange juice". Surrounding quotes and whitespace are trimmed, blank '
+                . 'lines are dropped, and duplicate terms (exact, case-sensitive match) are collapsed to '
+                . 'their first occurrence.',
             'mapped' => false,
             'required' => false,
             'constraints' => [
