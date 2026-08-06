@@ -209,9 +209,8 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
 
     /**
      * Writes a single metric's formula through `search-ranking`'s own facade, preserving every other
-     * field already on the transfer this reads first (name/isActive/isHigherBetter). formula IS
-     * store-scoped on `search-ranking`'s own side (its store-scoped-formula migration, see that package's
-     * own project memory) — writes for $storeName specifically, not globally.
+     * field already on the transfer this reads first (name/isActive/isHigherBetter). formula is
+     * store-scoped on `search-ranking`'s own side — writes for $storeName specifically, not globally.
      *
      * @param int $idSearchRankingMetric
      * @param string $formula

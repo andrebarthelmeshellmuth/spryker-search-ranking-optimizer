@@ -205,8 +205,8 @@ class RankEvalRunnerTest extends Unit
 
     /**
      * Proves `specificityCurveExponent` actually reaches this reimplementation's own shift math, not just
-     * the `?? 1.0` fallback -- the exact bug class Phase 5 already found and fixed once here (a forgotten
-     * parameter making a knob silently inert during optimizer evaluation, see this class's own sibling
+     * the `?? 1.0` fallback -- a forgotten parameter here has already once made a knob silently inert
+     * during optimizer evaluation (see this class's own sibling
      * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s docblock). Every other
      * test in this class either omits `specificityCurveExponent` entirely (falling back to the
      * pivot-neutral 1.0) or never varies it, so none of them would notice if this parameter were dropped
@@ -243,7 +243,7 @@ class RankEvalRunnerTest extends Unit
         $this->assertNotSame(
             $pivotNeutralConfigurationTransfer->getRelevanceWeight(),
             $sharpenedConfigurationTransfer->getRelevanceWeight(),
-            'Two different specificityCurveExponent values must produce two different adjusted relevanceWeight results for the same real query term -- if they don\'t, specificityCurveExponent is silently inert in this reimplementation, exactly the Phase 5 bug class this test guards against.',
+            'Two different specificityCurveExponent values must produce two different adjusted relevanceWeight results for the same real query term -- if they don\'t, specificityCurveExponent is silently inert in this reimplementation.',
         );
     }
 

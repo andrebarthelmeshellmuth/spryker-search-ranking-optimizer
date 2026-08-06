@@ -191,7 +191,7 @@
         <property name="weight" type="float"/>
     </transfer>
 
-    <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
+    <!-- A full point-in-time snapshot of what the propose/review/apply workflow needs to
          reproduce: the relevanceWeight blend, every metric's own weight, and the 4 specificity-weighting
          knobs (blend weight/curve exponent/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
          which already have their own versioning story via Saturation Point Calibration and stay out of checkpoint scope
