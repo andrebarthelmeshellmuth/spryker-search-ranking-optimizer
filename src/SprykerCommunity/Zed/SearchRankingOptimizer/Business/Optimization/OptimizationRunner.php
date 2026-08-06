@@ -122,6 +122,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $optimizableMetrics,
             $fixedMetricWeights,
             $liveConfigurationTransfer->getRelevanceWeightOrFail(),
+            $liveConfigurationTransfer->getSpecificityCurveExponentOrFail(),
             $liveConfigurationTransfer->getSpecificityWeightExponentOrFail(),
             $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
             $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
@@ -150,6 +151,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $this->buildBestMetricWeightTransfers($activeMetrics, $bestConfigurationTransfer),
             -$result->getBestValue(),
             $bestConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $bestConfigurationTransfer->getSpecificityCurveExponentOrFail(),
             $bestConfigurationTransfer->getSpecificityWeightExponentOrFail(),
             $bestConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
         );
@@ -176,6 +178,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
             ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint($storeName, $localeName))
             ->setMetricWeights($metricWeightsByName)
+            ->setSpecificityCurveExponent($this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName))
             ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
             ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
             ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName));

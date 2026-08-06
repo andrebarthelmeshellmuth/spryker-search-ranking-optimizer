@@ -70,6 +70,7 @@ class AutomatedWeightOptimizationController extends AbstractController
             'storeName' => $storeName,
             'localeName' => $localeName,
             'currentRelevanceWeight' => $this->getFactory()->getSearchRankingFacade()->getRelevanceWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
+            'currentSpecificityCurveExponent' => $this->getFactory()->getSearchRankingFacade()->getSpecificityCurveExponent($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'currentSpecificityWeightExponent' => $this->getFactory()->getSearchRankingFacade()->getSpecificityWeightExponent($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'currentSpecificityWeightShiftMagnitude' => $this->getFactory()->getSearchRankingFacade()->getSpecificityWeightShiftMagnitude($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'currentSpecificityBlendWeight' => $this->getFactory()->getSearchRankingFacade()->getSpecificityBlendWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),

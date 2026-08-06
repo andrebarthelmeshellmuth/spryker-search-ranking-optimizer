@@ -294,6 +294,48 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `specificityCurveExponent` instead — how far a single run may push it away from its own value at
+     *   the moment the run started, before clipping to the absolute bounds
+     *   {@see getSpecificityCurveExponentLowerBound()}/{@see getSpecificityCurveExponentUpperBound()}.
+     *
+     * @api
+     */
+    public static function getSpecificityCurveExponentTrustRegionMaxDistance(): float
+    {
+        return 0.5;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `specificityCurveExponent` regardless of trust region — same reasoning as
+     *   {@see getSpecificityWeightExponentLowerBound()}: the Hill-equation curve `raw^p / (raw^p + k^p)`
+     *   degenerates at `p <= 0` (0 collapses every input to the constant 0.5, discarding the specificity
+     *   signal entirely; negative values invert the curve's monotonicity in an unintended way).
+     *
+     * @api
+     */
+    public static function getSpecificityCurveExponentLowerBound(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute upper bound on `specificityCurveExponent` — same magnitude as
+     *   {@see getSpecificityWeightExponentUpperBound()}, deliberately generous (a value this high makes the
+     *   normalized-specificity curve extremely steep/near-binary around the saturation point, a real if
+     *   aggressive choice a run should be allowed to reach, not artificially capped tighter than that).
+     *
+     * @api
+     */
+    public static function getSpecificityCurveExponentUpperBound(): float
+    {
+        return 5.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
      *   `specificityWeightShiftMagnitude` instead.
      *
      * @api

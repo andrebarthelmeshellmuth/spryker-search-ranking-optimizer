@@ -47,6 +47,7 @@ class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
             ->setLocaleName($localeName)
             ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
             ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName))
+            ->setSpecificityCurveExponent($this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName))
             ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
             ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
             ->setIsSpecificityWeightingEnabled($this->searchRankingFacade->isSpecificityWeightingEnabled());

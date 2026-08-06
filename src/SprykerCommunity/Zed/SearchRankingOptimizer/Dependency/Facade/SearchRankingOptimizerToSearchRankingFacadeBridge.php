@@ -106,6 +106,25 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      */
+    public function getSpecificityCurveExponent(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityCurveExponent
+     */
+    public function saveSpecificityCurveExponent(string $storeName, string $localeName, float $specificityCurveExponent): void
+    {
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $specificityCurveExponent);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
     public function getSpecificityWeightExponent(string $storeName, string $localeName): float
     {
         return $this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName);

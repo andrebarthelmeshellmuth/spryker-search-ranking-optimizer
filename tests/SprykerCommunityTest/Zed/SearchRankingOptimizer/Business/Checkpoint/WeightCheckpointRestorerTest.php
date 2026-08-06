@@ -60,6 +60,7 @@ class WeightCheckpointRestorerTest extends Unit
             ->setSource('auto-tune')
             ->setRelevanceWeight(0.75)
             ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityCurveExponent(1.5)
             ->setSpecificityWeightExponent(2.0)
             ->setSpecificityWeightShiftMagnitude(0.25)
             ->setIsSpecificityWeightingEnabled(true)
@@ -82,6 +83,7 @@ class WeightCheckpointRestorerTest extends Unit
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with('DE', 'de_DE', 0.75);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityBlendWeight')->with('DE', 'de_DE', 0.7);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityCurveExponent')->with('DE', 'de_DE', 1.5);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightExponent')->with('DE', 'de_DE', 2.0);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightShiftMagnitude')->with('DE', 'de_DE', 0.25);
         $searchRankingFacadeMock->expects($this->exactly(2))
@@ -113,6 +115,7 @@ class WeightCheckpointRestorerTest extends Unit
             ->setSource('auto-tune')
             ->setRelevanceWeight(0.75)
             ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityCurveExponent(1.5)
             ->setSpecificityWeightExponent(2.0)
             ->setSpecificityWeightShiftMagnitude(0.25)
             ->setIsSpecificityWeightingEnabled(false)

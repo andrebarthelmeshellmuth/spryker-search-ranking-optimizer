@@ -121,6 +121,7 @@
         <column name="locale_name" type="VARCHAR" size="16" required="true"/>
         <column name="relevance_weight" type="DOUBLE" required="true" description="search-ranking's relevanceWeight blend at the moment this checkpoint was taken."/>
         <column name="specificity_blend_weight" type="DOUBLE" required="true" description="search-ranking's specificityBlendWeight at the moment this checkpoint was taken (meaningful only if specificity weighting is enabled at the code level, but always captured — cheap and keeps a checkpoint a complete snapshot regardless of that project-level flag)."/>
+        <column name="specificity_curve_exponent" type="DOUBLE" required="true" defaultValue="1.0" description="search-ranking's specificityCurveExponent at the moment this checkpoint was taken. Defaults 1.0 (the Hill-equation identity value) so migrating an existing table backfills every pre-existing checkpoint row with the value that reproduces its own original curve exactly, not an arbitrary placeholder."/>
         <column name="specificity_weight_exponent" type="DOUBLE" required="true" description="search-ranking's specificityWeightExponent at the moment this checkpoint was taken."/>
         <column name="specificity_weight_shift_magnitude" type="DOUBLE" required="true" description="search-ranking's specificityWeightShiftMagnitude at the moment this checkpoint was taken."/>
         <column name="is_specificity_weighting_enabled" type="BOOLEAN" required="true" description="Whether search-ranking's code-level specificity-weighting flag was on at the moment this checkpoint was taken — independent of the 3 knob values above, so a checkpoint honestly records whether those numbers were actually live, not just what they were set to."/>
@@ -165,6 +166,7 @@
         <column name="best_metric_weights" type="LONGVARCHAR" required="false" description="JSON array of {idSearchRankingMetric, name, weight} for the winning candidate — same shape/encoding as spy_search_ranking_weight_checkpoint.metric_weights. Null until status=done."/>
         <column name="best_score" type="DOUBLE" required="false" description="The winning candidate's own weighted nDCG score. Null until status=done."/>
         <column name="best_specificity_blend_weight" type="DOUBLE" required="false" description="The winning candidate's specificityBlendWeight. Null until status=done."/>
+        <column name="best_specificity_curve_exponent" type="DOUBLE" required="false" description="The winning candidate's specificityCurveExponent. Null until status=done."/>
         <column name="best_specificity_weight_exponent" type="DOUBLE" required="false" description="The winning candidate's specificityWeightExponent. Null until status=done."/>
         <column name="best_specificity_weight_shift_magnitude" type="DOUBLE" required="false" description="The winning candidate's specificityWeightShiftMagnitude. Null until status=done."/>
         <column name="completed_at" type="TIMESTAMP" required="false"/>

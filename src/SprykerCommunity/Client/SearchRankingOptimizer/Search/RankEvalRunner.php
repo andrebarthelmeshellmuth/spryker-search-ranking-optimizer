@@ -30,7 +30,7 @@ use Throwable;
  * on the live storefront: `search-ranking`'s `SearchRankingFunctionScoreQueryExpanderPlugin` is the ONLY
  * place that mechanism runs live, and this class's `applyRankingFormula()` calls
  * `FunctionScoreBuilder::build()` directly, bypassing that plugin entirely -- so a candidate/live
- * configuration's own specificityBlendWeight/specificityWeightExponent/specificityWeightShiftMagnitude
+ * configuration's own specificityBlendWeight/specificityCurveExponent/specificityWeightExponent/specificityWeightShiftMagnitude
  * were silently inert here despite always being present on `SearchRankingConfigurationStorageTransfer`.
  * `applySpecificityWeighting()` below closes that gap by reimplementing the same shift formula
  * {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator} uses -- reimplemented
@@ -273,6 +273,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $normalizedSpecificity = $this->querySpecificityCalculator->normalize(
             $rawSpecificity,
             (float)$configurationTransfer->getSpecificitySaturationPoint(),
+            (float)($configurationTransfer->getSpecificityCurveExponent() ?? 1.0),
         );
 
         $shift = $this->calculateSpecificityShift(

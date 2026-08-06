@@ -341,6 +341,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $weightCheckpointEntity->setLocaleName($weightCheckpointTransfer->getLocaleNameOrFail());
         $weightCheckpointEntity->setRelevanceWeight($weightCheckpointTransfer->getRelevanceWeightOrFail());
         $weightCheckpointEntity->setSpecificityBlendWeight($weightCheckpointTransfer->getSpecificityBlendWeightOrFail());
+        $weightCheckpointEntity->setSpecificityCurveExponent($weightCheckpointTransfer->getSpecificityCurveExponentOrFail());
         $weightCheckpointEntity->setSpecificityWeightExponent($weightCheckpointTransfer->getSpecificityWeightExponentOrFail());
         $weightCheckpointEntity->setSpecificityWeightShiftMagnitude($weightCheckpointTransfer->getSpecificityWeightShiftMagnitudeOrFail());
         $weightCheckpointEntity->setIsSpecificityWeightingEnabled($weightCheckpointTransfer->getIsSpecificityWeightingEnabledOrFail());
@@ -441,6 +442,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
      * @param float $bestScore
      * @param float $bestSpecificityBlendWeight
+     * @param float $bestSpecificityCurveExponent
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
      */
@@ -450,6 +452,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         array $bestMetricWeightTransfers,
         float $bestScore,
         float $bestSpecificityBlendWeight,
+        float $bestSpecificityCurveExponent,
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
     ): void {
@@ -466,6 +469,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setBestMetricWeights($this->getFactory()->createSearchRankingOptimizerMapper()->encodeMetricWeights($bestMetricWeightTransfers));
         $optimizerRunEntity->setBestScore($bestScore);
         $optimizerRunEntity->setBestSpecificityBlendWeight($bestSpecificityBlendWeight);
+        $optimizerRunEntity->setBestSpecificityCurveExponent($bestSpecificityCurveExponent);
         $optimizerRunEntity->setBestSpecificityWeightExponent($bestSpecificityWeightExponent);
         $optimizerRunEntity->setBestSpecificityWeightShiftMagnitude($bestSpecificityWeightShiftMagnitude);
         $optimizerRunEntity->setCompletedAt(new DateTime());

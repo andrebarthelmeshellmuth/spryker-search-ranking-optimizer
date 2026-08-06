@@ -80,6 +80,7 @@ class CheckpointController extends AbstractController
             ),
             'relevanceWeight' => $searchRankingFacade->getRelevanceWeight($storeName, $localeName),
             'specificityBlendWeight' => $searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName),
+            'specificityCurveExponent' => $searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName),
             'specificityWeightExponent' => $searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName),
             'specificityWeightShiftMagnitude' => $searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName),
             'isSpecificityWeightingEnabled' => $searchRankingFacade->isSpecificityWeightingEnabled(),

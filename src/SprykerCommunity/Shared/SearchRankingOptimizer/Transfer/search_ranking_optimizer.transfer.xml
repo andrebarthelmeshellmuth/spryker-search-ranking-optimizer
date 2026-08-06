@@ -192,8 +192,8 @@
     </transfer>
 
     <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
-         reproduce: the relevanceWeight blend, every metric's own weight, and the 3 specificity-weighting
-         knobs (blend weight/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
+         reproduce: the relevanceWeight blend, every metric's own weight, and the 4 specificity-weighting
+         knobs (blend weight/curve exponent/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
          which already have their own versioning story via Saturation Point Calibration and stay out of checkpoint scope
          deliberately. The specificity knobs ARE included: they directly shape the live ranking formula's
          behavior the same way relevanceWeight/metric weights do, so a checkpoint that omitted them
@@ -215,6 +215,7 @@
         <property name="localeName" type="string"/>
         <property name="relevanceWeight" type="float"/>
         <property name="specificityBlendWeight" type="float"/>
+        <property name="specificityCurveExponent" type="float"/>
         <property name="specificityWeightExponent" type="float"/>
         <property name="specificityWeightShiftMagnitude" type="float"/>
         <property name="isSpecificityWeightingEnabled" type="bool"/>
@@ -313,6 +314,7 @@
         <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>
         <property name="bestScore" type="float"/>
         <property name="bestSpecificityBlendWeight" type="float"/>
+        <property name="bestSpecificityCurveExponent" type="float"/>
         <property name="bestSpecificityWeightExponent" type="float"/>
         <property name="bestSpecificityWeightShiftMagnitude" type="float"/>
         <property name="completedAt" type="string"/>

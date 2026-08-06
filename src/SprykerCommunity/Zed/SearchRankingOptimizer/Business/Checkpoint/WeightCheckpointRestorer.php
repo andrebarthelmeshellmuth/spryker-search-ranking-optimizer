@@ -55,6 +55,7 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
 
         $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $weightCheckpointTransfer->getRelevanceWeightOrFail());
         $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $weightCheckpointTransfer->getSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $weightCheckpointTransfer->getSpecificityCurveExponentOrFail());
         $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightExponentOrFail());
         $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightShiftMagnitudeOrFail());
 

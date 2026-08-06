@@ -23,14 +23,14 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  *   is the pinned reference weight, never a free dimension) — omitted entirely when there are 0 or 1
  *   optimizable metrics, since a simplex of size <= 1 has no real degrees of freedom (0 metrics: nothing
  *   to weight at all; 1 metric: its weight is trivially always the full remaining budget).
- * - Final 3 indices, present ONLY when `search-ranking`'s specificity-aware relevance weighting is
- *   actually enabled (see the constructor's `$specificityWeightingEnabled`): `specificityWeightExponent`,
- *   `specificityWeightShiftMagnitude`, `specificityBlendWeight` — each its own independent box-bounded
- *   value (a trust region around its OWN value at run start, clipped to its own absolute bounds), not part
- *   of any simplex. When disabled, these 3 knobs are omitted from the vector entirely (not merely fixed,
- *   like an excluded metric — a disabled feature has no live effect to preserve a budget for) and every
- *   candidate configuration this mapper produces simply carries the values captured at run start,
- *   unchanged.
+ * - Final 4 indices, present ONLY when `search-ranking`'s specificity-aware relevance weighting is
+ *   actually enabled (see the constructor's `$specificityWeightingEnabled`): `specificityCurveExponent`,
+ *   `specificityWeightExponent`, `specificityWeightShiftMagnitude`, `specificityBlendWeight` — each its
+ *   own independent box-bounded value (a trust region around its OWN value at run start, clipped to its
+ *   own absolute bounds), not part of any simplex. When disabled, these 4 knobs are omitted from the
+ *   vector entirely (not merely fixed, like an excluded metric — a disabled feature has no live effect to
+ *   preserve a budget for) and every candidate configuration this mapper produces simply carries the
+ *   values captured at run start, unchanged.
  *
  * relevanceSaturationPoint/specificitySaturationPoint are deliberately never part of this vector at all --
  * see {@see ParameterVectorMapperInterface} and this package's own README/memory for why (Calibration's
@@ -54,6 +54,10 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
 
     protected float $relevanceWeightUpperBound;
 
+    protected float $specificityCurveExponentLowerBound;
+
+    protected float $specificityCurveExponentUpperBound;
+
     protected float $specificityWeightExponentLowerBound;
 
     protected float $specificityWeightExponentUpperBound;
@@ -67,6 +71,8 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
     protected float $specificityBlendWeightUpperBound;
 
     protected bool $specificityWeightingEnabled;
+
+    protected float $specificityCurveExponentAtRunStart;
 
     protected float $specificityWeightExponentAtRunStart;
 
@@ -88,13 +94,14 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      *   this mapper produces.
      * @param float $relevanceWeightAtRunStart The relevanceWeight value to center this run's trust region
      *   on — normally the LIVE value at the moment the run starts, read once and fixed for the whole run.
-     * @param float $specificityWeightExponentAtRunStart Same "center this run's trust region on the live
-     *   value" treatment as $relevanceWeightAtRunStart, for `specificityWeightExponent` — also the value
+     * @param float $specificityCurveExponentAtRunStart Same "center this run's trust region on the live
+     *   value" treatment as $relevanceWeightAtRunStart, for `specificityCurveExponent` — also the value
      *   every candidate carries unchanged when $specificityWeightingEnabled is false.
+     * @param float $specificityWeightExponentAtRunStart Same, for `specificityWeightExponent`.
      * @param float $specificityWeightShiftMagnitudeAtRunStart Same, for `specificityWeightShiftMagnitude`.
      * @param float $specificityBlendWeightAtRunStart Same, for `specificityBlendWeight`.
      * @param bool $specificityWeightingEnabled `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()`
-     *   at the moment this run starts — when false, the 3 specificity dimensions are omitted from the
+     *   at the moment this run starts — when false, the 4 specificity dimensions are omitted from the
      *   search vector entirely rather than searched: a disabled feature has no live effect for the
      *   optimizer to improve, so spending search budget on it would be pure waste (this mirrors, but is
      *   distinct from, $fixedMetricWeights above — that budget must still sum into the simplex; a disabled
@@ -105,6 +112,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         array $metrics,
         array $fixedMetricWeights,
         float $relevanceWeightAtRunStart,
+        float $specificityCurveExponentAtRunStart,
         float $specificityWeightExponentAtRunStart,
         float $specificityWeightShiftMagnitudeAtRunStart,
         float $specificityBlendWeightAtRunStart,
@@ -115,6 +123,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         $this->fixedMetricWeights = $fixedMetricWeights;
         $this->fixedWeightBudget = array_sum($fixedMetricWeights);
         $this->specificityWeightingEnabled = $specificityWeightingEnabled;
+        $this->specificityCurveExponentAtRunStart = $specificityCurveExponentAtRunStart;
         $this->specificityWeightExponentAtRunStart = $specificityWeightExponentAtRunStart;
         $this->specificityWeightShiftMagnitudeAtRunStart = $specificityWeightShiftMagnitudeAtRunStart;
         $this->specificityBlendWeightAtRunStart = $specificityBlendWeightAtRunStart;
@@ -122,6 +131,16 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         $maxDistance = SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance();
         $this->relevanceWeightLowerBound = max(0.0, $relevanceWeightAtRunStart - $maxDistance);
         $this->relevanceWeightUpperBound = min(1.0, $relevanceWeightAtRunStart + $maxDistance);
+
+        $curveExponentMaxDistance = SearchRankingOptimizerConfig::getSpecificityCurveExponentTrustRegionMaxDistance();
+        $this->specificityCurveExponentLowerBound = max(
+            SearchRankingOptimizerConfig::getSpecificityCurveExponentLowerBound(),
+            $specificityCurveExponentAtRunStart - $curveExponentMaxDistance,
+        );
+        $this->specificityCurveExponentUpperBound = min(
+            SearchRankingOptimizerConfig::getSpecificityCurveExponentUpperBound(),
+            $specificityCurveExponentAtRunStart + $curveExponentMaxDistance,
+        );
 
         $exponentMaxDistance = SearchRankingOptimizerConfig::getSpecificityWeightExponentTrustRegionMaxDistance();
         $this->specificityWeightExponentLowerBound = max(
@@ -173,6 +192,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         }
 
         if ($this->specificityWeightingEnabled) {
+            $bounds[] = $this->specificityCurveExponentLowerBound;
             $bounds[] = $this->specificityWeightExponentLowerBound;
             $bounds[] = $this->specificityWeightShiftMagnitudeLowerBound;
             $bounds[] = $this->specificityBlendWeightLowerBound;
@@ -195,6 +215,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         }
 
         if ($this->specificityWeightingEnabled) {
+            $bounds[] = $this->specificityCurveExponentUpperBound;
             $bounds[] = $this->specificityWeightExponentUpperBound;
             $bounds[] = $this->specificityWeightShiftMagnitudeUpperBound;
             $bounds[] = $this->specificityBlendWeightUpperBound;
@@ -225,19 +246,24 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         $metricWeights = $this->buildMetricWeightsByName($freeZ);
 
         if ($this->specificityWeightingEnabled) {
+            $specificityCurveExponent = min(
+                $this->specificityCurveExponentUpperBound,
+                max($this->specificityCurveExponentLowerBound, $vector[1 + $freeDimensionCount]),
+            );
             $specificityWeightExponent = min(
                 $this->specificityWeightExponentUpperBound,
-                max($this->specificityWeightExponentLowerBound, $vector[1 + $freeDimensionCount]),
+                max($this->specificityWeightExponentLowerBound, $vector[1 + $freeDimensionCount + 1]),
             );
             $specificityWeightShiftMagnitude = min(
                 $this->specificityWeightShiftMagnitudeUpperBound,
-                max($this->specificityWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 1]),
+                max($this->specificityWeightShiftMagnitudeLowerBound, $vector[1 + $freeDimensionCount + 2]),
             );
             $specificityBlendWeight = min(
                 $this->specificityBlendWeightUpperBound,
-                max($this->specificityBlendWeightLowerBound, $vector[1 + $freeDimensionCount + 2]),
+                max($this->specificityBlendWeightLowerBound, $vector[1 + $freeDimensionCount + 3]),
             );
         } else {
+            $specificityCurveExponent = $this->specificityCurveExponentAtRunStart;
             $specificityWeightExponent = $this->specificityWeightExponentAtRunStart;
             $specificityWeightShiftMagnitude = $this->specificityWeightShiftMagnitudeAtRunStart;
             $specificityBlendWeight = $this->specificityBlendWeightAtRunStart;
@@ -247,6 +273,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
             ->setRelevanceWeight($relevanceWeight)
             ->setRelevanceSaturationPoint($relevanceSaturationPoint)
             ->setMetricWeights($metricWeights)
+            ->setSpecificityCurveExponent($specificityCurveExponent)
             ->setSpecificityWeightExponent($specificityWeightExponent)
             ->setSpecificityWeightShiftMagnitude($specificityWeightShiftMagnitude)
             ->setSpecificityBlendWeight($specificityBlendWeight);
@@ -275,6 +302,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         }
 
         if ($this->specificityWeightingEnabled) {
+            $vector[] = (float)($configurationTransfer->getSpecificityCurveExponent() ?? 1.0);
             $vector[] = (float)($configurationTransfer->getSpecificityWeightExponent() ?? 1.0);
             $vector[] = (float)($configurationTransfer->getSpecificityWeightShiftMagnitude() ?? 0.0);
             $vector[] = (float)($configurationTransfer->getSpecificityBlendWeight() ?? 0.7);
@@ -335,6 +363,6 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
 
     protected function getSpecificityDimensionCount(): int
     {
-        return $this->specificityWeightingEnabled ? 3 : 0;
+        return $this->specificityWeightingEnabled ? 4 : 0;
     }
 }

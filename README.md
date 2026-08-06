@@ -296,16 +296,16 @@ From the **Search Ranking Optimizer → Weight Checkpoints** Zed page, which —
 in this package — has its own **Store + Locale selector** at the top:
 
 1. **Current State** shows exactly what `search-ranking` is using right now **for the selected scope**,
-   read live off its own facade: `relevanceWeight`, every metric's own weight, the 3 specificity-weighting
-   knobs (blend weight, weight exponent, weight shift magnitude), and whether specificity weighting is
-   currently enabled at the code level. Deliberately excluded: `relevanceSaturationPoint`/
+   read live off its own facade: `relevanceWeight`, every metric's own weight, the 4 specificity-weighting
+   knobs (blend weight, weight exponent, weight shift magnitude, curve exponent), and whether specificity
+   weighting is currently enabled at the code level. Deliberately excluded: `relevanceSaturationPoint`/
    `specificitySaturationPoint` (k), which already have their own versioning story via Saturation Point Calibration and
    stay out of checkpoint scope.
 2. **Take checkpoint now** persists that current state as a new row **tagged with the selected (store,
    locale)** — a manual snapshot, before hand-editing anything.
 3. **History** lists **every** checkpoint newest-first across every scope (with its own Store/Locale
    columns, not filtered to the currently selected one), each with a **Restore** button. Restoring writes
-   that checkpoint's `relevanceWeight`, metric weights, and 3 specificity knobs back through
+   that checkpoint's `relevanceWeight`, metric weights, and 4 specificity knobs back through
    `search-ranking`'s own facade **for the currently selected scope** — independent of whichever scope the
    checkpoint itself was originally recorded for, so a DE checkpoint can deliberately be restored into AT
    if that's genuinely what's wanted (a metric that no longer exists is skipped silently — a safe,
@@ -410,12 +410,14 @@ shift-invariant direction softmax would otherwise introduce), and `ParameterVect
 from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
 valid, real configuration by construction, with no rejection/repair step needed.
 
-Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 3
+Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 4
 specificity-aware relevance weighting parameters — `specificityWeightExponent`,
-`specificityWeightShiftMagnitude`, and `specificityBlendWeight` (see `search-ranking`'s own README for what
-these do: shifting `relevanceWeight` per query based on how specific that query's own text is — a rare
-term like a SKU vs. only common words). Each gets its own independent trust region around its current live
-value, the same "can't wander off in one shot" shape as `relevanceWeight`'s own trust region.
+`specificityWeightShiftMagnitude`, `specificityBlendWeight`, and `specificityCurveExponent` (see
+`search-ranking`'s own README for what these do: shifting `relevanceWeight` per query based on how specific
+that query's own text is — a rare term like a SKU vs. only common words; `specificityCurveExponent`
+specifically controls how sharply the `[0;1[`-normalized specificity value transitions around the
+calibrated saturation point). Each gets its own independent trust region around its current live value, the
+same "can't wander off in one shot" shape as `relevanceWeight`'s own trust region.
 `specificitySaturationPoint` is deliberately NOT one of these dimensions — like `relevanceSaturationPoint`,
 it's Saturation-Point-Calibration-tunable only, the same precedent `ParameterVectorMapper`'s own docblock already documents
 for the text-relevance side. This closes what would otherwise be a real gap: `search-ranking`'s evaluation
@@ -423,11 +425,11 @@ path builds its own `function_score` query directly rather than going through th
 query-expander plugin stack, so without this, a candidate's specificity settings would silently never be
 exercised at all during optimization, no matter how they were configured live.
 
-These 3 dimensions are only ever searched at all when `search-ranking`'s
+These 4 dimensions are only ever searched at all when `search-ranking`'s
 `SearchRankingConfig::isSpecificityWeightingEnabled()` is on — a project-level code flag, off by default,
 the same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live
 probe. When it's off, this package respects that at every layer: evaluation never applies the shift
-regardless of what a candidate's own specificity fields say, and the 3 dimensions are omitted from the
+regardless of what a candidate's own specificity fields say, and the 4 dimensions are omitted from the
 search vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no
 live effect for the optimizer to spend search budget improving.
 

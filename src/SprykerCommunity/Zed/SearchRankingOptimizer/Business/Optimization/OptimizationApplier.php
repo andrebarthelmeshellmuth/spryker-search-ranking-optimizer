@@ -93,6 +93,7 @@ class OptimizationApplier implements OptimizationApplierInterface
 
         $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $optimizerRunTransfer->getBestRelevanceWeightOrFail());
         $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityCurveExponentOrFail());
         $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightExponentOrFail());
         $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightShiftMagnitudeOrFail());
 

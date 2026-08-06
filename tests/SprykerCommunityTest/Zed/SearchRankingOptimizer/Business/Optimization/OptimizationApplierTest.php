@@ -85,6 +85,7 @@ class OptimizationApplierTest extends Unit
             ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
+            ->setBestSpecificityCurveExponent(1.3)
             ->setBestSpecificityWeightExponent(1.2)
             ->setBestSpecificityWeightShiftMagnitude(0.25)
             ->setBestSpecificityBlendWeight(0.7)
@@ -114,6 +115,7 @@ class OptimizationApplierTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with('DE', 'de_DE', 0.85);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityCurveExponent')->with('DE', 'de_DE', 1.3);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightExponent')->with('DE', 'de_DE', 1.2);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightShiftMagnitude')->with('DE', 'de_DE', 0.25);
         $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityBlendWeight')->with('DE', 'de_DE', 0.7);
@@ -158,6 +160,7 @@ class OptimizationApplierTest extends Unit
             ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
+            ->setBestSpecificityCurveExponent(1.3)
             ->setBestSpecificityWeightExponent(1.2)
             ->setBestSpecificityWeightShiftMagnitude(0.25)
             ->setBestSpecificityBlendWeight(0.7)
@@ -206,6 +209,7 @@ class OptimizationApplierTest extends Unit
             ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
+            ->setBestSpecificityCurveExponent(1.3)
             ->setBestSpecificityWeightExponent(1.2)
             ->setBestSpecificityWeightShiftMagnitude(0.25)
             ->setBestSpecificityBlendWeight(0.7);

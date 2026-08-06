@@ -451,7 +451,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         ];
 
         // Act
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 0.75, 1.2, 0.25);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 0.75, 1.4, 1.2, 0.25);
 
         // Assert
         $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
@@ -459,6 +459,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(0.8, $entity->getBestRelevanceWeight());
         $this->assertSame(0.91, $entity->getBestScore());
         $this->assertSame(0.75, $entity->getBestSpecificityBlendWeight());
+        $this->assertSame(1.4, $entity->getBestSpecificityCurveExponent());
         $this->assertSame(1.2, $entity->getBestSpecificityWeightExponent());
         $this->assertSame(0.25, $entity->getBestSpecificityWeightShiftMagnitude());
         $this->assertNotNull($entity->getCompletedAt());
@@ -467,7 +468,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
     public function testCompleteOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.2, 0.25);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.4, 1.2, 0.25);
         $this->addToAssertionCount(1);
     }
 
@@ -700,6 +701,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
             ->setLocaleName('de_AT')
             ->setRelevanceWeight(0.85)
             ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityCurveExponent(1.3)
             ->setSpecificityWeightExponent(1.5)
             ->setSpecificityWeightShiftMagnitude(0.1)
             ->setIsSpecificityWeightingEnabled(true)
@@ -720,6 +722,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame('AT', $resultTransfer->getStoreName());
         $this->assertSame('de_AT', $resultTransfer->getLocaleName());
         $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
+        $this->assertSame(1.3, $resultTransfer->getSpecificityCurveExponent());
         $this->assertTrue($resultTransfer->getIsSpecificityWeightingEnabled());
         $metricWeightTransfers = iterator_to_array($resultTransfer->getMetricWeights());
         $this->assertCount(1, $metricWeightTransfers);

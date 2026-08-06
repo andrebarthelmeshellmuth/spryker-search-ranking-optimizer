@@ -186,6 +186,7 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
      * @param float $bestScore
      * @param float $bestSpecificityBlendWeight
+     * @param float $bestSpecificityCurveExponent
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
      */
@@ -195,6 +196,7 @@ interface SearchRankingOptimizerEntityManagerInterface
         array $bestMetricWeightTransfers,
         float $bestScore,
         float $bestSpecificityBlendWeight,
+        float $bestSpecificityCurveExponent,
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
     ): void;
