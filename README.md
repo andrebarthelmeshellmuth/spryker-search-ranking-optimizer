@@ -36,7 +36,6 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [7. Schedule the calibration, auto-tune, and optimize crons](#7-schedule-the-calibration-auto-tune-and-optimize-crons)
 - [Calling `Client\Catalog`/`Client\Search` from Zed or console (optional)](#calling-clientcatalogclientsearch-from-zed-or-console-optional)
 - [Modules](#modules)
-- [Roadmap](#roadmap)
 - [Limitations](#limitations)
 - [Testing and CI](#testing-and-ci)
   - [Automated checks](#automated-checks)
@@ -98,8 +97,6 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
 (CMA-ES, the Rechenberg/Schwefel ES, or differential evolution against the rank-evaluation score, including
 `search-ranking`'s specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
-The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
-[Roadmap](#roadmap) but not built yet.
 
 Verified live end-to-end in a real browser (not just the automated test suite — see
 [Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
@@ -767,16 +764,6 @@ not just Catalog's — or you'll fix the domain you tested and still get paged b
   generic optimizer (see below), and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
-
-## Roadmap
-
-Saturation Point Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
-rollback, the monthly auto-tune job, and automated weight optimization are the tuning layer built so far.
-Designed, not yet built:
-
-- **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
-  metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
-  and a "fetch with these settings" button for a real, verified re-rank.
 
 ## Limitations
 
