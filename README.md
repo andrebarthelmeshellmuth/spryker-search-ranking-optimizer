@@ -15,6 +15,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 
 - [Terminology](#terminology)
 - [Status](#status)
+- [Before you start: this needs real relevance ratings](#before-you-start-this-needs-real-relevance-ratings)
 - [What it does today](#what-it-does-today)
   - [Saturation Point Calibration — empirically sampling `relevanceSaturationPoint` (k)](#saturation-point-calibration--empirically-sampling-relevancesaturationpoint-k)
   - [SRP relevance rating — capturing real (query, product) judgments](#srp-relevance-rating--capturing-real-query-product-judgments)
@@ -104,6 +105,36 @@ button on the storefront, the judgment round-trips through the Yves→Zed gatewa
 permission re-check, and lands correctly in the database.
 
 ![The SRP relevance-rating widget: heart/check/X buttons below each product tile, colorized once rated — heart red, check green, X red](docs/screenshots/srp-rating-widget.png)
+
+## Before you start: this needs real relevance ratings
+
+A fresh install has zero rows in `spy_search_ranking_query_rating`. Someone has to actually click
+heart/check/X on real search results — via the storefront rating widget, as a customer holding the
+**Relevance Rater** permission — before most of what this package does can run at all. Unlike
+`spryker-community/search-ranking`'s silent no-op degradation on missing business-signal data (see that
+package's own README), the features here fail loudly and explicitly rather than quietly doing nothing:
+
+- **`RankEvaluationRunner::computeWeightedAggregateFor()`** returns `null`, not `0.0` or `NaN`, the moment
+  either no rated queries exist or no ratings exist for this store/locale — a clean "not evaluable" signal
+  every caller checks explicitly, never a silently-wrong score.
+- **Automated weight optimization refuses to even start** without a baseline: `OptimizationRunner::process()`
+  fails the run immediately with `"No rated query with at least one rated product exists for this
+  store/locale yet -- nothing to evaluate."` (and, separately, `"No active metrics exist -- nothing to
+  optimize."` if `search-ranking` itself has no active metrics either) — visible in the run's status in the
+  Zed GUI, not a run that silently completes having changed nothing.
+- **The Zed "Assess Rated Queries" and offline `rank_eval` evaluation pages** have nothing to display until
+  ratings exist — there is no fallback dataset, synthetic or otherwise.
+- **Saturation Point Calibration** is the one feature that does *not* strictly require ratings — its
+  default search-term source is accumulated ratings, but `SaturationPointCalibrationUploadForm` also
+  accepts a manually uploaded CSV of search terms, so calibration alone can bootstrap without a single
+  click on the widget.
+
+**In short:** register the permission plugin (`RateSearchRelevancePermissionPlugin`) and the Yves widget
+plugins, grant the **Relevance Rater** permission to at least one real B2B `CompanyUser`, and have that
+user actually rate a handful of (query, product) pairs on the storefront — *then* Saturation Point
+Calibration's rating-based source, rank_eval, weight checkpoints' evaluation context, auto-tune, and
+automated weight optimization all have something real to work from. Before that, expect explicit
+"nothing to evaluate" failures, not incorrect results.
 
 ## What it does today
 
