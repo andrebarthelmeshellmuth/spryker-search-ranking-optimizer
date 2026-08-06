@@ -767,6 +767,25 @@ them from a session-less context. If you adopt these overrides, grep your own pr
 query-expander plugins your own team wrote that similarly assume a live session) and swap all of them —
 not just Catalog's — or you'll fix the domain you tested and still get paged by the next one.
 
+**Once you've applied the overrides above, you can swap this package's own bypass for the real facade —
+no package change needed.** `SaturationPointCalibrationSearcher`/`RankEvalRunner`/`SpecificitySearcher`
+are each built by an ordinary, interface-typed `SearchRankingOptimizerFactory` method
+(`createCalibrationSearcher()`/`createRankEvalRunner()`/`createSpecificitySearcher()`) — standard Spryker
+project-override territory. Extend the factory in your own project
+(`Pyz\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory extends
+SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory`), override whichever
+`create*()` method you want, and return your own implementation of the same interface built on the real
+`Client\Catalog`/`Client\Search` facade instead — the Locator picks it up automatically, nothing else to
+register. This is deliberately **not** something this package auto-detects or switches on internally:
+there's no reliable way for the package to tell whether a project has actually applied the overrides
+correctly (a project-declared flag would be no more trustworthy than the override method already is, and
+reflection on plugin class identity is brittle against future core changes), so the decision is left where
+it belongs — with the project that knows what it's actually wired up. Worth doing only if you've confirmed
+the bundled bypass's known gap (no customer-group visibility, no price-list scoping, no project-registered
+expanders — see [Limitations](#limitations)) actually skews your own calibration/rank_eval results; for
+most shops the bypass's statistical shape is close enough that this isn't worth the parallel implementation
+to maintain.
+
 ## Modules
 
 - **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, weight
