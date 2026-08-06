@@ -203,6 +203,50 @@ class RankEvalRunnerTest extends Unit
         $this->assertLessThanOrEqual(1.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
     }
 
+    /**
+     * Proves `specificityCurveExponent` actually reaches this reimplementation's own shift math, not just
+     * the `?? 1.0` fallback -- the exact bug class Phase 5 already found and fixed once here (a forgotten
+     * parameter making a knob silently inert during optimizer evaluation, see this class's own sibling
+     * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s docblock). Every other
+     * test in this class either omits `specificityCurveExponent` entirely (falling back to the
+     * pivot-neutral 1.0) or never varies it, so none of them would notice if this parameter were dropped
+     * on the floor again. Uses a deliberately small `specificityWeightShiftMagnitude` (0.05, vs the other
+     * tests' 0.4) so the final, clamped `relevanceWeight` has room to move in either direction regardless
+     * of which exponent produces the larger shift -- with a bigger magnitude, both exponents could clamp
+     * to the same boundary value and give a false pass that looks identical to the real bug.
+     */
+    public function testApplySpecificityWeightingRespectsTheConfiguredCurveExponent(): void
+    {
+        // Arrange
+        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
+
+        $buildConfigurationTransfer = fn (float $curveExponent): SearchRankingConfigurationStorageTransfer => (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.5)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setMetricWeights(['pdp_impressions' => 1.0])
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificitySaturationPoint(1.0)
+            ->setSpecificityCurveExponent($curveExponent)
+            ->setSpecificityWeightExponent(1.0)
+            ->setSpecificityWeightShiftMagnitude(0.05);
+
+        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
+        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
+
+        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
+
+        // Act
+        $pivotNeutralConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $buildConfigurationTransfer(1.0));
+        $sharpenedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $buildConfigurationTransfer(4.0));
+
+        // Assert
+        $this->assertNotSame(
+            $pivotNeutralConfigurationTransfer->getRelevanceWeight(),
+            $sharpenedConfigurationTransfer->getRelevanceWeight(),
+            'Two different specificityCurveExponent values must produce two different adjusted relevanceWeight results for the same real query term -- if they don\'t, specificityCurveExponent is silently inert in this reimplementation, exactly the Phase 5 bug class this test guards against.',
+        );
+    }
+
     public function testFetchIdfByTermCachesTheResultAcrossRepeatedCalls(): void
     {
         // Arrange

@@ -25,6 +25,19 @@ use Throwable;
  * time), resolved via the same {@see IndexNameResolverInterface} `SaturationPointCalibrationSearcher` uses. Only the IO is
  * reimplemented; the blend/normalize math itself reuses `QuerySpecificityCalculatorInterface` directly —
  * that class has no Store dependency at all.
+ *
+ * A deliberate choice, not an oversight: this fires `_termvectors` (a term-dictionary lookup) rather than
+ * a locale-filtered aggregation query. One index per store, not one per locale, is Spryker's own core
+ * convention (see {@see IndexNameResolverInterface}), and we don't think fighting that convention is the
+ * right fix here — going to one index per locale would mean overriding that resolver project-wide, not
+ * just in this package. The real cost of keeping the store-only index: `_termvectors`'s `doc_freq`/
+ * `doc_count` are corpus-wide, so a store that serves more than one locale gets its idf/specificity signal
+ * blended across every locale sharing that index, not scoped to the one the query is actually in. If your
+ * project does have several locales genuinely sharing real traffic on one store, and that blending is
+ * diluting scores enough to matter in practice, and you can afford the extra cost — swap this for a
+ * locale-filtered aggregation instead (a `filters` aggregation with a per-term `match` sub-filter, scoped
+ * by a top-level `{term: {locale: X}}` query): equally exact, but a real query execution per term rather
+ * than a dictionary lookup, so noticeably heavier on a large corpus.
  */
 class SpecificitySearcher implements SpecificitySearcherInterface
 {

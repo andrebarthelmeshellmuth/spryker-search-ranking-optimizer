@@ -73,6 +73,9 @@ class CheckpointCest
         $testValue = $originalRelevanceWeight === 0.6 ? 0.65 : 0.6;
         $i->amOnPage(SearchRankingSettingsPage::URL);
         $i->fillField('#' . SearchRankingSettingsPage::FIELD_RELEVANCE_WEIGHT, (string)$testValue);
+        // The Symfony debug toolbar sits fixed to the viewport bottom and can intercept a plain click
+        // on a button positioned right under it (see AutoTuneCest for the same fix, hit first there).
+        $i->scrollTo('button[type="submit"]', 0, -150);
         $i->click('button[type="submit"]');
         $i->see('Ranking settings were saved.');
         $i->amOnPage(SearchRankingSettingsPage::URL);

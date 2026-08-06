@@ -145,6 +145,25 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     }
 
     /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificityCurveExponent(string $storeName, string $localeName): float
+    {
+        return $this->realFacade->getSpecificityCurveExponent($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityCurveExponent
+     */
+    public function saveSpecificityCurveExponent(string $storeName, string $localeName, float $specificityCurveExponent): void
+    {
+        $this->realFacade->saveSpecificityCurveExponent($storeName, $localeName, $specificityCurveExponent);
+    }
+
+    /**
      * The one deliberately overridden method -- see this class's own docblock.
      */
     public function isSpecificityWeightingEnabled(): bool

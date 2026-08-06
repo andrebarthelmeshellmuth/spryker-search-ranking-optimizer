@@ -296,6 +296,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * the evaluation it was fired alongside, so any Throwable here is treated as "no usable signal" (falls
      * back to the unadjusted configured relevanceWeight via the empty array this returns). A term with
      * zero real corpus evidence is skipped, same reasoning as {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator}.
+     * Same store-only-index tradeoff as {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher}'s
+     * own docblock (dictionary lookup, corpus-wide, blended across locales sharing one store) — see there
+     * for why, and for the aggregation-based alternative if that blending ever needs fixing for real.
      *
      * @param string $indexName
      * @param string $searchTerm
