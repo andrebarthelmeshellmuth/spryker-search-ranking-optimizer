@@ -176,11 +176,14 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     }
 
     /**
+     * @param string $storeName
+     * @param string $localeName
+     *
      * @return array<int, array{idSearchRankingMetric: int, name: string}>
      */
-    public function getActiveMetrics(): array
+    public function getActiveMetrics(string $storeName, string $localeName): array
     {
-        return $this->realFacade->getActiveMetrics();
+        return $this->realFacade->getActiveMetrics($storeName, $localeName);
     }
 
     public function getRandomMetricName(): string
@@ -200,12 +203,14 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
 
     /**
      * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
      */
-    public function findMetricDetail(int $idSearchRankingMetric): ?array
+    public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array
     {
-        return $this->realFacade->findMetricDetail($idSearchRankingMetric);
+        return $this->realFacade->findMetricDetail($idSearchRankingMetric, $storeName, $localeName);
     }
 
     /**
@@ -223,11 +228,18 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $storeName
+     * @param string $localeName
      * @param string $changeSource
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool
-    {
-        return $this->realFacade->saveMetricFormula($idSearchRankingMetric, $formula, $changeSource);
+    public function saveMetricFormula(
+        int $idSearchRankingMetric,
+        string $formula,
+        string $storeName,
+        string $localeName,
+        string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE,
+    ): bool {
+        return $this->realFacade->saveMetricFormula($idSearchRankingMetric, $formula, $storeName, $localeName, $changeSource);
     }
 
     /**

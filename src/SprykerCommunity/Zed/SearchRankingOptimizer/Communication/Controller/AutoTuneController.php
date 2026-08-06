@@ -37,7 +37,12 @@ class AutoTuneController extends AbstractController
         $randomMetricName = $searchRankingFacade->getRandomMetricName();
         $rows = [];
 
-        foreach ($searchRankingFacade->getActiveMetrics() as $metric) {
+        foreach (
+            $searchRankingFacade->getActiveMetrics(
+                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+            ) as $metric
+        ) {
             // The random tie-breaker metric's formula is `random()` by design -- a fresh evaluation never
             // matches the last one, so its R² is meaningless noise, and there is nothing a refit could
             // sensibly converge on. Excluded here rather than from getActiveMetrics() itself, since this

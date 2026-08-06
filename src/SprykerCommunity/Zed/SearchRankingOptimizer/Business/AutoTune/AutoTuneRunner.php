@@ -103,13 +103,29 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * Returns null when the metric has been deleted since its config was set, or has no digest yet —
      * both safe, silent skips, never an error.
      *
+     * `spy_search_ranking_auto_tune_metric_config` has no store_name/locale_name columns of its own —
+     * Auto-Tune has always operated on a single implicit scope, pre-dating and independent of
+     * search-ranking's own store-scoped-formula migration (see that package's project memory). This
+     * method now passes that scope EXPLICITLY (DEFAULT_SCOPE_STORE_NAME/_LOCALE_NAME) to every
+     * store-aware search-ranking call, rather than relying on those calls to silently default it
+     * internally — same real behavior as before, but the "which scope Auto-Tune tunes" decision is now
+     * visible here, at its rightful owner, not buried in a bridge three layers down. Genuine multi-store
+     * Auto-Tune (fanning this whole method out per real store/locale) is real, valuable follow-up work,
+     * deliberately NOT attempted here — it needs its own schema change to
+     * `spy_search_ranking_auto_tune_metric_config` first (store_name/locale_name columns) plus a
+     * Settings-page rework, out of scope for a ripple fix.
+     *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */
     protected function processMetric(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
     ): ?SearchRankingAutoTuneMetricResultTransfer {
         $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
-        $metric = $this->searchRankingFacade->findMetricDetail($idSearchRankingMetric);
+        $metric = $this->searchRankingFacade->findMetricDetail(
+            $idSearchRankingMetric,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+        );
 
         if ($metric === null) {
             return null;
@@ -186,7 +202,12 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $wasApplied = false;
 
         if ($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabledOrFail()) {
-            $wasApplied = $this->searchRankingFacade->saveMetricFormula($idSearchRankingMetric, $chosenCandidate['formula']);
+            $wasApplied = $this->searchRankingFacade->saveMetricFormula(
+                $idSearchRankingMetric,
+                $chosenCandidate['formula'],
+                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+            );
         }
 
         if (!$wasApplied) {

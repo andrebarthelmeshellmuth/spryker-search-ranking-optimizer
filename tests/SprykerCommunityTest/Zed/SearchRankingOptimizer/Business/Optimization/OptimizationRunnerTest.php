@@ -212,9 +212,9 @@ class OptimizationRunnerTest extends Unit
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
-            [1, ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
-            [2, ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
-            [3, ['idSearchRankingMetric' => 3, 'name' => 'random', 'formula' => 'random()', 'isHigherBetter' => true, 'shape' => null]],
+            [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
+            [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
+            [3, 'DE', 'en_US', ['idSearchRankingMetric' => 3, 'name' => 'random', 'formula' => 'random()', 'isHigherBetter' => true, 'shape' => null]],
         ]);
 
         $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);

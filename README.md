@@ -298,6 +298,13 @@ package's own README). Auto-tune is the monthly job that watches that axis and, 
 applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
 specificity knobs, so it has no reason to write a weight checkpoint of its own.
 
+**Auto-tune operates on a single implicit store/locale scope, not per-store.** `search-ranking`'s own
+metric formula/active-flag are store-scoped (see that package's README), but Auto-Tune's own settings
+table (`spy_search_ranking_auto_tune_metric_config`) has no store/locale columns of its own — a
+pre-existing limitation, not something this package's store-scoping ripple attempted to fix. Genuine
+multi-store Auto-Tune is real, valuable follow-up work; it needs its own schema change plus a Settings
+page rework, which is future scope.
+
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
 From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page, per active metric:
@@ -463,6 +470,13 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   storefront search would, rather than reimplementing either (only the `_termvectors` IO itself is
   reimplemented, for the same Zed/console execution-context reasons documented in `RankEvalRunner`'s own
   docblock).
+- **`search-ranking`'s metric formula/active-flag/shape are store-scoped**, not global (see that package's
+  own README). The bridge methods this package calls through
+  (`SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()`/`findMetricDetail()`/
+  `saveMetricFormula()`) all require explicit `$storeName`/`$localeName` accordingly. Automated weight
+  optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
+  scope; Auto-tune (single implicit scope — see above) passes `SearchRankingConfig::DEFAULT_SCOPE_STORE_NAME`/
+  `DEFAULT_SCOPE_LOCALE_NAME` explicitly.
 
 ## Requirements
 

@@ -222,8 +222,8 @@ abstract class AbstractGroundTruthTest extends Unit
     {
         $names = [];
 
-        foreach ($this->getSearchRankingFacade()->getActiveMetrics() as $metric) {
-            $metricDetail = $this->getSearchRankingFacade()->findMetricDetail($metric['idSearchRankingMetric']);
+        foreach ($this->getSearchRankingFacade()->getActiveMetrics(static::STORE_NAME, static::LOCALE_NAME) as $metric) {
+            $metricDetail = $this->getSearchRankingFacade()->findMetricDetail($metric['idSearchRankingMetric'], static::STORE_NAME, static::LOCALE_NAME);
 
             if ($metricDetail !== null && preg_match('/\brandom\s*\(/', $metricDetail['formula']) === 1) {
                 continue;
@@ -254,7 +254,7 @@ abstract class AbstractGroundTruthTest extends Unit
     {
         $zeroedScores = [];
 
-        foreach ($this->getSearchRankingFacade()->getActiveMetrics() as $metric) {
+        foreach ($this->getSearchRankingFacade()->getActiveMetrics(static::STORE_NAME, static::LOCALE_NAME) as $metric) {
             $zeroedScores[$metric['name']] = 0.0;
         }
 

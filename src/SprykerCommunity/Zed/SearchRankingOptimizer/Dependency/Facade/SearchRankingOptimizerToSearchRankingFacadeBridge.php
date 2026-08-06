@@ -187,17 +187,17 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     }
 
     /**
+     * @param string $storeName
+     * @param string $localeName
+     *
      * @return array<int, array{idSearchRankingMetric: int, name: string}>
      */
-    public function getActiveMetrics(): array
+    public function getActiveMetrics(string $storeName, string $localeName): array
     {
         $metrics = [];
 
         foreach (
-            $this->searchRankingFacade->getActiveMetricCollection(
-                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-            )->getMetrics() as $metricTransfer
+            $this->searchRankingFacade->getActiveMetricCollection($storeName, $localeName)->getMetrics() as $metricTransfer
         ) {
             $metrics[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
@@ -225,16 +225,14 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
 
     /**
      * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
      */
-    public function findMetricDetail(int $idSearchRankingMetric): ?array
+    public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array
     {
-        $metricTransfer = $this->searchRankingFacade->findMetricById(
-            $idSearchRankingMetric,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        );
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return null;
@@ -289,21 +287,28 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $storeName
+     * @param string $localeName
      * @param string $changeSource
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool
-    {
-        $metricTransfer = $this->searchRankingFacade->findMetricById(
-            $idSearchRankingMetric,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        );
+    public function saveMetricFormula(
+        int $idSearchRankingMetric,
+        string $formula,
+        string $storeName,
+        string $localeName,
+        string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE,
+    ): bool {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return false;
         }
 
-        $this->searchRankingFacade->saveMetric($metricTransfer->setFormula($formula)->setChangeSource($changeSource));
+        $this->searchRankingFacade->saveMetric(
+            $metricTransfer->setFormula($formula)->setChangeSource($changeSource),
+            $storeName,
+            $localeName,
+        );
 
         return true;
     }

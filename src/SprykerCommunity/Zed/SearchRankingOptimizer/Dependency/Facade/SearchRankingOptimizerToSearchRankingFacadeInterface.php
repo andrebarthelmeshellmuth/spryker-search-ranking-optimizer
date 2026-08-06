@@ -136,12 +136,16 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * Deliberately returns a plain array, not `search-ranking`'s own
      * `SearchRankingMetricTransfer`/`SearchRankingMetricCollectionTransfer` — same discipline as
      * {@see getMetricWeights()}, keeps this interface free of any compile-time reference to a class that
-     * only exists when `search-ranking` is actually installed. Not store/locale scoped — `isActive` and
-     * `name` are both global identity fields on `search-ranking`'s own side.
+     * only exists when `search-ranking` is actually installed. `isActive` IS store-scoped on
+     * `search-ranking`'s own side (its store-scoped-formula migration, see that package's own project
+     * memory) — pass the real scope you mean to check, `name` is the only field here that's still global.
+     *
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array<int, array{idSearchRankingMetric: int, name: string}>
      */
-    public function getActiveMetrics(): array;
+    public function getActiveMetrics(string $storeName, string $localeName): array;
 
     /**
      * The name of `search-ranking`'s own configured random-tie-breaker metric — lets a consumer here
@@ -163,15 +167,18 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
 
     /**
      * Deliberately returns a plain array, not `search-ranking`'s own `SearchRankingMetricTransfer` — same
-     * discipline as {@see getMetricWeights()}. Returns null when the metric no longer exists. Not
-     * store/locale scoped — every field returned (name/formula/isHigherBetter/shape) is a global identity
-     * field on `search-ranking`'s own side.
+     * discipline as {@see getMetricWeights()}. Returns null when the metric no longer exists.
+     * formula/isActive/shape ARE store-scoped on `search-ranking`'s own side (its store-scoped-formula
+     * migration) — this returns the values for the given $storeName specifically, not a global fact.
+     * name/isHigherBetter are the only fields here still genuinely global.
      *
      * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
      */
-    public function findMetricDetail(int $idSearchRankingMetric): ?array;
+    public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array;
 
     /**
      * Fresh closed-form curve-fit candidates for $idSearchRankingMetric's own digest, ranked and flagged
@@ -189,18 +196,27 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
 
     /**
      * Writes a single metric's formula through `search-ranking`'s own facade, preserving every other
-     * global identity field (name/isActive/isHigherBetter). Not store/locale scoped — a formula is a
-     * global identity field on `search-ranking`'s own side.
+     * field already on the transfer this reads first (name/isActive/isHigherBetter). formula IS
+     * store-scoped on `search-ranking`'s own side (its store-scoped-formula migration, see that package's
+     * own project memory) — writes for $storeName specifically, not globally.
      *
      * @param int $idSearchRankingMetric
      * @param string $formula
+     * @param string $storeName
+     * @param string $localeName
      * @param string $changeSource One of `SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::CHANGE_SOURCE_*`
      * — defaults to CHANGE_SOURCE_AUTO_TUNE, this bridge method's only caller today
      * ({@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}).
      *
      * @return bool True if the metric still existed and was updated; false if it no longer exists.
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula, string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE): bool;
+    public function saveMetricFormula(
+        int $idSearchRankingMetric,
+        string $formula,
+        string $storeName,
+        string $localeName,
+        string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE,
+    ): bool;
 
     /**
      * Appends an `isChange=false` audit row for $idSearchRankingMetric's CURRENT (unmodified) config,

@@ -97,7 +97,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $storeName = $queuedRunTransfer->getStoreNameOrFail();
         $localeName = $queuedRunTransfer->getLocaleNameOrFail();
 
-        $activeMetrics = $this->searchRankingFacade->getActiveMetrics();
+        $activeMetrics = $this->searchRankingFacade->getActiveMetrics($storeName, $localeName);
 
         if ($activeMetrics === []) {
             $this->entityManager->failOptimizerRun($idOptimizerRun, 'No active metrics exist -- nothing to optimize.');
@@ -117,7 +117,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer);
+        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer, $storeName, $localeName);
         $mapper = new ParameterVectorMapper(
             $optimizableMetrics,
             $fixedMetricWeights,
@@ -190,17 +190,23 @@ class OptimizationRunner implements OptimizationRunnerInterface
      *
      * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array{0: array<int, array{idSearchRankingMetric: int, name: string}>, 1: array<string, float>}
      */
-    protected function splitMetricsByDeterminism(array $activeMetrics, SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer): array
-    {
+    protected function splitMetricsByDeterminism(
+        array $activeMetrics,
+        SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
+        string $storeName,
+        string $localeName,
+    ): array {
         $optimizableMetrics = [];
         $fixedMetricWeights = [];
         $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
 
         foreach ($activeMetrics as $metric) {
-            $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric']);
+            $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric'], $storeName, $localeName);
             $isDeterministic = $metricDetail === null || $this->formulaDeterminismChecker->isDeterministic($metricDetail['formula']);
 
             if ($isDeterministic) {
