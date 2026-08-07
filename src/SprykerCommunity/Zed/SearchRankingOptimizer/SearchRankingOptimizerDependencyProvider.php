@@ -11,14 +11,17 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToPermissionClientBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToGlossaryFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToTranslatorFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerBridge;
 
 /**
@@ -92,6 +95,32 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     public const FACADE_SYMFONY_MAILER = 'FACADE_SYMFONY_MAILER';
 
     /**
+     * Used ONLY by `search-ranking-optimizer:check-installation` to verify RateSearchRelevancePermissionPlugin
+     * is registered on the CLIENT side too (README step 3a) — resolved from Zed via Locator, same
+     * cross-app-via-facade pattern search-ranking's own event-listener check uses, never by referencing
+     * `Pyz\Client\*` directly.
+     *
+     * @var string
+     */
+    public const CLIENT_PERMISSION = 'CLIENT_PERMISSION';
+
+    /**
+     * Used ONLY by `search-ranking-optimizer:check-installation` to verify this package's Yves glossary
+     * key (README step 5) is imported.
+     *
+     * @var string
+     */
+    public const FACADE_GLOSSARY = 'FACADE_GLOSSARY';
+
+    /**
+     * Used ONLY by `search-ranking-optimizer:check-installation` to verify this package's Zed GUI
+     * translation catalog (README step 5) is loaded.
+     *
+     * @var string
+     */
+    public const FACADE_TRANSLATOR = 'FACADE_TRANSLATOR';
+
+    /**
      * @param \Spryker\Zed\Kernel\Container $container
      */
     #[\Override]
@@ -112,7 +141,10 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      * feature (`WeightCheckpointRecorder`/`WeightCheckpointRestorer` read and write `search-ranking`'s own
      * live tuning values directly) — every other base-package bridge here stays Communication-layer only
      * (the Gui apply controller), since calibration/scoring business logic still has no dependency on the
-     * base package beyond the Client it already used.
+     * base package beyond the Client it already used. The permission client, glossary facade, and
+     * translator facade are ALL Communication-layer-only too, and exist purely to let
+     * `search-ranking-optimizer:check-installation` diagnose this package's own wiring — none of them
+     * belong on the real business logic's dependency surface.
      *
      * @param \Spryker\Zed\Kernel\Container $container
      */
@@ -126,6 +158,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = $this->addLocaleFacade($container);
         $container = $this->addCompanyUserFacade($container);
         $container = $this->addPermissionFacade($container);
+        $container = $this->addPermissionClient($container);
+        $container = $this->addGlossaryFacade($container);
+        $container = $this->addTranslatorFacade($container);
 
         return $container;
     }
@@ -233,6 +268,42 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     {
         $container->set(static::FACADE_SYMFONY_MAILER, fn (Container $container) => new SearchRankingOptimizerToSymfonyMailerFacadeBridge(
             $container->getLocator()->symfonyMailer()->facade(),
+        ));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     */
+    protected function addPermissionClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_PERMISSION, fn (Container $container) => new SearchRankingOptimizerToPermissionClientBridge(
+            $container->getLocator()->permission()->client(),
+        ));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     */
+    protected function addGlossaryFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_GLOSSARY, fn (Container $container) => new SearchRankingOptimizerToGlossaryFacadeBridge(
+            $container->getLocator()->glossary()->facade(),
+        ));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     */
+    protected function addTranslatorFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_TRANSLATOR, fn (Container $container) => new SearchRankingOptimizerToTranslatorFacadeBridge(
+            $container->getLocator()->translator()->facade(),
         ));
 
         return $container;

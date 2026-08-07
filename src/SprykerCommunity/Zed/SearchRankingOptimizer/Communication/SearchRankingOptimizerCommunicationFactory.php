@@ -26,11 +26,14 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPoi
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\TestCurrentEvaluationForm;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\AssessRatedQueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\RatingTable;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToPermissionClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToGlossaryFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToTranslatorFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
 use Symfony\Component\Form\FormInterface;
 
@@ -143,6 +146,21 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
     public function getPermissionFacade(): SearchRankingOptimizerToPermissionFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_PERMISSION);
+    }
+
+    public function getPermissionClient(): SearchRankingOptimizerToPermissionClientInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_PERMISSION);
+    }
+
+    public function getGlossaryFacade(): SearchRankingOptimizerToGlossaryFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_GLOSSARY);
+    }
+
+    public function getTranslatorFacade(): SearchRankingOptimizerToTranslatorFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_TRANSLATOR);
     }
 
     public function createCompanyUserPermissionAuthorizer(): CompanyUserPermissionAuthorizerInterface

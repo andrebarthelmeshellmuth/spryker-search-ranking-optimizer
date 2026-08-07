@@ -35,6 +35,7 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [5. Translations](#5-translations)
   - [6. Build (transfers, Propel tables, caches)](#6-build-transfers-propel-tables-caches)
   - [7. Schedule the calibration, auto-tune, and optimize crons](#7-schedule-the-calibration-auto-tune-and-optimize-crons)
+  - [8. Verify the installation](#8-verify-the-installation)
 - [Calling `Client\Catalog`/`Client\Search` from Zed or console (optional)](#calling-clientcatalogclientsearch-from-zed-or-console-optional)
 - [Modules](#modules)
 - [Limitations](#limitations)
@@ -579,11 +580,13 @@ In `Pyz\Zed\Console\ConsoleDependencyProvider::getConsoleCommands()`:
 ```php
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerAutoTuneConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCalibrateConsole;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCheckInstallationConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerOptimizeConsole;
 
 new SearchRankingOptimizerCalibrateConsole(),
 new SearchRankingOptimizerAutoTuneConsole(),
 new SearchRankingOptimizerOptimizeConsole(),
+new SearchRankingOptimizerCheckInstallationConsole(),
 ```
 
 ### 3a. Register the permission plugin (required for the SRP rating widget)
@@ -740,6 +743,26 @@ finer granularity. `search-ranking-optimizer:optimize` processes at most one que
 oldest queued run, FIFO); the [Zed page](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
 already processes a run in-request when you click "Run now", so the cron only matters for runs queued some
 other way.
+
+### 8. Verify the installation
+
+```bash
+vendor/bin/console search-ranking-optimizer:check-installation
+```
+
+Most of the steps above fail *silently* when missed — a forgotten DependencyProvider wire-up produces no
+error, just a feature that quietly never does anything (a permission nobody can ever be granted, a widget
+button with no translated label). This command checks the core namespace registration, that every console
+command from step 3 actually registered, that RateSearchRelevancePermissionPlugin (step 3a) is registered
+on BOTH Zed and Client — either half missing independently makes the rating widget silently ungrantable or
+invisible — that the Yves glossary key and Zed GUI translation catalog (step 5) both resolve, and that all
+8 Propel tables this package ships (step 6) exist and are queryable. It exits non-zero and names the exact
+remedy for whatever is wrong.
+
+It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
+and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below
+product tiles and submits successfully on a live storefront page — those need a real browser request, not
+a CLI probe.
 
 ## Calling `Client\Catalog`/`Client\Search` from Zed or console (optional)
 
