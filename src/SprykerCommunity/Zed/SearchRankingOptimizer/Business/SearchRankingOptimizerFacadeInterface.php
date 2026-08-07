@@ -124,7 +124,9 @@ interface SearchRankingOptimizerFacadeInterface
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
      */
-    public function getProductRelevanceJudgments(SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 
     /**
      * Specification:

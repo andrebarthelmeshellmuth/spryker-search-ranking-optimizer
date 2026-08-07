@@ -233,6 +233,7 @@ class GatewayControllerTest extends Unit
     }
 
     /**
+     * @param string $searchTerm
      * @param array<int> $idProductAbstracts
      */
     protected function createBatchRequestTransfer(string $searchTerm, array $idProductAbstracts): SearchRankingProductRelevanceJudgmentBatchRequestTransfer

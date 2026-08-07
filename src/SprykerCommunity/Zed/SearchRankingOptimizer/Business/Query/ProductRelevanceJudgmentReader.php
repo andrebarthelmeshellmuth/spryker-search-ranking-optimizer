@@ -30,8 +30,9 @@ class ProductRelevanceJudgmentReader implements ProductRelevanceJudgmentReaderIn
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
      */
-    public function getJudgments(SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer): SearchRankingProductRelevanceJudgmentBatchResponseTransfer
-    {
+    public function getJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
         $idProductAbstracts = $requestTransfer->getIdProductAbstracts();
 
         if ($idProductAbstracts === []) {

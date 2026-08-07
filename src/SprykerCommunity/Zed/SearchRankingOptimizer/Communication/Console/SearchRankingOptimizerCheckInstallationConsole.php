@@ -261,6 +261,8 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
     }
 
     /**
+     * @param \Generated\Shared\Transfer\PermissionCollectionTransfer $permissionCollectionTransfer
+     *
      * @return array<string>
      */
     protected function extractPermissionKeys(PermissionCollectionTransfer $permissionCollectionTransfer): array
@@ -334,10 +336,9 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
 
         foreach (static::PROPEL_TABLES as $tableName => $queryClass) {
             try {
-                /** @var \Propel\Runtime\ActiveQuery\ModelCriteria $query */
                 $query = new $queryClass();
                 $query->count();
-            } catch (Throwable $exception) {
+            } catch (Throwable) {
                 $missingTables[] = $tableName;
             }
         }

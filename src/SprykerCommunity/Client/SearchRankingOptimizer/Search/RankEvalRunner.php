@@ -358,6 +358,35 @@ class RankEvalRunner implements RankEvalRunnerInterface
      */
     protected function calculateIdfByTermFromResponse(array $responseData): array
     {
+        [$docCount, $termDocumentFrequencies] = $this->extractDocCountAndTermFrequencies($responseData);
+
+        if ($docCount <= 0) {
+            return [];
+        }
+
+        $idfByTerm = [];
+
+        foreach ($termDocumentFrequencies as $term => $documentFrequency) {
+            if ($documentFrequency <= 0) {
+                continue;
+            }
+
+            $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
+        }
+
+        return $idfByTerm;
+    }
+
+    /**
+     * The `doc_count`/`doc_freq` extraction half of {@see calculateIdfByTermFromResponse()}, split out
+     * purely to keep that method's own cyclomatic/NPath complexity down — no behavioral change.
+     *
+     * @param array<string, mixed> $responseData
+     *
+     * @return array{0: int, 1: array<string, int>}
+     */
+    protected function extractDocCountAndTermFrequencies(array $responseData): array
+    {
         $termVectorsByField = is_array($responseData['term_vectors'] ?? null) ? $responseData['term_vectors'] : [];
 
         $docCount = 0;
@@ -379,21 +408,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             }
         }
 
-        if ($docCount <= 0) {
-            return [];
-        }
-
-        $idfByTerm = [];
-
-        foreach ($termDocumentFrequencies as $term => $documentFrequency) {
-            if ($documentFrequency <= 0) {
-                continue;
-            }
-
-            $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
-        }
-
-        return $idfByTerm;
+        return [$docCount, $termDocumentFrequencies];
     }
 
     /**

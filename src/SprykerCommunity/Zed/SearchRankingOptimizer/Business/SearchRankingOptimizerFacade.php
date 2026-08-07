@@ -114,8 +114,9 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
      */
-    public function getProductRelevanceJudgments(SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer): SearchRankingProductRelevanceJudgmentBatchResponseTransfer
-    {
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
         return $this->getFactory()->createProductRelevanceJudgmentReader()->getJudgments($requestTransfer);
     }
 
@@ -203,6 +204,8 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param string $source
+     * @param string $storeName
+     * @param string $localeName
      */
     public function recordWeightCheckpoint(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {
@@ -215,6 +218,8 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingWeightCheckpoint
+     * @param string $storeName
+     * @param string $localeName
      */
     public function restoreWeightCheckpoint(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {

@@ -93,6 +93,7 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
         $twig->addFunction(new TwigFunction(
             static::FUNCTION_NAME_GET_SEARCH_RELEVANCE_RATINGS,
             /**
+             * @param string $searchTerm
              * @param array<int> $idProductAbstracts
              *
              * @return array<int, string>
@@ -104,6 +105,7 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
     }
 
     /**
+     * @param string $searchTerm
      * @param array<int> $idProductAbstracts
      *
      * @return array<int, string>

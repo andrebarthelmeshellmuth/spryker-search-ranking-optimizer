@@ -125,6 +125,7 @@ class ProductRelevanceJudgmentReaderTest extends Unit
     }
 
     /**
+     * @param string $searchTerm
      * @param array<int> $idProductAbstracts
      */
     protected function createRequestTransfer(string $searchTerm, array $idProductAbstracts): SearchRankingProductRelevanceJudgmentBatchRequestTransfer

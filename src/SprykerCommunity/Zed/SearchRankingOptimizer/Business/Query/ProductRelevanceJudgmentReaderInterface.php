@@ -23,5 +23,7 @@ interface ProductRelevanceJudgmentReaderInterface
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
      */
-    public function getJudgments(SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
+    public function getJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 }
