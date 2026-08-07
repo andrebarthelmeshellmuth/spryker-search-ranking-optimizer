@@ -175,11 +175,23 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float, isLocaleScoped: bool}>
      */
     public function getMetricWeights(string $storeName, string $localeName): array
     {
         return $this->realFacade->getMetricWeights($storeName, $localeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function resolveEffectiveWeightLocales(int $idSearchRankingMetric, string $storeName, string $localeName): array
+    {
+        return $this->realFacade->resolveEffectiveWeightLocales($idSearchRankingMetric, $storeName, $localeName);
     }
 
     /**
@@ -198,7 +210,7 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>
      */
     public function getActiveMetrics(string $storeName, string $localeName): array
     {
@@ -225,7 +237,7 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null
      */
     public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array
     {

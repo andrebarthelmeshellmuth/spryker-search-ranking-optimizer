@@ -185,18 +185,27 @@ class OptimizationRunner implements OptimizationRunnerInterface
     }
 
     /**
-     * Splits the active metrics into the ones this run actually searches (a deterministic formula — the
-     * normal case) and the ones it holds fixed at their current live weight instead (a non-deterministic
-     * formula, e.g. a placeholder/noise metric — searching a weight against pure noise is meaningless, and
-     * a metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
-     * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run).
+     * Splits the active metrics into the ones this run actually searches (a deterministic, locale-scoped
+     * formula — the normal case) and the ones it holds fixed at their current live weight instead. A
+     * metric ends up fixed for either of two independent reasons:
+     * - a non-deterministic formula (e.g. a placeholder/noise metric — searching a weight against pure
+     *   noise is meaningless), or
+     * - `isLocaleScoped=false` (a store-wide metric, e.g. `top_seller`) — this (store, locale) run does
+     *   not own that weight alone: `search-ranking`'s own `saveMetricWeight()` fans a write for it out to
+     *   EVERY real locale of the store, so searching it here would either get silently overwritten by
+     *   another locale's run, or silently overwrite theirs. It's still included in the candidate
+     *   configuration's weight budget at its live value (never dropped outright) so the formula scored
+     *   during this run matches the real live formula; {@see buildBestMetricWeightTransfers()} is what
+     *   keeps it out of what actually gets written back on Apply.
+     * A metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
+     * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run.
      *
-     * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
+     * @param array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}> $activeMetrics
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array{0: array<int, array{idSearchRankingMetric: int, name: string}>, 1: array<string, float>}
+     * @return array{0: array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>, 1: array<string, float>}
      */
     protected function splitMetricsByDeterminism(
         array $activeMetrics,
@@ -209,6 +218,12 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
 
         foreach ($activeMetrics as $metric) {
+            if ($metric['isLocaleScoped'] === false) {
+                $fixedMetricWeights[$metric['name']] = (float)($liveMetricWeightsByName[$metric['name']] ?? 0.0);
+
+                continue;
+            }
+
             $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric'], $storeName, $localeName);
             $isDeterministic = $metricDetail === null || $this->formulaDeterminismChecker->isDeterministic($metricDetail['formula']);
 
@@ -272,7 +287,16 @@ class OptimizationRunner implements OptimizationRunnerInterface
     }
 
     /**
-     * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
+     * A store-wide metric (`isLocaleScoped=false`) is deliberately excluded from the output here, not just
+     * held at an unchanged value — {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier}
+     * writes back every transfer this method returns, and `search-ranking`'s own `saveMetricWeight()` fans
+     * a write for such a metric out to EVERY real locale of the store. Returning it here (even unchanged)
+     * would mean applying THIS run silently re-fans it into every sibling locale, potentially clobbering a
+     * more recent value a sibling locale's own run or a manual edit set in the meantime. This run never
+     * searched that weight (see {@see splitMetricsByDeterminism()}) — it has nothing legitimate to write
+     * back for it, so it writes nothing at all.
+     *
+     * @param array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}> $activeMetrics
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $bestConfigurationTransfer
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer>
@@ -283,6 +307,10 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $bestMetricWeightTransfers = [];
 
         foreach ($activeMetrics as $metric) {
+            if ($metric['isLocaleScoped'] === false) {
+                continue;
+            }
+
             $bestMetricWeightTransfers[] = (new SearchRankingWeightCheckpointMetricWeightTransfer())
                 ->setIdSearchRankingMetric($metric['idSearchRankingMetric'])
                 ->setName($metric['name'])

@@ -312,7 +312,11 @@ in this package — has its own **Store + Locale selector** at the top:
    if that's genuinely what's wanted (a metric that no longer exists is skipped silently — a safe,
    best-effort restore, not an all-or-nothing transaction) — then immediately records the resulting state
    as a **new** checkpoint of its own, for that same target scope. Restoring IS applying, not a special
-   "undo" mechanism — there is always a way back from a restore too.
+   "undo" mechanism — there is always a way back from a restore too. If any metric in a checkpoint is
+   store-wide (`isLocaleScoped=false`) in the currently selected target store, restoring fans that metric's
+   weight out to every real locale of that store, not just the selected one — the same fan-out
+   `search-ranking`'s own `saveMetricWeight()` always does. The page names exactly which metric and which
+   sibling locales are affected next to that Restore button before it's clicked.
 
 `isSpecificityWeightingEnabled` is captured on every checkpoint for historical transparency but is
 **never** written back by a restore — it is a pure code-level project flag
@@ -444,6 +448,16 @@ against pure noise would be meaningless. Excluding it isn't just "drop it from t
 sums to `1` on every candidate this mapper produces — a naive filter would either silently zero the
 excluded metric's weight on apply, or let the other metrics quietly absorb its whole share.
 
+A metric with `isLocaleScoped=false` (a store-wide fact — see `search-ranking`'s own
+[SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
+excluded the same way, for a different reason: this run's own (store, locale) doesn't own that weight
+alone. `search-ranking`'s own `saveMetricWeight()` fans a write for such a metric out to EVERY real locale
+of the store, so searching it here would either get silently overwritten by another locale's own run, or
+silently overwrite theirs on Apply. It's still held at its current live value in every candidate this run
+scores (so the ranking formula evaluated during the search matches the real live formula), but it's never
+part of what a run proposes to write back — the Automated Weight Optimization page names it explicitly
+when this applies, and Apply never touches its weight at all. Change it on the Metrics page instead.
+
 The actual black-box optimization — the algorithms, their generic `Parameter`/`ProblemInterface`
 vocabulary, and the objective-function contract — lives in a separate, Spryker-agnostic package,
 [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer),
@@ -511,6 +525,14 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
   scope; Auto-tune (single implicit scope — see above) passes `SearchRankingConfig::DEFAULT_SCOPE_STORE_NAME`/
   `DEFAULT_SCOPE_LOCALE_NAME` explicitly.
+- **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
+  [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
+  a store-wide-vs-per-locale fact this package respects end to end, not just reads: `getActiveMetrics()`/
+  `getMetricWeights()`/`findMetricDetail()` all surface it, `OptimizationRunner` excludes such a metric from
+  the search, and `resolveEffectiveWeightLocales()` — a thin passthrough to
+  `search-ranking`'s own method of the same name — lets this package ask which locales a given weight write
+  would actually touch before committing one, the same question the Weight Checkpoints restore warning
+  answers.
 
 ## Requirements
 

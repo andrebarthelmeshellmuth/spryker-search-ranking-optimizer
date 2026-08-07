@@ -57,7 +57,8 @@ class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric($metricWeight['idSearchRankingMetric'])
                     ->setName($metricWeight['name'])
-                    ->setWeight($metricWeight['weight']),
+                    ->setWeight($metricWeight['weight'])
+                    ->setIsLocaleScoped($metricWeight['isLocaleScoped']),
             );
         }
 

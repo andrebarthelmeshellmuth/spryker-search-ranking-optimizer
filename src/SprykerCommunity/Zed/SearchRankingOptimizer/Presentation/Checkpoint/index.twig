@@ -119,10 +119,20 @@
                                     <td>{{ weightCheckpoint.storeName }}</td>
                                     <td>
                                         {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
+                                        {% set siblingLocalesByMetric = restoreSiblingLocalesByCheckpointId[weightCheckpoint.idSearchRankingWeightCheckpoint] ?? [] %}
                                         {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
                                         {{ form_widget(restoreForm) }}
-                                        <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Restore' | trans }}</button>
+                                        <button type="submit" class="btn btn-xs btn-outline-primary"
+                                            {% if siblingLocalesByMetric %}
+                                                onclick="return confirm('Restoring this will also overwrite the store-wide weight of {% for metricName, siblingLocales in siblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %} for {{ selectedStoreName }} -- not just {{ selectedLocaleName }}. Continue?');"
+                                            {% endif %}
+                                        >{{ 'Restore' | trans }}</button>
                                         {{ form_end(restoreForm) }}
+                                        {% if siblingLocalesByMetric %}
+                                            <div class="text-warning" style="font-size: 11px;">
+                                                Also overwrites: {% for metricName, siblingLocales in siblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </td>
                                     <td>{{ weightCheckpoint.localeName }}</td>
                                     <td>{{ weightCheckpoint.source }}</td>

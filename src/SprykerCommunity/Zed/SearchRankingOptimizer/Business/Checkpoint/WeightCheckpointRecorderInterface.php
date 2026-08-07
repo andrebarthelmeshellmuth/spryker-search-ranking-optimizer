@@ -19,6 +19,10 @@ interface WeightCheckpointRecorderInterface
      *   relevanceWeight, every metric's own weight, the 3 specificity-weighting knobs, and whether
      *   specificity weighting is currently enabled at the code level — and persists it as one new weight
      *   checkpoint.
+     * - Each metric weight row also captures that metric's `isLocaleScoped` flag AT RECORD TIME — a
+     *   store-wide metric (`isLocaleScoped=false`) is the one whose weight `search-ranking`'s own
+     *   `saveMetricWeight()` fans out to every real locale of the store on write, so a later restore needs
+     *   to know which rows carry that wider blast radius (see `WeightCheckpointRestorer`).
      *
      * @param string $source
      * @param string $storeName

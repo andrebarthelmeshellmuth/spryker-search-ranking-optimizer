@@ -52,6 +52,8 @@ class CheckpointController extends AbstractController
         $restoreForms = [];
         $metricNameSet = [];
         $metricWeightsByCheckpointId = [];
+        $restoreSiblingLocalesByCheckpointId = [];
+        $effectiveWeightLocalesCache = [];
 
         foreach ($weightCheckpointHistory as $weightCheckpointTransfer) {
             $idSearchRankingWeightCheckpoint = $weightCheckpointTransfer->getIdSearchRankingWeightCheckpointOrFail();
@@ -63,6 +65,29 @@ class CheckpointController extends AbstractController
                 $metricName = $metricWeightTransfer->getNameOrFail();
                 $metricNameSet[$metricName] = true;
                 $metricWeightsByCheckpointId[$idSearchRankingWeightCheckpoint][$metricName] = $metricWeightTransfer->getWeightOrFail();
+
+                // Restoring THIS row writes its weight into $storeName/$localeName -- the page's currently
+                // selected target scope, not necessarily this checkpoint's own original store/locale (a
+                // checkpoint can be restored as a template into any scope). So the real blast radius has
+                // to be resolved against the TARGET scope: if the metric is store-wide there, restoring
+                // fans this weight out to every other real locale of $storeName too, silently overwriting
+                // whatever those locales currently hold for it. Cached per (metric, store) -- every row on
+                // this page restores into the SAME target scope, so this is at most one facade call per
+                // distinct metric, however many checkpoints are in history.
+                $idSearchRankingMetric = $metricWeightTransfer->getIdSearchRankingMetricOrFail();
+                $cacheKey = $idSearchRankingMetric . ':' . $storeName;
+
+                if (!array_key_exists($cacheKey, $effectiveWeightLocalesCache)) {
+                    $effectiveWeightLocalesCache[$cacheKey] = $searchRankingFacade->resolveEffectiveWeightLocales($idSearchRankingMetric, $storeName, $localeName);
+                }
+
+                $siblingLocales = array_values(array_diff($effectiveWeightLocalesCache[$cacheKey], [$localeName]));
+
+                if ($siblingLocales === []) {
+                    continue;
+                }
+
+                $restoreSiblingLocalesByCheckpointId[$idSearchRankingWeightCheckpoint][$metricName] = $siblingLocales;
             }
         }
 
@@ -89,6 +114,7 @@ class CheckpointController extends AbstractController
             'restoreForms' => $restoreForms,
             'metricNames' => $metricNames,
             'metricWeightsByCheckpointId' => $metricWeightsByCheckpointId,
+            'restoreSiblingLocalesByCheckpointId' => $restoreSiblingLocalesByCheckpointId,
             'stores' => $this->getFactory()->getAllStoreNames(),
             'locales' => $this->getFactory()->getAllLocaleNames(),
             'selectedStoreName' => $storeName,

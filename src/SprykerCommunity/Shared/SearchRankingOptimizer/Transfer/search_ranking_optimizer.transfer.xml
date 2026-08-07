@@ -185,10 +185,18 @@
     <!-- One metric's weight at the moment a checkpoint was taken. idSearchRankingMetric is
          search-ranking's own metric id, kept only as a best-effort restore key, since that metric could
          be deleted before a restore attempt (see WeightCheckpointRestorer, a safe no-op in that case). -->
+    <!-- isLocaleScoped mirrors search-ranking's own per-metric flag AT RECORD TIME: a store-wide metric
+         (isLocaleScoped=false) is the one whose weight search-ranking's own saveMetricWeight() fans out
+         to every real locale of the store on write. Recorded here so a checkpoint restore can warn which
+         other locales it's about to touch, not just this one (see WeightCheckpointRestorer). Left unset
+         (null) on the SearchRankingOptimizerRun::bestMetricWeights reuse of this same shape: a run never
+         proposes a value for a store-wide metric at all (see OptimizationRunner), so there's nothing to
+         flag there. -->
     <transfer name="SearchRankingWeightCheckpointMetricWeight" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="name" type="string"/>
         <property name="weight" type="float"/>
+        <property name="isLocaleScoped" type="bool"/>
     </transfer>
 
     <!-- A full point-in-time snapshot of what the propose/review/apply workflow needs to

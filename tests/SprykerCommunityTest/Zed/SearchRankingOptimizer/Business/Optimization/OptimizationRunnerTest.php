@@ -200,14 +200,14 @@ class OptimizationRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('getActiveMetrics')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller'],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions'],
-            ['idSearchRankingMetric' => 3, 'name' => 'random'],
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 3, 'name' => 'random', 'isLocaleScoped' => true],
         ]);
         $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.4],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4],
-            ['idSearchRankingMetric' => 3, 'name' => 'random', 'weight' => 0.2],
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.4, 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4, 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 3, 'name' => 'random', 'weight' => 0.2, 'isLocaleScoped' => true],
         ]);
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
@@ -245,6 +245,62 @@ class OptimizationRunnerTest extends Unit
 
         $this->assertSame(0.2, $weightsByName['random'], "random's weight must be exactly its current live value, untouched by the search.");
         $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
+    }
+
+    public function testRunNextExcludesAStoreWideMetricFromTheSearchAndFromTheAppliedResult(): void
+    {
+        // Arrange -- "top_seller" is store-wide (isLocaleScoped=false): search-ranking's own
+        // saveMetricWeight() fans a write for it out to every real locale of the store, so this
+        // (store, locale) run must never search it AND must never propose a value to write back for it --
+        // unlike a non-deterministic metric (see the "random" test above), which IS still written back,
+        // just held at its unchanged value.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('getActiveMetrics')->willReturn([
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => false],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
+        ]);
+        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.3, 'isLocaleScoped' => false],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.7, 'isLocaleScoped' => true],
+        ]);
+        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
+        $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
+        // Never called for the store-wide metric -- excluded before the determinism check even runs.
+        $searchRankingFacadeMock->expects($this->once())->method('findMetricDetail')->willReturnMap([
+            [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
+        ]);
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedBestMetricWeightTransfers = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 4 arguments; only the metric weight transfers are used below.
+        $captureCallback = function (int $idOptimizerRun, float $bestRelevanceWeight, array $bestMetricWeightTransfers) use (&$capturedBestMetricWeightTransfers): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedBestMetricWeightTransfers = $bestMetricWeightTransfers;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $namesReturned = array_map(
+            fn ($metricWeightTransfer) => $metricWeightTransfer->getName(),
+            $capturedBestMetricWeightTransfers,
+        );
+
+        $this->assertNotContains('top_seller', $namesReturned, 'A store-wide metric must never be part of what an Apply action writes back.');
+        $this->assertContains('pdp_impressions', $namesReturned);
     }
 
     public function testRunNextSeedsTheBaselineWithTheLiveSpecificitySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
@@ -332,12 +388,12 @@ class OptimizationRunnerTest extends Unit
     {
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('getActiveMetrics')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller'],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions'],
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
         ]);
         $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.6],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4],
+            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.6, 'isLocaleScoped' => true],
+            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4, 'isLocaleScoped' => true],
         ]);
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);

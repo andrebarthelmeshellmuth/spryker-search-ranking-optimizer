@@ -110,6 +110,16 @@
                         </tbody>
                     </table>
 
+                    {% if storeWideMetricNames %}
+                        <p class="text-muted">
+                            Not searched or proposed above -- {{ storeWideMetricNames | join(', ') }}
+                            {{ storeWideMetricNames | length > 1 ? 'are' : 'is' }} store-wide (not per-locale),
+                            so this store+locale run doesn't own {{ storeWideMetricNames | length > 1 ? 'their' : 'its' }}
+                            weight alone. Change {{ storeWideMetricNames | length > 1 ? 'them' : 'it' }} on the
+                            Metrics page instead.
+                        </p>
+                    {% endif %}
+
                     {% if latestOptimizerRun.appliedAt %}
                         <p>Applied at {{ latestOptimizerRun.appliedAt }}.</p>
                     {% elseif applyForm %}

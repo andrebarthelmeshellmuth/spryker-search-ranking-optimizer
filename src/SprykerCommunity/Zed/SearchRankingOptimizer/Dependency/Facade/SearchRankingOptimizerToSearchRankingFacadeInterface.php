@@ -119,13 +119,31 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * any compile-time reference to a class that only exists when `search-ranking` is actually installed
      * (see the Bridge implementation for where that real coupling lives). Weight is store+locale scoped
      * on `search-ranking`'s own side; the returned weight is for the given scope (0.0 if none saved yet).
+     * `isLocaleScoped=false` means this metric is store-wide on `search-ranking`'s own side — writing its
+     * weight for ANY locale of this store fans out to every real locale of the store (see
+     * {@see resolveEffectiveWeightLocales()}); a consumer here must not treat that weight as an
+     * independent per-locale value.
      *
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float, isLocaleScoped: bool}>
      */
     public function getMetricWeights(string $storeName, string $localeName): array;
+
+    /**
+     * Every locale name a {@see saveMetricWeight()} call for this metric/store/locale would actually write
+     * to: just $localeName when the metric is locale-scoped (the normal case), or every real locale of
+     * $storeName when it isn't (`isLocaleScoped=false`) — lets a caller know the real blast radius of a
+     * weight write before committing it. A metric that no longer exists resolves to just [$localeName].
+     *
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function resolveEffectiveWeightLocales(int $idSearchRankingMetric, string $storeName, string $localeName): array;
 
     /**
      * Writes a single metric's weight for the given store+locale through `search-ranking`'s own facade.
@@ -156,7 +174,7 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>
      */
     public function getActiveMetrics(string $storeName, string $localeName): array;
 
@@ -189,7 +207,7 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null
      */
     public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array;
 

@@ -38,8 +38,8 @@ class WeightCheckpointRecorderTest extends Unit
         $searchRankingFacadeMock->method('getSpecificityWeightShiftMagnitude')->willReturn(0.25);
         $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(false);
         $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'sales', 'weight' => 0.4],
-            ['idSearchRankingMetric' => 2, 'name' => 'margin', 'weight' => 0.6],
+            ['idSearchRankingMetric' => 1, 'name' => 'sales', 'weight' => 0.4, 'isLocaleScoped' => false],
+            ['idSearchRankingMetric' => 2, 'name' => 'margin', 'weight' => 0.6, 'isLocaleScoped' => true],
         ]);
 
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
@@ -64,5 +64,14 @@ class WeightCheckpointRecorderTest extends Unit
         // Assert
         $this->assertSame('manual', $result->getSource());
         $this->assertSame(0.75, $result->getRelevanceWeight());
+
+        $isLocaleScopedByName = [];
+
+        foreach ($result->getMetricWeights() as $metricWeightTransfer) {
+            $isLocaleScopedByName[$metricWeightTransfer->getName()] = $metricWeightTransfer->getIsLocaleScoped();
+        }
+
+        $this->assertFalse($isLocaleScopedByName['sales'], "A store-wide metric's isLocaleScoped must be recorded as false.");
+        $this->assertTrue($isLocaleScopedByName['margin']);
     }
 }

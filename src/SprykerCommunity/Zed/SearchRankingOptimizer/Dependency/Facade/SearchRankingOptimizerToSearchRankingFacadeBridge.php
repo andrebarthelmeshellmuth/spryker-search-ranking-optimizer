@@ -168,7 +168,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float, isLocaleScoped: bool}>
      */
     public function getMetricWeights(string $storeName, string $localeName): array
     {
@@ -179,10 +179,23 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
                 'weight' => $metricTransfer->getWeightOrFail(),
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
             ];
         }
 
         return $metricWeights;
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<string>
+     */
+    public function resolveEffectiveWeightLocales(int $idSearchRankingMetric, string $storeName, string $localeName): array
+    {
+        return $this->searchRankingFacade->resolveEffectiveWeightLocales($idSearchRankingMetric, $storeName, $localeName);
     }
 
     /**
@@ -209,7 +222,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     * @return array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>
      */
     public function getActiveMetrics(string $storeName, string $localeName): array
     {
@@ -221,6 +234,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             $metrics[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
             ];
         }
 
@@ -247,7 +261,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
      * @param string $storeName
      * @param string $localeName
      *
-     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null
      */
     public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array
     {
@@ -263,6 +277,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             'formula' => $metricTransfer->getFormulaOrFail(),
             'isHigherBetter' => $metricTransfer->getIsHigherBetter() ?? true,
             'shape' => $metricTransfer->getShape(),
+            'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
         ];
     }
 

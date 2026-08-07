@@ -65,6 +65,18 @@ class AutomatedWeightOptimizationController extends AbstractController
         $currentConfigurationStoreName = $storeName !== '' ? $storeName : SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
         $currentConfigurationLocaleName = $localeName !== '' ? $localeName : SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
 
+        // A store-wide metric (isLocaleScoped=false) never appears in a run's own bestMetricWeights (see
+        // OptimizationRunner::buildBestMetricWeightTransfers()) -- it's never searched, so a run has
+        // nothing to propose for it. Surfaced here so the "Winning weight" table's silence about it reads
+        // as deliberate, not as a metric the optimizer forgot.
+        $storeWideMetricNames = array_values(array_map(
+            static fn (array $metric): string => $metric['name'],
+            array_filter(
+                $this->getFactory()->getSearchRankingFacade()->getActiveMetrics($currentConfigurationStoreName, $currentConfigurationLocaleName),
+                static fn (array $metric): bool => $metric['isLocaleScoped'] === false,
+            ),
+        ));
+
         return $this->viewResponse([
             'optimizeRunForm' => $optimizeRunForm->createView(),
             'storeName' => $storeName,
@@ -76,6 +88,7 @@ class AutomatedWeightOptimizationController extends AbstractController
             'currentSpecificityBlendWeight' => $this->getFactory()->getSearchRankingFacade()->getSpecificityBlendWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'inProgressOptimizerRun' => $this->getFacade()->findOptimizerRunInProgress(),
             'latestOptimizerRun' => $latestOptimizerRunTransfer,
+            'storeWideMetricNames' => $storeWideMetricNames,
             'applyForm' => $latestOptimizerRunTransfer !== null
                 ? $this->getFactory()->createOptimizationApplyForm($latestOptimizerRunTransfer->getIdSearchRankingOptimizerRunOrFail())->createView()
                 : null,
