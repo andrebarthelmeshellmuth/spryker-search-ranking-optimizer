@@ -244,10 +244,11 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @api
      *
      * @param int $idSearchRankingMetric
+     * @param string $storeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer
     {
-        return $this->getRepository()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric);
+        return $this->getRepository()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName);
     }
 
     /**
@@ -255,11 +256,13 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
+     * @param string $storeName
+     *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
      */
-    public function findAutoTuneMetricConfigsWithThresholdSet(): array
+    public function findAutoTuneMetricConfigsWithThresholdSet(string $storeName): array
     {
-        return $this->getRepository()->findAutoTuneMetricConfigsWithThresholdSet();
+        return $this->getRepository()->findAutoTuneMetricConfigsWithThresholdSet($storeName);
     }
 
     /**

@@ -258,4 +258,14 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * @param string $localeName
      */
     public function recordMetricCheckOnly(int $idSearchRankingMetric, string $storeName, string $localeName): bool;
+
+    /**
+     * True if the given store has any explicitly-saved metric store-config row — lets
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner} skip a
+     * configured store that has never actually had `search-ranking` set up for it, rather than treating
+     * an empty/default state as "nothing to refit".
+     *
+     * @param string $storeName
+     */
+    public function hasStoreConfiguration(string $storeName): bool;
 }

@@ -54,10 +54,15 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
         }
 
         foreach ($autoTuneResultTransfer->getMetricResults() as $metricResultTransfer) {
+            // Prefixed with the store, not just the metric name: a multi-store run checks the SAME
+            // metric name once per store, so "top_seller: ..." alone would be ambiguous about which
+            // store's result a given line describes.
+            $label = sprintf('[%s] %s', $metricResultTransfer->getStoreNameOrFail(), $metricResultTransfer->getMetricNameOrFail());
+
             if ($metricResultTransfer->getErrorMessage() !== null) {
                 $output->writeln(sprintf(
                     '%s: FAILED to check — %s',
-                    $metricResultTransfer->getMetricNameOrFail(),
+                    $label,
                     $metricResultTransfer->getErrorMessage(),
                 ));
 
@@ -67,7 +72,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
             if ($metricResultTransfer->getWasThresholdMetOrFail()) {
                 $output->writeln(sprintf(
                     '%s: fit still adequate (R² = %.4f), no change.',
-                    $metricResultTransfer->getMetricNameOrFail(),
+                    $label,
                     $metricResultTransfer->getBeforeFitRSquaredOrFail(),
                 ));
 
@@ -77,7 +82,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
             if ($metricResultTransfer->getWasSkippedNonDeterministic()) {
                 $output->writeln(sprintf(
                     '%s: fit dropped to R² = %.4f (below threshold) — skipped, no refit: formula is non-deterministic.',
-                    $metricResultTransfer->getMetricNameOrFail(),
+                    $label,
                     $metricResultTransfer->getBeforeFitRSquaredOrFail(),
                 ));
 
@@ -86,7 +91,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
 
             $output->writeln(sprintf(
                 '%s: fit dropped to R² = %.4f (below threshold) — %s %s (R² = %.4f).',
-                $metricResultTransfer->getMetricNameOrFail(),
+                $label,
                 $metricResultTransfer->getBeforeFitRSquaredOrFail(),
                 $metricResultTransfer->getWasApplied() ? 'applied' : 'proposed',
                 $metricResultTransfer->getAfterFormula() ?? '(no candidate found)',

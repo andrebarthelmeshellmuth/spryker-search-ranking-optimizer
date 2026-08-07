@@ -355,18 +355,20 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * Upserts by `idSearchRankingMetric` — at most one config row per metric, same "find existing or
-     * create new, then overwrite the editable fields" shape as {@see upsertRating()}.
+     * Upserts by `(idSearchRankingMetric, storeName)` — at most one config row per metric+store, same
+     * "find existing or create new, then overwrite the editable fields" shape as {@see upsertRating()}.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */
     public function saveAutoTuneMetricConfig(SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer): SearchRankingAutoTuneMetricConfigTransfer
     {
         $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
+        $storeName = $autoTuneMetricConfigTransfer->getStoreNameOrFail();
 
         $autoTuneMetricConfigEntity = $this->getFactory()
             ->createSearchRankingAutoTuneMetricConfigQuery()
             ->filterByFkSearchRankingMetric($idSearchRankingMetric)
+            ->filterByStoreName($storeName)
             ->findOne();
 
         if ($autoTuneMetricConfigEntity === null) {

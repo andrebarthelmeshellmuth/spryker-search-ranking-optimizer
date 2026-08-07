@@ -148,20 +148,24 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Returns null when the metric has no auto-tune config yet (has never had a threshold set) — a
-     * safe, expected state for most metrics, not an error.
+     * Returns null when the metric has no auto-tune config yet for this store (has never had a
+     * threshold set here) — a safe, expected state for most metric+store combinations, not an error.
      *
      * @param int $idSearchRankingMetric
+     * @param string $storeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer;
 
     /**
-     * Only configs with a real threshold set — a metric with no config row, or an explicit NULL
-     * threshold, has opted out of auto-tune entirely and is simply absent here.
+     * Only configs with a real threshold set for THIS store — a metric with no config row for this
+     * store, or an explicit NULL threshold, has opted out of auto-tune entirely (for this store) and is
+     * simply absent here.
+     *
+     * @param string $storeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
      */
-    public function findAutoTuneMetricConfigsWithThresholdSet(): array;
+    public function findAutoTuneMetricConfigsWithThresholdSet(string $storeName): array;
 
     /**
      * @param int $idSearchRankingOptimizerRun

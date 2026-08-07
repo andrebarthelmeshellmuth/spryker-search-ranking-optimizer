@@ -227,6 +227,7 @@ class SearchRankingOptimizerMapper
         return $autoTuneMetricConfigTransfer
             ->setIdSearchRankingAutoTuneMetricConfig($autoTuneMetricConfigEntity->getIdSearchRankingAutoTuneMetricConfig())
             ->setIdSearchRankingMetric($autoTuneMetricConfigEntity->getFkSearchRankingMetric())
+            ->setStoreName($autoTuneMetricConfigEntity->getStoreName())
             ->setAutoTuneThreshold($autoTuneMetricConfigEntity->getAutoTuneThreshold())
             ->setIsAutoUpdateEnabled($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled())
             ->setAutoUpdateScope($autoTuneMetricConfigEntity->getAutoUpdateScope())
@@ -242,6 +243,7 @@ class SearchRankingOptimizerMapper
         SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail());
+        $autoTuneMetricConfigEntity->setStoreName($autoTuneMetricConfigTransfer->getStoreNameOrFail());
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneMetricConfigTransfer->getAutoTuneThreshold());
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled() ?? false);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail());

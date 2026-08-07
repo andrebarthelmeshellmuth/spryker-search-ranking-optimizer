@@ -207,6 +207,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
         $autoTuneMetricConfigEntity->setIdSearchRankingAutoTuneMetricConfig(3);
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric(7);
+        $autoTuneMetricConfigEntity->setStoreName('DE');
         $autoTuneMetricConfigEntity->setAutoTuneThreshold(0.8);
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled(true);
         $autoTuneMetricConfigEntity->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY);
@@ -221,6 +222,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Assert
         $this->assertSame(3, $autoTuneMetricConfigTransfer->getIdSearchRankingAutoTuneMetricConfig());
         $this->assertSame(7, $autoTuneMetricConfigTransfer->getIdSearchRankingMetric());
+        $this->assertSame('DE', $autoTuneMetricConfigTransfer->getStoreName());
         $this->assertSame(0.8, $autoTuneMetricConfigTransfer->getAutoTuneThreshold());
         $this->assertTrue($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigTransfer->getAutoUpdateScope());
@@ -232,6 +234,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Arrange
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric(7)
+            ->setStoreName('DE')
             ->setAutoTuneThreshold(0.8)
             ->setIsAutoUpdateEnabled(true)
             ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
@@ -245,6 +248,7 @@ class SearchRankingOptimizerMapperTest extends Unit
 
         // Assert
         $this->assertSame(7, $autoTuneMetricConfigEntity->getFkSearchRankingMetric());
+        $this->assertSame('DE', $autoTuneMetricConfigEntity->getStoreName());
         $this->assertSame(0.8, $autoTuneMetricConfigEntity->getAutoTuneThreshold());
         $this->assertTrue($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigEntity->getAutoUpdateScope());
@@ -259,6 +263,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Arrange
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric(7)
+            ->setStoreName('DE')
             ->setAutoTuneThreshold(null)
             ->setIsAutoUpdateEnabled(false)
             ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)

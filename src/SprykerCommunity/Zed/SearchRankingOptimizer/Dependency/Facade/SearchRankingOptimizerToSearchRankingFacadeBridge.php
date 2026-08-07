@@ -364,4 +364,12 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
 
         return true;
     }
+
+    /**
+     * @param string $storeName
+     */
+    public function hasStoreConfiguration(string $storeName): bool
+    {
+        return $this->searchRankingFacade->hasStoreConfiguration($storeName);
+    }
 }

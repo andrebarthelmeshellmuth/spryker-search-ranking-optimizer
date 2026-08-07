@@ -363,12 +363,14 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
 
     /**
      * @param int $idSearchRankingMetric
+     * @param string $storeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer
+    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer
     {
         $autoTuneMetricConfigEntity = $this->getFactory()
             ->createSearchRankingAutoTuneMetricConfigQuery()
             ->filterByFkSearchRankingMetric($idSearchRankingMetric)
+            ->filterByStoreName($storeName)
             ->findOne();
 
         if ($autoTuneMetricConfigEntity === null) {
@@ -381,16 +383,19 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
-     * Only configs with a real threshold set — a metric with no config row, or an explicit NULL
-     * threshold, has opted out of auto-tune entirely and is simply absent here, per this feature's own
-     * design (see the package README).
+     * Only configs with a real threshold set for THIS store — a metric with no config row for this
+     * store, or an explicit NULL threshold, has opted out of auto-tune entirely (for this store) and is
+     * simply absent here, per this feature's own design (see the package README).
+     *
+     * @param string $storeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
      */
-    public function findAutoTuneMetricConfigsWithThresholdSet(): array
+    public function findAutoTuneMetricConfigsWithThresholdSet(string $storeName): array
     {
         $autoTuneMetricConfigEntities = $this->getFactory()
             ->createSearchRankingAutoTuneMetricConfigQuery()
+            ->filterByStoreName($storeName)
             ->filterByAutoTuneThreshold(null, Criteria::ISNOTNULL)
             ->find();
 

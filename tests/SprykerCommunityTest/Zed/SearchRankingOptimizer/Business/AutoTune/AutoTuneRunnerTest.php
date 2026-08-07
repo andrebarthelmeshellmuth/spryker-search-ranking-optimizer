@@ -11,6 +11,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\AutoTune;
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use Generated\Shared\Transfer\StoreTransfer;
 use RuntimeException;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -18,6 +19,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotifi
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -392,21 +394,132 @@ class AutoTuneRunnerTest extends Unit
     }
 
     /**
+     * Two real stores, DE and AT, each with their own metric #7 config and their own current fit — proves
+     * a run genuinely processes every store independently: DE's fit is above threshold (no refit), AT's
+     * is below (refit proposed), and both results carry their own storeName, not a single shared scope.
+     */
+    public function testChecksEveryRealStoreIndependently(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturnMap([
+            ['DE', [$this->createConfigTransfer(7, 0.8, false, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, 'DE')]],
+            ['AT', [$this->createConfigTransfer(7, 0.8, false, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, 'AT')]],
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
+            [7, 'DE', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(7)],
+            [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(7)],
+        ]);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturnMap([
+            [7, 'DE', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, 0.9],
+            [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, 0.5],
+        ]);
+        $searchRankingFacadeMock->method('getFitCandidates')->willReturnMap([
+            [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, [
+                ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
+            ]],
+        ]);
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, storeFacade: $this->createStoreFacadeMock(['DE', 'AT']));
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(2, $metricResults);
+
+        $this->assertSame('DE', $metricResults[0]->getStoreName());
+        $this->assertTrue($metricResults[0]->getWasThresholdMet());
+
+        $this->assertSame('AT', $metricResults[1]->getStoreName());
+        $this->assertFalse($metricResults[1]->getWasThresholdMet());
+        $this->assertSame('x / (x + 3)', $metricResults[1]->getAfterFormula());
+    }
+
+    /**
+     * A store that has never had `search-ranking` set up for it (no metric store-config rows at all) is
+     * skipped BEFORE its auto-tune configs are even queried — never evaluated against empty/default state.
+     */
+    public function testSkipsAStoreWithNoSearchRankingConfiguration(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->expects($this->once())
+            ->method('findAutoTuneMetricConfigsWithThresholdSet')
+            ->with('DE')
+            ->willReturn([$this->createConfigTransfer(7, 0.8, false, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, 'DE')]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('hasStoreConfiguration')->willReturnMap([
+            ['DE', true],
+            ['AT', false],
+        ]);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.9);
+
+        $runner = $this->createRunner(
+            $repositoryMock,
+            $searchRankingFacadeMock,
+            storeFacade: $this->createStoreFacadeMock(['DE', 'AT']),
+            stubHasStoreConfiguration: false,
+        );
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(1, $metricResults);
+        $this->assertSame('DE', $metricResults[0]->getStoreName());
+    }
+
+    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
-     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
+     * @param \PHPUnit\Framework\MockObject\MockObject&\SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface|null $recipientResolver
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface|null $mailerFacade
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface|null $storeFacade
+     * @param bool $stubHasStoreConfiguration Every pre-existing test in this file assumes search-ranking is
+     *   already configured for whichever store it's checking — pass false when a test needs to configure
+     *   `hasStoreConfiguration` itself (e.g. to exercise the skip-an-unconfigured-store path), since
+     *   PHPUnit mocks only honor the FIRST stub registered for a given method with no `->with()` constraint.
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         ?AutoTuneNotificationRecipientResolverInterface $recipientResolver = null,
         ?SearchRankingOptimizerToSymfonyMailerFacadeInterface $mailerFacade = null,
+        ?SearchRankingOptimizerToStoreFacadeInterface $storeFacade = null,
+        bool $stubHasStoreConfiguration = true,
     ): AutoTuneRunner {
         $recipientResolver ??= $this->createMock(AutoTuneNotificationRecipientResolverInterface::class);
         $mailerFacade ??= $this->createMock(SearchRankingOptimizerToSymfonyMailerFacadeInterface::class);
+        $storeFacade ??= $this->createStoreFacadeMock([SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME]);
 
-        return new AutoTuneRunner($repository, $searchRankingFacade, $recipientResolver, $mailerFacade, new FormulaDeterminismChecker());
+        if ($stubHasStoreConfiguration) {
+            $searchRankingFacade->method('hasStoreConfiguration')->willReturn(true);
+        }
+
+        return new AutoTuneRunner($repository, $searchRankingFacade, $storeFacade, $recipientResolver, $mailerFacade, new FormulaDeterminismChecker());
+    }
+
+    /**
+     * @param array<string> $storeNames
+     */
+    protected function createStoreFacadeMock(array $storeNames): SearchRankingOptimizerToStoreFacadeInterface
+    {
+        $storeFacadeMock = $this->createMock(SearchRankingOptimizerToStoreFacadeInterface::class);
+        $storeFacadeMock->method('getAllStores')->willReturn(array_map(
+            fn (string $storeName) => (new StoreTransfer())
+                ->setName($storeName)
+                ->setDefaultLocaleIsoCode(SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME),
+            $storeNames,
+        ));
+
+        return $storeFacadeMock;
     }
 
     /**
@@ -415,6 +528,7 @@ class AutoTuneRunnerTest extends Unit
      * @param bool $isAutoUpdateEnabled
      * @param bool $isNotifyEnabled
      * @param string $autoUpdateScope
+     * @param string $storeName
      */
     protected function createConfigTransfer(
         int $idSearchRankingMetric,
@@ -422,9 +536,11 @@ class AutoTuneRunnerTest extends Unit
         bool $isAutoUpdateEnabled = false,
         bool $isNotifyEnabled = false,
         string $autoUpdateScope = SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE,
+        string $storeName = SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
     ): SearchRankingAutoTuneMetricConfigTransfer {
         return (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric($idSearchRankingMetric)
+            ->setStoreName($storeName)
             ->setAutoTuneThreshold($autoTuneThreshold)
             ->setIsAutoUpdateEnabled($isAutoUpdateEnabled)
             ->setIsNotifyEnabled($isNotifyEnabled)

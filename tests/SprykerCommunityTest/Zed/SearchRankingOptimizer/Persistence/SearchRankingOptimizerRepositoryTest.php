@@ -354,14 +354,15 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
     {
         // Arrange
-        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true);
+        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE');
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101);
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101, 'DE');
 
         // Assert
         $this->assertNotNull($resultTransfer);
         $this->assertSame(90101, $resultTransfer->getIdSearchRankingMetric());
+        $this->assertSame('DE', $resultTransfer->getStoreName());
         $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
         $this->assertFalse($resultTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, $resultTransfer->getAutoUpdateScope());
@@ -371,7 +372,23 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigByMetricIdReturnsNullWhenTheMetricHasNoConfigYet(): void
     {
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102);
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102, 'DE');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * A config saved for one store must be invisible when looking up the SAME metric under a different
+     * store — proves lookups are genuinely scoped by (metric, store), not by metric alone.
+     */
+    public function testFindAutoTuneMetricConfigByMetricIdIsScopedByStore(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90105, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90105, 'AT');
 
         // Assert
         $this->assertNull($resultTransfer);
@@ -380,11 +397,11 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigsWithThresholdSetExcludesConfigsWithNoThreshold(): void
     {
         // Arrange
-        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
-        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
+        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
+        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
 
         // Act
-        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet();
+        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
         $returnedMetricIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingMetric(), $resultTransfers);
 
         // Assert
@@ -393,11 +410,31 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * The same metric can have a threshold set for one store and none for another — each store's list
+     * must reflect only its own configs.
+     */
+    public function testFindAutoTuneMetricConfigsWithThresholdSetIsScopedByStore(): void
+    {
+        // Arrange
+        $deConfig = $this->createTestAutoTuneMetricConfig(90106, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
+        $this->createTestAutoTuneMetricConfig(90106, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'AT');
+
+        // Act
+        $deResultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
+        $atResultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('AT');
+
+        // Assert
+        $this->assertContains($deConfig->getFkSearchRankingMetric(), array_map(fn ($transfer) => $transfer->getIdSearchRankingMetric(), $deResultTransfers));
+        $this->assertSame([], array_filter($atResultTransfers, fn ($transfer) => $transfer->getIdSearchRankingMetric() === 90106));
+    }
+
+    /**
      * @param int $idSearchRankingMetric
      * @param float|null $autoTuneThreshold
      * @param bool $isAutoUpdateEnabled
      * @param string $autoUpdateScope
      * @param bool $isNotifyEnabled
+     * @param string $storeName
      */
     protected function createTestAutoTuneMetricConfig(
         int $idSearchRankingMetric,
@@ -405,9 +442,11 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         bool $isAutoUpdateEnabled,
         string $autoUpdateScope,
         bool $isNotifyEnabled,
+        string $storeName = 'DE',
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($idSearchRankingMetric);
+        $autoTuneMetricConfigEntity->setStoreName($storeName);
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneThreshold);
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($isAutoUpdateEnabled);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoUpdateScope);

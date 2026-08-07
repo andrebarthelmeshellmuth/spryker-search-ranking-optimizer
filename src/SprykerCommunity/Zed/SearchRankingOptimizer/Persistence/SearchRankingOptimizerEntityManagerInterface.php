@@ -138,7 +138,7 @@ interface SearchRankingOptimizerEntityManagerInterface
     public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Upserts by `idSearchRankingMetric` — at most one config row per metric.
+     * Upserts by `(idSearchRankingMetric, storeName)` — at most one config row per metric+store.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */

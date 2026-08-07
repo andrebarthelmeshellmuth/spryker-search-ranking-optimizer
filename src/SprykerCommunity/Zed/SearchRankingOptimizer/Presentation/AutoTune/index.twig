@@ -30,11 +30,10 @@
                 </select>
             </form>
             <p class="text-muted">
-                <strong>Current fit (R²)</strong> below is evaluated for the store/locale selected above.
-                The automated monthly refit (cron) always evaluates
-                <strong>{{ cronScopeStoreName }}/{{ cronScopeLocaleName }}</strong>, regardless of what's
-                selected here — the threshold/auto-update/notify settings you save below apply to a
-                metric's formula globally, not per store/locale.
+                <strong>Current fit (R²)</strong> below, and the settings you save, both apply to the
+                <strong>store</strong> selected above — the automated monthly refit checks every real
+                store independently. Locale only affects which fit is previewed here (formula/shape
+                aren't locale-scoped).
             </p>
             {% if rows %}
                 <table class="table">

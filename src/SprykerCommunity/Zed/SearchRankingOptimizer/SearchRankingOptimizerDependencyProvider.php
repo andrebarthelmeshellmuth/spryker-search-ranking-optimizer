@@ -129,6 +129,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = parent::provideBusinessLayerDependencies($container);
         $container = $this->addSearchRankingClient($container);
         $container = $this->addSearchRankingFacade($container);
+        $container = $this->addStoreFacade($container);
         $container = $this->addAclFacade($container);
         $container = $this->addAclQueryContainer($container);
         $container = $this->addSymfonyMailerFacade($container);
@@ -139,7 +140,9 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     /**
      * The base-package facade bridge is also needed in the Business layer as of the weight-checkpoint
      * feature (`WeightCheckpointRecorder`/`WeightCheckpointRestorer` read and write `search-ranking`'s own
-     * live tuning values directly) — every other base-package bridge here stays Communication-layer only
+     * live tuning values directly), and the Store facade bridge joined it as of genuine multi-store
+     * Auto-Tune (`AutoTuneRunner` enumerates every real store via `getAllStores()` instead of a single
+     * hardcoded scope) — every other base-package bridge here stays Communication-layer only
      * (the Gui apply controller), since calibration/scoring business logic still has no dependency on the
      * base package beyond the Client it already used. The permission client, glossary facade, and
      * translator facade are ALL Communication-layer-only too, and exist purely to let

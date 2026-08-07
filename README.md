@@ -334,16 +334,19 @@ package's own README). Auto-tune is the monthly job that watches that axis and, 
 applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
 specificity knobs, so it has no reason to write a weight checkpoint of its own.
 
-**Auto-tune operates on a single implicit store/locale scope, not per-store.** `search-ranking`'s own
-metric formula/active-flag are store-scoped (see that package's README), but Auto-Tune's own settings
-table (`spy_search_ranking_auto_tune_metric_config`) has no store/locale columns of its own — a
-pre-existing limitation, not something this package's store-scoping ripple attempted to fix. Genuine
-multi-store Auto-Tune is real, valuable follow-up work; it needs its own schema change plus a Settings
-page rework, which is future scope.
+**Auto-tune runs independently for every real configured store** — `search-ranking`'s own metric
+formula/active-flag are store-scoped (see that package's README), and Auto-Tune's own settings table
+(`spy_search_ranking_auto_tune_metric_config`) is scoped the same way: one threshold/auto-update/notify
+config per (metric, store), not per metric alone. The monthly job enumerates every store the Store
+facade reports and checks each one's own thresholds against that store's own fit — a store that has
+never had `search-ranking` configured for it is skipped entirely, never evaluated against empty/default
+state. Deliberately NOT locale-scoped, matching `search-ranking`'s own formula/shape.
 
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
-From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page, per active metric:
+From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page — like every other scoped page in
+this package, with its own **Store + Locale selector** at the top (locale only affects which fit is
+previewed; the settings themselves are per-store) — per active metric:
 
 - **Auto-tune threshold (R²)** — left blank by default, meaning the metric is opted OUT of auto-tune
   entirely. Setting a value opts it in: the monthly job compares the metric's CURRENT fit (evaluated
@@ -364,10 +367,14 @@ Running `vendor/bin/console search-ranking-optimizer:auto-tune` (intended for th
 [Installation](#installation)):
 
 ```
-pdp_impressions: fit still adequate (R² = 0.9883), no change.
-random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+[DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE] random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+[AT] pdp_impressions: fit dropped to R² = 0.6021 (below threshold) — proposed atan(x / 4.1) (R² = 0.9412).
 Notified 0 admin(s) by email.
 ```
+
+Each line is prefixed with the store it applies to — a multi-store run checks the same metric name once
+per store, so the prefix is what tells two "pdp_impressions" lines apart.
 
 A metric whose formula calls a non-deterministic function (`random()` is the one that ships in
 `search-ranking`'s own formula DSL today — see
@@ -385,14 +392,16 @@ The failed metric shows up instead with its error, both in the console output an
 in the summary email, rather than silently vanishing or taking every other metric's check down with it:
 
 ```
-pdp_impressions: fit still adequate (R² = 0.9883), no change.
-top_seller: FAILED to check — Elasticsearch unreachable.
+[DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE] top_seller: FAILED to check — Elasticsearch unreachable.
 Notified 1 admin(s) by email.
 ```
 
-Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
-every metric that crossed its threshold with notify on, to every admin holding an ACL role named
-`search-score-admin` (every member of every ACL group holding that role; see [Requirements](#requirements)).
+Exactly **one** combined before/after summary email is sent per run — never one per metric, and never
+one per store — covering every metric (across every store) that crossed its threshold with notify on,
+to every admin holding an ACL role named `search-score-admin` (every member of every ACL group holding
+that role; see [Requirements](#requirements)). The summary email's table has its own Store column for
+the same reason the console output has its `[DE]`/`[AT]` prefix.
 A run that needs to notify but finds no admin holding that role yet simply sends to nobody
 (`notifiedEmailCount = 0`), logged rather than treated as an error — the same posture the weight-checkpoint
 restore path takes toward a metric deleted since a checkpoint was taken.
@@ -523,8 +532,9 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   (`SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()`/`findMetricDetail()`/
   `saveMetricFormula()`) all require explicit `$storeName`/`$localeName` accordingly. Automated weight
   optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
-  scope; Auto-tune (single implicit scope — see above) passes `SearchRankingConfig::DEFAULT_SCOPE_STORE_NAME`/
-  `DEFAULT_SCOPE_LOCALE_NAME` explicitly.
+  scope; Auto-tune (genuinely per-store — see above) passes the real store it's currently checking, and
+  that store's own configured default locale (`StoreTransfer::getDefaultLocaleIsoCodeOrFail()`) — formula
+  fit is evaluated against one real locale per store, since formula/shape themselves aren't locale-scoped.
 - **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
   [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
   a store-wide-vs-per-locale fact this package respects end to end, not just reads: `getActiveMetrics()`/

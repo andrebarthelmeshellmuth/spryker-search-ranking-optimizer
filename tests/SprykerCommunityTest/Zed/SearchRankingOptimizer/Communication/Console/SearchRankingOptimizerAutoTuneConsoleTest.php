@@ -52,18 +52,22 @@ class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
         // Arrange
         $metricResults = [
             (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('DE')
                 ->setMetricNameOrFail('failed_metric')
                 ->setErrorMessageOrFail('formula evaluation threw'),
             (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('DE')
                 ->setMetricNameOrFail('still_fitting')
                 ->setWasThresholdMetOrFail(true)
                 ->setBeforeFitRSquaredOrFail(0.91),
             (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('AT')
                 ->setMetricNameOrFail('non_deterministic')
                 ->setWasThresholdMetOrFail(false)
                 ->setWasSkippedNonDeterministic(true)
                 ->setBeforeFitRSquaredOrFail(0.4),
             (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('AT')
                 ->setMetricNameOrFail('refitted')
                 ->setWasThresholdMetOrFail(false)
                 ->setWasSkippedNonDeterministic(false)
@@ -79,12 +83,12 @@ class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
         $exitCode = $commandTester->execute([]);
         $display = $commandTester->getDisplay();
 
-        // Assert
+        // Assert -- two different stores among the results, proving the store label distinguishes them.
         $this->assertSame(SearchRankingOptimizerAutoTuneConsole::CODE_SUCCESS, $exitCode);
-        $this->assertStringContainsString('failed_metric: FAILED to check — formula evaluation threw', $display);
-        $this->assertStringContainsString('still_fitting: fit still adequate (R² = 0.9100), no change.', $display);
-        $this->assertStringContainsString('non_deterministic: fit dropped to R² = 0.4000 (below threshold) — skipped, no refit: formula is non-deterministic.', $display);
-        $this->assertStringContainsString('refitted: fit dropped to R² = 0.3000 (below threshold) — applied atan(x/avg) (R² = 0.9500).', $display);
+        $this->assertStringContainsString('[DE] failed_metric: FAILED to check — formula evaluation threw', $display);
+        $this->assertStringContainsString('[DE] still_fitting: fit still adequate (R² = 0.9100), no change.', $display);
+        $this->assertStringContainsString('[AT] non_deterministic: fit dropped to R² = 0.4000 (below threshold) — skipped, no refit: formula is non-deterministic.', $display);
+        $this->assertStringContainsString('[AT] refitted: fit dropped to R² = 0.3000 (below threshold) — applied atan(x/avg) (R² = 0.9500).', $display);
         $this->assertStringContainsString('Notified 2 admin(s) by email.', $display);
     }
 
@@ -96,6 +100,7 @@ class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
         // Arrange
         $metricResults = [
             (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('DE')
                 ->setMetricNameOrFail('proposed_only')
                 ->setWasThresholdMetOrFail(false)
                 ->setWasSkippedNonDeterministic(false)
@@ -112,7 +117,7 @@ class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
 
         // Assert
         $this->assertSame(SearchRankingOptimizerAutoTuneConsole::CODE_SUCCESS, $exitCode);
-        $this->assertStringContainsString('proposed_only: fit dropped to R² = 0.2000 (below threshold) — proposed sigmoid(x) (R² = 0.8800).', $commandTester->getDisplay());
+        $this->assertStringContainsString('[DE] proposed_only: fit dropped to R² = 0.2000 (below threshold) — proposed sigmoid(x) (R² = 0.8800).', $commandTester->getDisplay());
     }
 
     /**

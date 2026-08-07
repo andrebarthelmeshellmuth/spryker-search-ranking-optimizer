@@ -62,7 +62,7 @@ class AutoTuneController extends AbstractController
             }
 
             $idSearchRankingMetric = $metric['idSearchRankingMetric'];
-            $autoTuneMetricConfigTransfer = $this->getFacade()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric);
+            $autoTuneMetricConfigTransfer = $this->getFacade()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName);
 
             $rows[] = [
                 'metricName' => $metric['name'],
@@ -87,16 +87,6 @@ class AutoTuneController extends AbstractController
             'locales' => $this->getFactory()->getAllLocaleNames(),
             'selectedStoreName' => $storeName,
             'selectedLocaleName' => $localeName,
-            // The R² column above is evaluated for whatever scope is selected -- but the settings saved
-            // below (threshold/auto-update/notify) are read by a SINGLE global cron tick that always
-            // evaluates THIS fixed scope, regardless of what's selected on this page. Surfaced explicitly
-            // in the twig so picking a different store/locale here to preview its fit never reads as
-            // "auto-tune now runs against this store too" -- see this controller's own class docblock
-            // history / README's "Auto-tune operates on a single implicit store/locale scope" section for
-            // why (spy_search_ranking_auto_tune_metric_config has no store_name/locale_name columns of its
-            // own; a genuine per-scope Auto-Tune needs a schema change, deliberately not attempted here).
-            'cronScopeStoreName' => SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            'cronScopeLocaleName' => SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
         ]);
     }
 
@@ -105,7 +95,8 @@ class AutoTuneController extends AbstractController
      */
     public function saveAction(Request $request): RedirectResponse
     {
-        $redirectUrl = $this->buildAutoTuneUrl($this->resolveStoreName($request), $this->resolveLocaleName($request));
+        $storeName = $this->resolveStoreName($request);
+        $redirectUrl = $this->buildAutoTuneUrl($storeName, $this->resolveLocaleName($request));
 
         $autoTuneMetricConfigForm = $this->getFactory()
             ->createAutoTuneMetricConfigForm(0, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false)
@@ -121,6 +112,7 @@ class AutoTuneController extends AbstractController
 
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric((int)$formData[AutoTuneMetricConfigForm::FIELD_ID_SEARCH_RANKING_METRIC])
+            ->setStoreName($storeName)
             ->setAutoTuneThreshold($formData[AutoTuneMetricConfigForm::FIELD_AUTO_TUNE_THRESHOLD] !== null ? (float)$formData[AutoTuneMetricConfigForm::FIELD_AUTO_TUNE_THRESHOLD] : null)
             ->setIsAutoUpdateEnabled((bool)$formData[AutoTuneMetricConfigForm::FIELD_IS_AUTO_UPDATE_ENABLED])
             ->setAutoUpdateScope((string)$formData[AutoTuneMetricConfigForm::FIELD_AUTO_UPDATE_SCOPE])

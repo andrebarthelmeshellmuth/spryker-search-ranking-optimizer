@@ -16,10 +16,11 @@ use Generated\Shared\Transfer\MailTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
-use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+use Generated\Shared\Transfer\StoreTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 use Throwable;
@@ -34,6 +35,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface $storeFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface $recipientResolver
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
@@ -41,6 +43,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
     public function __construct(
         protected SearchRankingOptimizerRepositoryInterface $repository,
         protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
+        protected SearchRankingOptimizerToStoreFacadeInterface $storeFacade,
         protected AutoTuneNotificationRecipientResolverInterface $recipientResolver,
         protected SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade,
         protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
@@ -49,26 +52,40 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
     /**
      * {@inheritDoc}
+     *
+     * Genuinely per-store: every real store returned by {@see SearchRankingOptimizerToStoreFacadeInterface::getAllStores()}
+     * gets its own independent pass over ITS OWN threshold-set metric configs — a store that has never had
+     * `search-ranking` set up for it ({@see SearchRankingOptimizerToSearchRankingFacadeInterface::hasStoreConfiguration()}
+     * returns false) is skipped entirely rather than evaluated against empty/default state. One combined
+     * summary email still covers every store's results from this single run, not one email per store.
      */
     public function run(): SearchRankingAutoTuneResultTransfer
     {
         $resultTransfer = new SearchRankingAutoTuneResultTransfer();
         $metricResultsToNotify = [];
 
-        foreach ($this->repository->findAutoTuneMetricConfigsWithThresholdSet() as $autoTuneMetricConfigTransfer) {
-            $metricResultTransfer = $this->processMetricSafely($autoTuneMetricConfigTransfer);
+        foreach ($this->storeFacade->getAllStores() as $storeTransfer) {
+            $storeName = $storeTransfer->getNameOrFail();
 
-            if ($metricResultTransfer === null) {
+            if (!$this->searchRankingFacade->hasStoreConfiguration($storeName)) {
                 continue;
             }
 
-            $resultTransfer->addMetricResult($metricResultTransfer);
+            foreach ($this->repository->findAutoTuneMetricConfigsWithThresholdSet($storeName) as $autoTuneMetricConfigTransfer) {
+                $metricResultTransfer = $this->processMetricSafely($autoTuneMetricConfigTransfer, $storeTransfer);
 
-            if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
-                continue;
+                if ($metricResultTransfer === null) {
+                    continue;
+                }
+
+                $resultTransfer->addMetricResult($metricResultTransfer);
+
+                if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
+                    continue;
+                }
+
+                $metricResultsToNotify[] = $metricResultTransfer;
             }
-
-            $metricResultsToNotify[] = $metricResultTransfer;
         }
 
         $notifiedEmailCount = $metricResultsToNotify === [] ? 0 : $this->sendSummaryEmail($metricResultsToNotify);
@@ -85,15 +102,18 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * "safe, silent skip vs. real result" shape, uncomplicated by exception handling.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
      */
     protected function processMetricSafely(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        StoreTransfer $storeTransfer,
     ): ?SearchRankingAutoTuneMetricResultTransfer {
         try {
-            return $this->processMetric($autoTuneMetricConfigTransfer);
+            return $this->processMetric($autoTuneMetricConfigTransfer, $storeTransfer);
         } catch (Throwable $throwable) {
             return (new SearchRankingAutoTuneMetricResultTransfer())
                 ->setIdSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail())
+                ->setStoreName($storeTransfer->getNameOrFail())
                 ->setMetricName(sprintf('metric #%d', $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()))
                 ->setErrorMessage($throwable->getMessage());
         }
@@ -103,38 +123,30 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * Returns null when the metric has been deleted since its config was set, or has no digest yet —
      * both safe, silent skips, never an error.
      *
-     * `spy_search_ranking_auto_tune_metric_config` has no store_name/locale_name columns of its own —
-     * Auto-Tune operates on a single implicit scope, independent of search-ranking's own per-store
-     * formula scoping. This method passes that scope EXPLICITLY (DEFAULT_SCOPE_STORE_NAME/_LOCALE_NAME)
-     * to every store-aware search-ranking call, rather than relying on those calls to silently default it
-     * internally — the "which scope Auto-Tune tunes" decision is visible here, at its rightful owner, not
-     * buried in a bridge three layers down. Genuine multi-store
-     * Auto-Tune (fanning this whole method out per real store/locale) is real, valuable follow-up work,
-     * deliberately NOT attempted here — it needs its own schema change to
-     * `spy_search_ranking_auto_tune_metric_config` first (store_name/locale_name columns) plus a
-     * Settings-page rework, out of scope for a ripple fix.
+     * The store to check is $storeTransfer, resolved by the caller from every real configured store —
+     * formula/shape are store-only on `search-ranking`'s own side (not locale-scoped), but the digest
+     * fit computation still needs A locale, so this uses the store's own configured default
+     * ({@see \Generated\Shared\Transfer\StoreTransfer::getDefaultLocaleIsoCodeOrFail()}) rather than
+     * re-deriving one from project config.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
      */
     protected function processMetric(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        StoreTransfer $storeTransfer,
     ): ?SearchRankingAutoTuneMetricResultTransfer {
         $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
-        $metric = $this->searchRankingFacade->findMetricDetail(
-            $idSearchRankingMetric,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        );
+        $storeName = $storeTransfer->getNameOrFail();
+        $localeName = $storeTransfer->getDefaultLocaleIsoCodeOrFail();
+
+        $metric = $this->searchRankingFacade->findMetricDetail($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metric === null) {
             return null;
         }
 
-        $currentFitRSquared = $this->searchRankingFacade->evaluateCurrentMetricFit(
-            $idSearchRankingMetric,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        );
+        $currentFitRSquared = $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric, $storeName, $localeName);
 
         if ($currentFitRSquared === null) {
             return null;
@@ -142,13 +154,14 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
         $metricResultTransfer = (new SearchRankingAutoTuneMetricResultTransfer())
             ->setIdSearchRankingMetric($idSearchRankingMetric)
+            ->setStoreName($storeName)
             ->setMetricName($metric['name'])
             ->setBeforeFormula($metric['formula'])
             ->setBeforeFitRSquared($currentFitRSquared)
             ->setWasSkippedNonDeterministic(false);
 
         if ($currentFitRSquared >= $autoTuneMetricConfigTransfer->getAutoTuneThresholdOrFail()) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, $storeName, $localeName);
 
             return $metricResultTransfer->setWasThresholdMet(true)->setWasApplied(false);
         }
@@ -159,12 +172,12 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         // to whatever randomness happened to be in THIS digest snapshot, then silently swap in a formula
         // that looks like a real fit but carries no more signal than random() did.
         if (!$this->formulaDeterminismChecker->isDeterministic($metric['formula'])) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, $storeName, $localeName);
 
             return $metricResultTransfer->setWasThresholdMet(false)->setWasSkippedNonDeterministic(true)->setWasApplied(false);
         }
 
-        return $this->refit($metricResultTransfer, $metric, $autoTuneMetricConfigTransfer);
+        return $this->refit($metricResultTransfer, $metric, $autoTuneMetricConfigTransfer, $storeName, $localeName);
     }
 
     // phpcs:disable Spryker.Commenting.DocBlockParamAllowDefaultValue.Typehint -- misreads this shaped array docblock as a default-value typehint check
@@ -173,20 +186,20 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer
      * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null} $metric
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @param string $storeName
+     * @param string $localeName
      */
     protected function refit(
         SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer,
         array $metric,
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        string $storeName,
+        string $localeName,
     ): SearchRankingAutoTuneMetricResultTransfer {
         $idSearchRankingMetric = $metric['idSearchRankingMetric'];
         $metricResultTransfer->setWasThresholdMet(false);
 
-        $candidates = $this->searchRankingFacade->getFitCandidates(
-            $idSearchRankingMetric,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-            SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-        );
+        $candidates = $this->searchRankingFacade->getFitCandidates($idSearchRankingMetric, $storeName, $localeName);
         $chosenCandidate = $this->chooseCandidate($candidates, $autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail(), $metric['shape']);
 
         if ($chosenCandidate === null) {
@@ -204,13 +217,13 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             $wasApplied = $this->searchRankingFacade->saveMetricFormula(
                 $idSearchRankingMetric,
                 $chosenCandidate['formula'],
-                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+                $storeName,
+                $localeName,
             );
         }
 
         if (!$wasApplied) {
-            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
+            $this->searchRankingFacade->recordMetricCheckOnly($idSearchRankingMetric, $storeName, $localeName);
         }
 
         return $metricResultTransfer->setWasApplied($wasApplied);

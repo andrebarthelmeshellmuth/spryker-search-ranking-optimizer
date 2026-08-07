@@ -49,6 +49,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibrat
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
@@ -160,6 +161,11 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
     }
 
+    public function getStoreFacade(): SearchRankingOptimizerToStoreFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_STORE);
+    }
+
     public function getAclFacade(): SearchRankingOptimizerToAclFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_ACL);
@@ -188,6 +194,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         return new AutoTuneRunner(
             $this->getRepository(),
             $this->getSearchRankingFacade(),
+            $this->getStoreFacade(),
             $this->createAutoTuneNotificationRecipientResolver(),
             $this->getSymfonyMailerFacade(),
             $this->createFormulaDeterminismChecker(),

@@ -246,6 +246,7 @@
     <transfer name="SearchRankingAutoTuneMetricConfig" strict="true">
         <property name="idSearchRankingAutoTuneMetricConfig" type="int"/>
         <property name="idSearchRankingMetric" type="int"/>
+        <property name="storeName" type="string"/>
         <property name="autoTuneThreshold" type="float"/>
         <property name="isAutoUpdateEnabled" type="bool"/>
         <property name="autoUpdateScope" type="string"/>
@@ -268,6 +269,7 @@
          threshold set still gets checked, and this entry surfaces the failure rather than swallowing it. -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
+        <property name="storeName" type="string"/>
         <property name="metricName" type="string"/>
         <property name="wasThresholdMet" type="bool"/>
         <property name="wasSkippedNonDeterministic" type="bool"/>
