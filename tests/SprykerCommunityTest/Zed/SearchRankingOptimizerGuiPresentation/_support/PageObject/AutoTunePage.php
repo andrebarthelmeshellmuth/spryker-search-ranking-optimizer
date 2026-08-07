@@ -32,6 +32,16 @@ class AutoTunePage
     public const CONSOLE_COMMAND_AUTO_TUNE = 'search-ranking-optimizer:auto-tune';
 
     /**
+     * @var string
+     */
+    public const STORE_SELECT_ID = 'storeName';
+
+    /**
+     * @var string
+     */
+    public const LOCALE_SELECT_ID = 'localeName';
+
+    /**
      * The random tie-breaker metric must never appear as its own row (its formula is `random()` -- no R²
      * fit makes sense against noise). See SearchRankingConfig for why "random" is the fixed name.
      *

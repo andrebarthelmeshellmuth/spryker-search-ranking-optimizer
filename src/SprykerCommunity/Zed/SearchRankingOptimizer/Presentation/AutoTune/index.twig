@@ -11,6 +11,31 @@
                 nothing runs against it until one is set. Auto-update and notify are independent toggles:
                 you can get a proposal email without anything changing automatically, or the reverse.
             </p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            <p class="text-muted">
+                <strong>Current fit (R²)</strong> below is evaluated for the store/locale selected above.
+                The automated monthly refit (cron) always evaluates
+                <strong>{{ cronScopeStoreName }}/{{ cronScopeLocaleName }}</strong>, regardless of what's
+                selected here — the threshold/auto-update/notify settings you save below apply to a
+                metric's formula globally, not per store/locale.
+            </p>
             {% if rows %}
                 <table class="table">
                     <thead>
@@ -29,7 +54,7 @@
                                     {# A whole per-metric form must live inside ONE <td> - a <form> spanning
                                        multiple <td> siblings inside a <tr> is invalid HTML and gets silently
                                        relocated/dropped by browsers, breaking submission. #}
-                                    {{ form_start(row.form, { action: url('/search-ranking-optimizer/auto-tune/save'), method: 'POST', attr: { class: 'search-ranking-optimizer-auto-tune-row-form' } }) }}
+                                    {{ form_start(row.form, { action: url('/search-ranking-optimizer/auto-tune/save') ~ '?storeName=' ~ selectedStoreName ~ '&localeName=' ~ selectedLocaleName, method: 'POST', attr: { class: 'search-ranking-optimizer-auto-tune-row-form' } }) }}
                                     {{ form_row(row.form.autoTuneThreshold) }}
                                     {{ form_row(row.form.isAutoUpdateEnabled) }}
                                     {{ form_row(row.form.autoUpdateScope) }}

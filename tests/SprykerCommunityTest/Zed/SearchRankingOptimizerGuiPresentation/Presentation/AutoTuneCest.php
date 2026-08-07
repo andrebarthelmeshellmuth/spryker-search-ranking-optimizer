@@ -59,6 +59,32 @@ class AutoTuneCest
     }
 
     /**
+     * The R² preview is scoped to whatever's selected here (see AutoTuneController::indexAction()) --
+     * unlike every other page in this package, this one was previously silent about scope entirely. This
+     * only proves the selector itself round-trips through a reload; it deliberately does not assert on
+     * the R² value changing, since a fresh demoshop's en_US and de_DE metric data can coincidentally fit
+     * to the same value.
+     *
+     * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
+     */
+    public function selectingALocalePersistsAcrossReload(SearchRankingOptimizerGuiPresentationTester $i): void
+    {
+        $i->amOnPage(AutoTunePage::URL);
+        $i->waitForElementVisible('#' . AutoTunePage::LOCALE_SELECT_ID, 10);
+
+        $i->selectOption('#' . AutoTunePage::LOCALE_SELECT_ID, 'en_US');
+        $i->waitForElementVisible('#' . AutoTunePage::LOCALE_SELECT_ID, 10);
+        $i->seeInCurrentUrl('localeName=en_US');
+        $i->seeOptionIsSelected('#' . AutoTunePage::LOCALE_SELECT_ID, 'en_US');
+
+        // Reload from a fresh navigation (not just the select's own re-render) to prove the selection is
+        // real query-string state, not just unsubmitted DOM state the browser happened to keep.
+        $i->amOnPage(AutoTunePage::URL . '?localeName=en_US');
+        $i->waitForElementVisible('#' . AutoTunePage::LOCALE_SELECT_ID, 10);
+        $i->seeOptionIsSelected('#' . AutoTunePage::LOCALE_SELECT_ID, 'en_US');
+    }
+
+    /**
      * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
      */
     public function settingAThresholdPersistsAndCanBeClearedAgain(SearchRankingOptimizerGuiPresentationTester $i): void

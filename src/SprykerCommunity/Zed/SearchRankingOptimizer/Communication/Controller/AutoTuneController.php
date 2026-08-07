@@ -29,20 +29,30 @@ class AutoTuneController extends AbstractController
     protected const URL_AUTO_TUNE = '/search-ranking-optimizer/auto-tune';
 
     /**
+     * @var string
+     */
+    protected const PARAM_STORE_NAME = 'storeName';
+
+    /**
+     * @var string
+     */
+    protected const PARAM_LOCALE_NAME = 'localeName';
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
      * @return array<string, mixed>
      */
-    public function indexAction(): array
+    public function indexAction(Request $request): array
     {
+        $storeName = $this->resolveStoreName($request);
+        $localeName = $this->resolveLocaleName($request);
+
         $searchRankingFacade = $this->getFactory()->getSearchRankingFacade();
         $randomMetricName = $searchRankingFacade->getRandomMetricName();
         $rows = [];
 
-        foreach (
-            $searchRankingFacade->getActiveMetrics(
-                SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
-            ) as $metric
-        ) {
+        foreach ($searchRankingFacade->getActiveMetrics($storeName, $localeName) as $metric) {
             // The random tie-breaker metric's formula is `random()` by design -- a fresh evaluation never
             // matches the last one, so its R² is meaningless noise, and there is nothing a refit could
             // sensibly converge on. Excluded here rather than from getActiveMetrics() itself, since this
@@ -58,8 +68,8 @@ class AutoTuneController extends AbstractController
                 'metricName' => $metric['name'],
                 'currentFitRSquared' => $searchRankingFacade->evaluateCurrentMetricFit(
                     $idSearchRankingMetric,
-                    SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
-                    SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+                    $storeName,
+                    $localeName,
                 ),
                 'form' => $this->getFactory()->createAutoTuneMetricConfigForm(
                     $idSearchRankingMetric,
@@ -73,6 +83,20 @@ class AutoTuneController extends AbstractController
 
         return $this->viewResponse([
             'rows' => $rows,
+            'stores' => $this->getFactory()->getAllStoreNames(),
+            'locales' => $this->getFactory()->getAllLocaleNames(),
+            'selectedStoreName' => $storeName,
+            'selectedLocaleName' => $localeName,
+            // The R² column above is evaluated for whatever scope is selected -- but the settings saved
+            // below (threshold/auto-update/notify) are read by a SINGLE global cron tick that always
+            // evaluates THIS fixed scope, regardless of what's selected on this page. Surfaced explicitly
+            // in the twig so picking a different store/locale here to preview its fit never reads as
+            // "auto-tune now runs against this store too" -- see this controller's own class docblock
+            // history / README's "Auto-tune operates on a single implicit store/locale scope" section for
+            // why (spy_search_ranking_auto_tune_metric_config has no store_name/locale_name columns of its
+            // own; a genuine per-scope Auto-Tune needs a schema change, deliberately not attempted here).
+            'cronScopeStoreName' => SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+            'cronScopeLocaleName' => SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
         ]);
     }
 
@@ -81,6 +105,8 @@ class AutoTuneController extends AbstractController
      */
     public function saveAction(Request $request): RedirectResponse
     {
+        $redirectUrl = $this->buildAutoTuneUrl($this->resolveStoreName($request), $this->resolveLocaleName($request));
+
         $autoTuneMetricConfigForm = $this->getFactory()
             ->createAutoTuneMetricConfigForm(0, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false)
             ->handleRequest($request);
@@ -88,7 +114,7 @@ class AutoTuneController extends AbstractController
         if (!$autoTuneMetricConfigForm->isSubmitted() || !$autoTuneMetricConfigForm->isValid()) {
             $this->addErrorMessage('The submitted auto-tune settings are invalid.');
 
-            return $this->redirectResponse(static::URL_AUTO_TUNE);
+            return $this->redirectResponse($redirectUrl);
         }
 
         $formData = $autoTuneMetricConfigForm->getData();
@@ -104,6 +130,31 @@ class AutoTuneController extends AbstractController
 
         $this->addSuccessMessage('Auto-tune settings saved.');
 
-        return $this->redirectResponse(static::URL_AUTO_TUNE);
+        return $this->redirectResponse($redirectUrl);
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveStoreName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_STORE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveLocaleName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_LOCALE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    protected function buildAutoTuneUrl(string $storeName, string $localeName): string
+    {
+        return sprintf('%s?%s=%s&%s=%s', static::URL_AUTO_TUNE, static::PARAM_STORE_NAME, $storeName, static::PARAM_LOCALE_NAME, $localeName);
     }
 }

@@ -94,6 +94,15 @@ abstract class AbstractGroundTruthTest extends Unit
     protected const LOCALE_NAME = 'en_US';
 
     /**
+     * `runNextOptimization()` processes the OLDEST queued run across the whole shop, not scoped to this
+     * test's own (store, locale) or run id -- see {@see runRealOptimization()}'s own docblock for why a
+     * bounded drain loop, not a single call, is needed to reliably get back the run this test just queued.
+     *
+     * @var int
+     */
+    protected const MAX_QUEUE_DRAIN_ATTEMPTS = 20;
+
+    /**
      * Large enough that the real, already-rated queries in this shop (whatever their own importanceWeight)
      * contribute a statistically negligible fraction of the weighted aggregate rank_eval score -- see this
      * class's own docblock for why this is preferred over touching any real query's weight.
@@ -472,22 +481,51 @@ abstract class AbstractGroundTruthTest extends Unit
      * -- the exact same call the Zed "Run now" button makes, no shortcuts. Blocks until done/failed since
      * this package's own console command does the same in-request for a shop this size (see the README).
      *
+     * `runNextOptimization()` (`OptimizationRunner::runNext()`) dequeues the SINGLE OLDEST queued run
+     * across the entire shop -- it has no store/locale/run-id scoping at all, by design (a real background
+     * worker just drains a global work queue in FIFO order, and each run is correctly scoped once it's
+     * picked up). That's fine for production, but not for this test: if anything else queued a run before
+     * this call -- another Presentation suite's own `OptimizationCest::queueingARunNeverSilentlyAppliesLive()`
+     * deliberately leaves one behind for its own default scope without processing it, and a real cron tick
+     * or another admin action could too -- the very next `runNextOptimization()` call can silently process
+     * THAT leftover run instead of the one this method just queued, and this method would misattribute its
+     * (unrelated) failure to this test. Confirmed empirically: running this suite right after the
+     * Presentation suite reproduces exactly this. So: drain and discard anything that isn't OUR run id,
+     * bounded by {@see MAX_QUEUE_DRAIN_ATTEMPTS} rather than looping forever if something is genuinely
+     * broken.
+     *
      * @param string $algorithm
      */
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
     ): SearchRankingOptimizerRunTransfer {
-        $this->getFacade()->queueOptimizationRun(static::STORE_NAME, static::LOCALE_NAME, $algorithm);
-        $runTransfer = $this->getFacade()->runNextOptimization();
+        $queuedRunTransfer = $this->getFacade()->queueOptimizationRun(static::STORE_NAME, static::LOCALE_NAME, $algorithm);
+        $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
-        $this->assertNotNull($runTransfer, 'A run was just queued -- runNextOptimization() must pick it up.');
-        $this->assertSame(
-            SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
-            $runTransfer->getStatus(),
-            'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
-        );
+        for ($attempt = 0; $attempt < static::MAX_QUEUE_DRAIN_ATTEMPTS; $attempt++) {
+            $runTransfer = $this->getFacade()->runNextOptimization();
+            $this->assertNotNull($runTransfer, 'A run was just queued -- runNextOptimization() must pick it up.');
 
-        return $runTransfer;
+            if ($runTransfer->getIdSearchRankingOptimizerRunOrFail() !== $idQueuedRun) {
+                continue;
+            }
+
+            $this->assertSame(
+                SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
+                $runTransfer->getStatus(),
+                'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
+            );
+
+            return $runTransfer;
+        }
+
+        $this->fail(sprintf(
+            'Queued run #%d never came back from runNextOptimization() after %d attempts -- the shared run '
+                . 'queue has a bigger leftover backlog than expected (see this method\'s own docblock for why '
+                . 'the queue can contain other actors\' runs).',
+            $idQueuedRun,
+            static::MAX_QUEUE_DRAIN_ATTEMPTS,
+        ));
     }
 
     /**
@@ -757,17 +795,35 @@ abstract class AbstractGroundTruthTest extends Unit
                 ->setLocaleName(static::LOCALE_NAME)
                 ->setAlgorithm($algorithm),
         );
+        $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
-        $optimizationRunner->runNext();
-        $runTransfer = $this->getRepository()->findOptimizerRunById($queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail());
+        // Same global-FIFO dequeue as OptimizationRunnerInterface::runNext() itself (this IS that real
+        // method, just constructed by hand here) -- see runRealOptimization()'s own docblock for why a
+        // bounded drain loop, not a single call, is needed to reliably process the run just queued above
+        // rather than some other leftover queued run.
+        for ($attempt = 0; $attempt < static::MAX_QUEUE_DRAIN_ATTEMPTS; $attempt++) {
+            $optimizationRunner->runNext();
+            $runTransfer = $this->getRepository()->findOptimizerRunById($idQueuedRun);
+            $this->assertNotNull($runTransfer, 'The run this method itself just created must still be findable by id.');
 
-        $this->assertNotNull($runTransfer);
-        $this->assertSame(
-            SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
-            $runTransfer->getStatus(),
-            'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
-        );
+            if ($runTransfer->getStatus() === SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED) {
+                continue;
+            }
 
-        return $runTransfer;
+            $this->assertSame(
+                SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
+                $runTransfer->getStatus(),
+                'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
+            );
+
+            return $runTransfer;
+        }
+
+        $this->fail(sprintf(
+            'Queued run #%d was still \'queued\' after %d runNext() attempts -- the shared run queue has a '
+                . 'bigger leftover backlog than expected.',
+            $idQueuedRun,
+            static::MAX_QUEUE_DRAIN_ATTEMPTS,
+        ));
     }
 }
