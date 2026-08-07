@@ -97,11 +97,9 @@ class OptimizationApplier implements OptimizationApplierInterface
         $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightExponentOrFail());
         $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightShiftMagnitudeOrFail());
 
-        // getBestMetricWeights() never includes a store-wide (isLocaleScoped=false) metric -- see
-        // OptimizationRunner::buildBestMetricWeightTransfers()'s own docblock. That exclusion is what
-        // matters here: search-ranking's own saveMetricWeight() fans a write for such a metric out to
-        // EVERY real locale of the store, so blindly writing back every metric this run's own (store,
-        // locale) formula happened to use would silently clobber a sibling locale's current weight for it.
+        // A store-wide (isLocaleScoped=false) metric can appear here like any other -- search-ranking's
+        // own saveMetricWeight() already fans that write out to every real locale of the store, the same
+        // as a human editing it manually from the Metrics page in any one locale already does today.
         foreach ($optimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
             $idSearchRankingMetric = $metricWeightTransfer->getIdSearchRankingMetricOrFail();
             $wasSaved = $this->searchRankingFacade->saveMetricWeight(

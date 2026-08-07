@@ -459,13 +459,14 @@ excluded metric's weight on apply, or let the other metrics quietly absorb its w
 
 A metric with `isLocaleScoped=false` (a store-wide fact — see `search-ranking`'s own
 [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
-excluded the same way, for a different reason: this run's own (store, locale) doesn't own that weight
-alone. `search-ranking`'s own `saveMetricWeight()` fans a write for such a metric out to EVERY real locale
-of the store, so searching it here would either get silently overwritten by another locale's own run, or
-silently overwrite theirs on Apply. It's still held at its current live value in every candidate this run
-scores (so the ranking formula evaluated during the search matches the real live formula), but it's never
-part of what a run proposes to write back — the Automated Weight Optimization page names it explicitly
-when this applies, and Apply never touches its weight at all. Change it on the Metrics page instead.
+searched and proposed exactly like any other deterministic metric — this run's own (store, locale) reads
+and writes it the same way a human editing it from the Metrics page in any one locale already does today,
+via `search-ranking`'s own `saveMetricWeight()`, which fans that write out to every real locale of the
+store. Excluding it would have been solving a problem that doesn't exist: the fan-out isn't a new risk the
+optimizer introduces, it's the existing, accepted semantics of `isLocaleScoped=false`. The Automated Weight
+Optimization page still discloses the blast radius before Apply — via
+`resolveEffectiveWeightLocales()`, the same call the Weight Checkpoints restore warning uses — so a human
+approving Apply always sees which sibling locales a store-wide metric's proposed weight will also land on.
 
 The actual black-box optimization — the algorithms, their generic `Parameter`/`ProblemInterface`
 vocabulary, and the objective-function contract — lives in a separate, Spryker-agnostic package,
@@ -538,11 +539,12 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
 - **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
   [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
   a store-wide-vs-per-locale fact this package respects end to end, not just reads: `getActiveMetrics()`/
-  `getMetricWeights()`/`findMetricDetail()` all surface it, `OptimizationRunner` excludes such a metric from
-  the search, and `resolveEffectiveWeightLocales()` — a thin passthrough to
-  `search-ranking`'s own method of the same name — lets this package ask which locales a given weight write
-  would actually touch before committing one, the same question the Weight Checkpoints restore warning
-  answers.
+  `getMetricWeights()`/`findMetricDetail()` all surface it, and `resolveEffectiveWeightLocales()` — a thin
+  passthrough to `search-ranking`'s own method of the same name — lets this package ask which locales a
+  given weight write would actually touch before committing one. Two independent callers use it for the
+  same purpose: the Weight Checkpoints restore warning, and the Automated Weight Optimization Apply
+  disclosure (see above) — both surface the real blast radius of a store-wide metric's write before a human
+  clicks the button, rather than treating `OptimizationRunner` as needing to exclude such a metric at all.
 
 ## Requirements
 

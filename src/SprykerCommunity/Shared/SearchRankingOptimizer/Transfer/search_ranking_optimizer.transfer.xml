@@ -189,9 +189,10 @@
          (isLocaleScoped=false) is the one whose weight search-ranking's own saveMetricWeight() fans out
          to every real locale of the store on write. Recorded here so a checkpoint restore can warn which
          other locales it's about to touch, not just this one (see WeightCheckpointRestorer). Left unset
-         (null) on the SearchRankingOptimizerRun::bestMetricWeights reuse of this same shape: a run never
-         proposes a value for a store-wide metric at all (see OptimizationRunner), so there's nothing to
-         flag there. -->
+         (null) on the SearchRankingOptimizerRun::bestMetricWeights reuse of this same shape: a run
+         proposes a value for a store-wide metric like any other, but the blast-radius disclosure there is
+         resolved on demand via resolveEffectiveWeightLocales() instead of carried on this field (see
+         AutomatedWeightOptimizationController). -->
     <transfer name="SearchRankingWeightCheckpointMetricWeight" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="name" type="string"/>

@@ -65,17 +65,31 @@ class AutomatedWeightOptimizationController extends AbstractController
         $currentConfigurationStoreName = $storeName !== '' ? $storeName : SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
         $currentConfigurationLocaleName = $localeName !== '' ? $localeName : SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
 
-        // A store-wide metric (isLocaleScoped=false) never appears in a run's own bestMetricWeights (see
-        // OptimizationRunner::buildBestMetricWeightTransfers()) -- it's never searched, so a run has
-        // nothing to propose for it. Surfaced here so the "Winning weight" table's silence about it reads
-        // as deliberate, not as a metric the optimizer forgot.
-        $storeWideMetricNames = array_values(array_map(
-            static fn (array $metric): string => $metric['name'],
-            array_filter(
-                $this->getFactory()->getSearchRankingFacade()->getActiveMetrics($currentConfigurationStoreName, $currentConfigurationLocaleName),
-                static fn (array $metric): bool => $metric['isLocaleScoped'] === false,
-            ),
-        ));
+        // A store-wide metric's winning weight applies to this run's own (store, locale) same as any
+        // other, but Apply writes it through search-ranking's own saveMetricWeight(), which fans that
+        // write out to every real locale of the store too. Resolved per metric (same
+        // resolveEffectiveWeightLocales() call CheckpointController already uses for its own Restore
+        // warning) so the Apply button below can disclose the real blast radius before it's clicked.
+        $applySiblingLocalesByMetric = [];
+
+        if ($latestOptimizerRunTransfer !== null) {
+            foreach ($latestOptimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
+                $siblingLocales = array_values(array_diff(
+                    $this->getFactory()->getSearchRankingFacade()->resolveEffectiveWeightLocales(
+                        $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
+                        $currentConfigurationStoreName,
+                        $currentConfigurationLocaleName,
+                    ),
+                    [$currentConfigurationLocaleName],
+                ));
+
+                if ($siblingLocales === []) {
+                    continue;
+                }
+
+                $applySiblingLocalesByMetric[$metricWeightTransfer->getNameOrFail()] = $siblingLocales;
+            }
+        }
 
         return $this->viewResponse([
             'optimizeRunForm' => $optimizeRunForm->createView(),
@@ -88,7 +102,7 @@ class AutomatedWeightOptimizationController extends AbstractController
             'currentSpecificityBlendWeight' => $this->getFactory()->getSearchRankingFacade()->getSpecificityBlendWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'inProgressOptimizerRun' => $this->getFacade()->findOptimizerRunInProgress(),
             'latestOptimizerRun' => $latestOptimizerRunTransfer,
-            'storeWideMetricNames' => $storeWideMetricNames,
+            'applySiblingLocalesByMetric' => $applySiblingLocalesByMetric,
             'applyForm' => $latestOptimizerRunTransfer !== null
                 ? $this->getFactory()->createOptimizationApplyForm($latestOptimizerRunTransfer->getIdSearchRankingOptimizerRunOrFail())->createView()
                 : null,

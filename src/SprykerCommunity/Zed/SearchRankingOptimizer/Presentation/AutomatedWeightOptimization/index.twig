@@ -103,22 +103,19 @@
                         <tbody>
                             {% for metricWeight in latestOptimizerRun.bestMetricWeights %}
                                 <tr>
-                                    <td>{{ metricWeight.name }}</td>
+                                    <td>
+                                        {{ metricWeight.name }}
+                                        {% if applySiblingLocalesByMetric[metricWeight.name] is defined %}
+                                            <div class="text-warning" style="font-size: 11px;">
+                                                Store-wide — also applies to {{ applySiblingLocalesByMetric[metricWeight.name] | join(', ') }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ metricWeight.weight }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-
-                    {% if storeWideMetricNames %}
-                        <p class="text-muted">
-                            Not searched or proposed above -- {{ storeWideMetricNames | join(', ') }}
-                            {{ storeWideMetricNames | length > 1 ? 'are' : 'is' }} store-wide (not per-locale),
-                            so this store+locale run doesn't own {{ storeWideMetricNames | length > 1 ? 'their' : 'its' }}
-                            weight alone. Change {{ storeWideMetricNames | length > 1 ? 'them' : 'it' }} on the
-                            Metrics page instead.
-                        </p>
-                    {% endif %}
 
                     {% if latestOptimizerRun.appliedAt %}
                         <p>Applied at {{ latestOptimizerRun.appliedAt }}.</p>
@@ -127,7 +124,11 @@
                            decide.</p>
                         {{ form_start(applyForm, { action: url('/search-ranking-optimizer/automated-weight-optimization-apply'), method: 'POST' }) }}
                         {{ form_widget(applyForm) }}
-                        <button type="submit" class="btn btn-primary">{{ 'Apply' | trans }}</button>
+                        <button type="submit" class="btn btn-primary"
+                            {% if applySiblingLocalesByMetric %}
+                                onclick="return confirm('Applying will also overwrite the store-wide weight of {% for metricName, siblingLocales in applySiblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %} for {{ storeName }} -- not just {{ localeName }}. Continue?');"
+                            {% endif %}
+                        >{{ 'Apply' | trans }}</button>
                         {{ form_end(applyForm) }}
                     {% endif %}
                 {% endif %}

@@ -247,13 +247,13 @@ class OptimizationRunnerTest extends Unit
         $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
     }
 
-    public function testRunNextExcludesAStoreWideMetricFromTheSearchAndFromTheAppliedResult(): void
+    public function testRunNextIncludesAStoreWideMetricInTheSearchAndInTheAppliedResult(): void
     {
         // Arrange -- "top_seller" is store-wide (isLocaleScoped=false): search-ranking's own
-        // saveMetricWeight() fans a write for it out to every real locale of the store, so this
-        // (store, locale) run must never search it AND must never propose a value to write back for it --
-        // unlike a non-deterministic metric (see the "random" test above), which IS still written back,
-        // just held at its unchanged value.
+        // saveMetricWeight() fans a write for it out to every real locale of the store on Apply, same as a
+        // human manually editing it from the Metrics page in any one locale already does today. That's not
+        // a reason to exclude it -- this (store, locale) run searches and proposes a value for it exactly
+        // like any other deterministic metric.
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
         $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
         $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
@@ -269,8 +269,9 @@ class OptimizationRunnerTest extends Unit
         ]);
         $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
-        // Never called for the store-wide metric -- excluded before the determinism check even runs.
-        $searchRankingFacadeMock->expects($this->once())->method('findMetricDetail')->willReturnMap([
+        // Now called for BOTH metrics -- a store-wide metric goes through the same determinism check.
+        $searchRankingFacadeMock->expects($this->exactly(2))->method('findMetricDetail')->willReturnMap([
+            [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
             [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
         ]);
 
@@ -294,13 +295,15 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
 
         // Assert
-        $namesReturned = array_map(
-            fn ($metricWeightTransfer) => $metricWeightTransfer->getName(),
-            $capturedBestMetricWeightTransfers,
-        );
+        $weightsByName = [];
 
-        $this->assertNotContains('top_seller', $namesReturned, 'A store-wide metric must never be part of what an Apply action writes back.');
-        $this->assertContains('pdp_impressions', $namesReturned);
+        foreach ($capturedBestMetricWeightTransfers as $metricWeightTransfer) {
+            $weightsByName[$metricWeightTransfer->getName()] = $metricWeightTransfer->getWeight();
+        }
+
+        $this->assertArrayHasKey('top_seller', $weightsByName, 'A store-wide metric must be part of what an Apply action writes back.');
+        $this->assertArrayHasKey('pdp_impressions', $weightsByName);
+        $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
     }
 
     public function testRunNextSeedsTheBaselineWithTheLiveSpecificitySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
