@@ -254,23 +254,31 @@
         <property name="isNotifyEnabled" type="bool"/>
     </transfer>
 
-    <!-- One metric processed by a single auto-tune run. wasThresholdMet=true means the live formula's fit
-         was already at or above autoTuneThreshold - nothing else on this transfer is meaningful (no refit
-         was computed, since none was needed). wasThresholdMet=false + wasSkippedNonDeterministic=true
-         means the fit dropped below threshold but the metric's own formula calls a non-deterministic
-         function (e.g. random()) - still checked and visible, but no refit was ever computed, since
-         fitting a "better" curve to noise would just overfit to whatever randomness happened to be in
-         that digest snapshot. wasThresholdMet=false + wasSkippedNonDeterministic=false means a refit WAS
-         computed (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether
-         it was actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be
-         persisted through search-ranking's own facade, or it was only proposed (logged/emailed, formula
-         left untouched). errorMessage is set instead of everything above when processing this ONE metric
-         raised an unexpected exception (e.g. search-ranking's facade/ES call failed) — AutoTuneRunner
-         catches per-metric so one broken metric can never abort the whole run; every other metric with a
+    <!-- One metric processed by a single auto-tune run, at one (storeName, localeName). For a store-wide
+         metric (search-ranking's own isLocaleScoped=false, the common case) there is exactly one of these
+         per (metric, store), always at that store's own default locale - a refit/apply fans out to every
+         real locale of the store on search-ranking's own side regardless. For a genuinely locale-scoped
+         metric (isLocaleScoped=true) there is one of these per (metric, store, REAL locale) instead - each
+         checked/refit/applied fully independently, since a save for one locale never touches another.
+
+         wasThresholdMet=true means the live formula's fit was already at or above autoTuneThreshold -
+         nothing else on this transfer is meaningful (no refit was computed, since none was needed).
+         wasThresholdMet=false + wasSkippedNonDeterministic=true means the fit dropped below threshold but
+         the metric's own formula calls a non-deterministic function (e.g. random()) - still checked and
+         visible, but no refit was ever computed, since fitting a "better" curve to noise would just
+         overfit to whatever randomness happened to be in that digest snapshot. wasThresholdMet=false +
+         wasSkippedNonDeterministic=false means a refit WAS computed (afterFormula/afterFitRSquared/
+         afterShape always set in that case, regardless of whether it was actually applied); wasApplied
+         reflects whether isAutoUpdateEnabled caused it to be persisted through search-ranking's own
+         facade, or it was only proposed (logged/emailed, formula left untouched). errorMessage is set
+         instead of everything above when processing this ONE (metric, locale) raised an unexpected
+         exception (e.g. search-ranking's facade/ES call failed) — AutoTuneRunner catches per-(metric,
+         locale) so one broken one can never abort the whole run; every other metric/locale with a
          threshold set still gets checked, and this entry surfaces the failure rather than swallowing it. -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="metricName" type="string"/>
         <property name="wasThresholdMet" type="bool"/>
         <property name="wasSkippedNonDeterministic" type="bool"/>

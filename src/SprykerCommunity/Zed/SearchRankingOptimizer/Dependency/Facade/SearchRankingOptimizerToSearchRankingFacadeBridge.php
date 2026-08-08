@@ -179,7 +179,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
                 'weight' => $metricTransfer->getWeightOrFail(),
-                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
             ];
         }
 
@@ -234,7 +234,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             $metrics[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
-                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
             ];
         }
 
@@ -288,7 +288,7 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             'formula' => $metricTransfer->getFormulaOrFail(),
             'isHigherBetter' => $metricTransfer->getIsHigherBetter() ?? true,
             'shape' => $metricTransfer->getShape(),
-            'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? true,
+            'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
         ];
     }
 

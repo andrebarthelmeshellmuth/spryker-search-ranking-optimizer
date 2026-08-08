@@ -72,19 +72,15 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             }
 
             foreach ($this->repository->findAutoTuneMetricConfigsWithThresholdSet($storeName) as $autoTuneMetricConfigTransfer) {
-                $metricResultTransfer = $this->processMetricSafely($autoTuneMetricConfigTransfer, $storeTransfer);
+                foreach ($this->processMetricSafely($autoTuneMetricConfigTransfer, $storeTransfer) as $metricResultTransfer) {
+                    $resultTransfer->addMetricResult($metricResultTransfer);
 
-                if ($metricResultTransfer === null) {
-                    continue;
+                    if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
+                        continue;
+                    }
+
+                    $metricResultsToNotify[] = $metricResultTransfer;
                 }
-
-                $resultTransfer->addMetricResult($metricResultTransfer);
-
-                if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
-                    continue;
-                }
-
-                $metricResultsToNotify[] = $metricResultTransfer;
             }
         }
 
@@ -94,76 +90,165 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
     }
 
     /**
-     * One metric's `evaluateCurrentMetricFit()`/`getFitCandidates()`/`saveMetricFormula()` calls all reach
-     * out to search-ranking's own facade (ultimately Elasticsearch/Propel) -- an unexpected failure there
-     * (e.g. ES temporarily unreachable) must never abort the whole run: every OTHER metric with a
-     * threshold set still deserves its check this month. Caught here, at the single call site, rather than
-     * inside {@see processMetric()} itself, so that method's own early-return control flow stays a plain
-     * "safe, silent skip vs. real result" shape, uncomplicated by exception handling.
+     * One metric's `evaluateCurrentMetricFitAcrossLocales()`/`getFitCandidates()`/`saveMetricFormula()`
+     * calls all reach out to search-ranking's own facade (ultimately Elasticsearch/Propel) -- an
+     * unexpected failure there (e.g. ES temporarily unreachable) must never abort the whole run: every
+     * OTHER metric with a threshold set still deserves its check this month. Caught here, at the single
+     * call site, rather than inside {@see processMetric()} itself, so that method's own control flow stays
+     * a plain "safe, silent skip vs. real results" shape, uncomplicated by exception handling. The error
+     * result is anchored to the store's own default locale — a failure this early (e.g. the very first
+     * facade call) means isLocaleScoped isn't known yet, so there is no real per-locale fan-out to report
+     * against; a single error entry is enough to surface the failure without inventing scope it doesn't
+     * have.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer>
      */
     protected function processMetricSafely(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
         StoreTransfer $storeTransfer,
-    ): ?SearchRankingAutoTuneMetricResultTransfer {
+    ): array {
         try {
             return $this->processMetric($autoTuneMetricConfigTransfer, $storeTransfer);
         } catch (Throwable $throwable) {
-            return (new SearchRankingAutoTuneMetricResultTransfer())
-                ->setIdSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail())
-                ->setStoreName($storeTransfer->getNameOrFail())
-                ->setMetricName(sprintf('metric #%d', $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()))
-                ->setErrorMessage($throwable->getMessage());
+            return [
+                (new SearchRankingAutoTuneMetricResultTransfer())
+                    ->setIdSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail())
+                    ->setStoreName($storeTransfer->getNameOrFail())
+                    ->setLocaleName($storeTransfer->getDefaultLocaleIsoCodeOrFail())
+                    ->setMetricName(sprintf('metric #%d', $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()))
+                    ->setErrorMessage($throwable->getMessage()),
+            ];
         }
     }
 
     /**
-     * Returns null when the metric has been deleted since its config was set, or has no digest yet —
-     * both safe, silent skips, never an error.
+     * Returns an empty array when the metric has been deleted since its config was set, or has no digest
+     * anywhere yet — both safe, silent skips, never an error.
      *
-     * The store to check is $storeTransfer, resolved by the caller from every real configured store.
-     * `search-ranking` now supports a genuinely per-locale formula (`isLocaleScoped=true`, rare), but this
-     * runner still only ever checks/refits ONE locale per store — its own configured default
-     * ({@see \Generated\Shared\Transfer\StoreTransfer::getDefaultLocaleIsoCodeOrFail()}) — never any other
-     * real locale, even for a metric that is genuinely locale-scoped on the other side. A known, tracked
-     * gap (see this package's own README), not yet closed here.
+     * For a store-wide metric (`isLocaleScoped=false`, the common case), returns exactly ONE result, at
+     * the store's own default locale — a refit/apply for it fans out to every real locale of the store on
+     * search-ranking's own side regardless of which one locale was checked here, so checking every locale
+     * independently would be redundant work, AND actively wrong: an independent refit per locale would
+     * refit against each locale's own digest and re-fan-out on every iteration, leaving whichever locale
+     * was processed LAST to silently overwrite every earlier one — an order-dependent, non-deterministic
+     * final formula, not a real improvement.
+     *
+     * For a genuinely locale-scoped metric (`isLocaleScoped=true`, rare), returns one result per REAL
+     * locale of the store that has a digest — each checked/refit/applied fully independently, since a save
+     * for one locale never touches another on search-ranking's own side any more. A locale with no digest
+     * yet is skipped for that locale only (same "safe absence" contract as the store-wide case), not
+     * treated as a reason to skip the whole metric.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer>
      */
     protected function processMetric(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
         StoreTransfer $storeTransfer,
-    ): ?SearchRankingAutoTuneMetricResultTransfer {
+    ): array {
         $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
         $storeName = $storeTransfer->getNameOrFail();
-        $localeName = $storeTransfer->getDefaultLocaleIsoCodeOrFail();
+        $defaultLocaleName = $storeTransfer->getDefaultLocaleIsoCodeOrFail();
 
-        $metric = $this->searchRankingFacade->findMetricDetail($idSearchRankingMetric, $storeName, $localeName);
+        $metric = $this->searchRankingFacade->findMetricDetail($idSearchRankingMetric, $storeName, $defaultLocaleName);
 
         if ($metric === null) {
-            return null;
+            return [];
         }
 
-        $currentFitRSquared = $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric, $storeName, $localeName);
-
-        if ($currentFitRSquared === null) {
-            return null;
-        }
-
-        // Informational only -- this runner still only checks/refits the store's default locale (see this
-        // method's own docblock), so nothing here or downstream acts on a per-locale gap yet, even though
-        // search-ranking's own formula CAN genuinely differ per locale now. Surfaces the diagnostic in the
-        // summary email/result so a curator can
-        // see whether the store-wide formula is quietly a worse fit for some locale than for the one
-        // (the store's own default) refit/apply decisions are actually based on.
+        // The single source of "current fit" from here on, for BOTH branches below — evaluated once per
+        // real locale of the store, never recomputed per locale a second time. For the store-wide branch
+        // this map is also exactly the divergence diagnostic {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerAutoTuneConsole::reportLocaleDivergence()}
+        // surfaces — the evidence for whether this metric should become locale-scoped in the first place.
         $fitRSquaredByLocale = $this->searchRankingFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
+
+        if (!$metric['isLocaleScoped']) {
+            $currentFitRSquared = $fitRSquaredByLocale[$defaultLocaleName] ?? null;
+
+            if ($currentFitRSquared === null) {
+                return [];
+            }
+
+            return [
+                $this->processMetricAtScope(
+                    $autoTuneMetricConfigTransfer,
+                    $metric,
+                    $storeName,
+                    $defaultLocaleName,
+                    $currentFitRSquared,
+                    $fitRSquaredByLocale,
+                ),
+            ];
+        }
+
+        $metricResultTransfers = [];
+
+        foreach ($fitRSquaredByLocale as $localeName => $currentFitRSquared) {
+            if ($currentFitRSquared === null) {
+                continue;
+            }
+
+            // Re-fetched per locale (not reused from the default-locale $metric above) -- for a genuinely
+            // locale-scoped metric, formula/shape are each locale's own independent value, not the default
+            // locale's fanned-out one.
+            $localeMetric = $localeName === $defaultLocaleName
+                ? $metric
+                : $this->searchRankingFacade->findMetricDetail($idSearchRankingMetric, $storeName, $localeName);
+
+            if ($localeMetric === null) {
+                continue;
+            }
+
+            // fitRSquaredByLocale is deliberately NOT attached per row here (unlike the store-wide branch
+            // above) -- every real locale already gets its own full result row, so repeating the same
+            // cross-locale map on each one would be redundant, and reportLocaleDivergence()'s own
+            // "count < 2" guard already skips a divergence warning wherever this is left unset (empty).
+            $metricResultTransfers[] = $this->processMetricAtScope(
+                $autoTuneMetricConfigTransfer,
+                $localeMetric,
+                $storeName,
+                $localeName,
+                $currentFitRSquared,
+                [],
+            );
+        }
+
+        return $metricResultTransfers;
+    }
+
+    // phpcs:disable Spryker.Commenting.DocBlockParamAllowDefaultValue.Typehint -- misreads this shaped array docblock as a default-value typehint check
+
+    /**
+     * The threshold-check / determinism-check / refit body shared by every (metric, store, locale) this
+     * runner ever produces a result for — extracted so {@see processMetric()}'s own store-wide-vs-fan-out
+     * branching stays free of this method's own unrelated complexity.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool} $metric
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $currentFitRSquared
+     * @param array<string, float|null> $fitRSquaredByLocale
+     */
+    protected function processMetricAtScope(
+        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        array $metric,
+        string $storeName,
+        string $localeName,
+        float $currentFitRSquared,
+        array $fitRSquaredByLocale,
+    ): SearchRankingAutoTuneMetricResultTransfer {
+        $idSearchRankingMetric = $metric['idSearchRankingMetric'];
 
         $metricResultTransfer = (new SearchRankingAutoTuneMetricResultTransfer())
             ->setIdSearchRankingMetric($idSearchRankingMetric)
             ->setStoreName($storeName)
+            ->setLocaleName($localeName)
             ->setMetricName($metric['name'])
             ->setBeforeFormula($metric['formula'])
             ->setBeforeFitRSquared($currentFitRSquared)
@@ -190,11 +275,13 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         return $this->refit($metricResultTransfer, $metric, $autoTuneMetricConfigTransfer, $storeName, $localeName);
     }
 
+    // phpcs:enable Spryker.Commenting.DocBlockParamAllowDefaultValue.Typehint
+
     // phpcs:disable Spryker.Commenting.DocBlockParamAllowDefaultValue.Typehint -- misreads this shaped array docblock as a default-value typehint check
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer
-     * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null} $metric
+     * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool} $metric
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param string $storeName
      * @param string $localeName

@@ -334,33 +334,33 @@ package's own README). Auto-tune is the monthly job that watches that axis and, 
 applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
 specificity knobs, so it has no reason to write a weight checkpoint of its own.
 
-**Auto-tune runs independently for every real configured store, but only ever against ONE locale per
-store — that store's own default.** Auto-Tune's own settings table
-(`spy_search_ranking_auto_tune_metric_config`) is scoped per (metric, store), not per metric alone, and
-the monthly job enumerates every store the Store facade reports and checks each one's own thresholds
-against that store's own default-locale fit — a store that has never had `search-ranking` configured for
-it is skipped entirely, never evaluated against empty/default state.
+**Auto-tune runs independently for every real configured store, and — for a genuinely locale-scoped
+metric — independently for every real locale of that store too.** `search-ranking` itself supports a
+metric whose formula genuinely differs per locale for a metric explicitly flagged `isLocaleScoped=true`
+(rare — most metrics stay store-wide; see that package's own README and `SCOPING.md`). For a store-wide
+metric (the common case), this job checks/refits only the store's own default locale — a refit/apply for
+it fans out to every real locale of the store on `search-ranking`'s own side regardless of which one
+locale triggered it, so checking every locale independently would be redundant AND actively wrong: an
+independent refit per locale would refit against each locale's own digest and re-fan-out on every
+iteration, leaving whichever locale was processed last to silently overwrite every earlier one. For a
+genuinely locale-scoped metric, this job instead checks/refits/applies EVERY real locale of the store
+fully independently, since a save for one locale never touches another there. Auto-Tune's own settings
+table (`spy_search_ranking_auto_tune_metric_config`) stays scoped per (metric, store), not per (metric,
+store, locale) — the same threshold/auto-update/notify settings apply to every locale of a locale-scoped
+metric within a store. A store that has never had `search-ranking` configured for it is skipped entirely,
+never evaluated against empty/default state.
 
-**Known limitation:** `search-ranking` itself now supports a genuinely per-locale formula for a metric
-explicitly flagged `isLocaleScoped=true` (rare — most metrics stay store-wide; see that package's own
-README and `SCOPING.md`). Auto-Tune here does **not** yet extend to that case: it still only ever
-checks/refits a store's default locale, even for a metric that is locale-scoped on the other side — any
-non-default locale of a locale-scoped metric is neither checked nor refit by this job today. What Auto-Tune
-DOES do is surface the evidence for *whether* a metric should become locale-scoped in the first place: each
-line's before/after fit is followed, when the spread across a metric's real locales exceeds
+For a store-wide metric, this job also surfaces the evidence for *whether* it should become locale-scoped
+in the first place: its one result line is followed, when the spread across its real locales exceeds
 `SearchRankingOptimizerConfig::getLocaleFitDivergenceWarningThreshold()` (0.1 by default), by a warning
-line showing every real locale's own current fit:
+line showing every real locale's own current fit (purely informational — nothing acts on it
+automatically; a genuinely locale-scoped metric never gets this warning, since it already gets its own
+full result line per locale instead):
 
 ```
-[DE] top_seller: fit still adequate (R² = 0.9883), no change.
-[DE] top_seller:   ⚠ fit varies by locale (spread 0.3861): de_DE=0.9883, en_US=0.6022 — this store-wide formula may not fit every locale equally well.
+[DE/de_DE] top_seller: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] top_seller:   ⚠ fit varies by locale (spread 0.3861): de_DE=0.9883, en_US=0.6022 — this store-wide formula may not fit every locale equally well.
 ```
-
-That divergence is purely informational — nothing here or downstream acts on it automatically. It exists so
-a curator can decide, from real evidence, whether to flip a metric's `isLocaleScoped` flag on
-`search-ranking`'s own Metrics page and then author a genuinely different formula per locale by hand;
-extending Auto-Tune itself to check/refit every real locale of a locale-scoped metric is a real gap, not
-yet closed.
 
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
@@ -387,14 +387,15 @@ Running `vendor/bin/console search-ranking-optimizer:auto-tune` (intended for th
 [Installation](#installation)):
 
 ```
-[DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
-[DE] random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
-[AT] pdp_impressions: fit dropped to R² = 0.6021 (below threshold) — proposed atan(x / 4.1) (R² = 0.9412).
+[DE/de_DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+[AT/de_DE] pdp_impressions: fit dropped to R² = 0.6021 (below threshold) — proposed atan(x / 4.1) (R² = 0.9412).
 Notified 0 admin(s) by email.
 ```
 
-Each line is prefixed with the store it applies to — a multi-store run checks the same metric name once
-per store, so the prefix is what tells two "pdp_impressions" lines apart.
+Each line is prefixed with the store and locale it applies to — a multi-store run checks the same metric
+name once per store (each at its own default locale, unless it's genuinely locale-scoped — see below), so
+the prefix is what tells two "pdp_impressions" lines apart.
 
 A metric whose formula calls a non-deterministic function (`random()` is the one that ships in
 `search-ranking`'s own formula DSL today — see
@@ -412,16 +413,17 @@ The failed metric shows up instead with its error, both in the console output an
 in the summary email, rather than silently vanishing or taking every other metric's check down with it:
 
 ```
-[DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
-[DE] top_seller: FAILED to check — Elasticsearch unreachable.
+[DE/de_DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] top_seller: FAILED to check — Elasticsearch unreachable.
 Notified 1 admin(s) by email.
 ```
 
 Exactly **one** combined before/after summary email is sent per run — never one per metric, and never
-one per store — covering every metric (across every store) that crossed its threshold with notify on,
-to every admin holding an ACL role named `search-score-admin` (every member of every ACL group holding
-that role; see [Requirements](#requirements)). The summary email's table has its own Store column for
-the same reason the console output has its `[DE]`/`[AT]` prefix.
+one per store — covering every metric (across every store, and across every real locale for a
+locale-scoped one) that crossed its threshold with notify on, to every admin holding an ACL role named
+`search-score-admin` (every member of every ACL group holding that role; see [Requirements](#requirements)).
+The summary email's table has its own Store and Locale columns for the same reason the console output has
+its `[DE/de_DE]`/`[AT/de_DE]` prefix.
 A run that needs to notify but finds no admin holding that role yet simply sends to nobody
 (`notifiedEmailCount = 0`), logged rather than treated as an error — the same posture the weight-checkpoint
 restore path takes toward a metric deleted since a checkpoint was taken.
@@ -555,11 +557,9 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   (`SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()`/`findMetricDetail()`/
   `saveMetricFormula()`) all require explicit `$storeName`/`$localeName` accordingly. Automated weight
   optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
-  scope; Auto-tune (genuinely per-store — see above) passes the real store it's currently checking, and
-  that store's own configured default locale (`StoreTransfer::getDefaultLocaleIsoCodeOrFail()`) — Auto-Tune
-  itself still only ever checks/refits that ONE locale per store, even for a metric explicitly flagged
-  `isLocaleScoped=true` on `search-ranking`'s side; see
-  [Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric)'s own "Known limitation" note.
+  scope; Auto-tune (genuinely per-store, AND per-locale for a genuinely locale-scoped metric — see above)
+  passes each real locale it's actually checking, derived from `evaluateCurrentMetricFitAcrossLocales()`'s
+  own return map rather than re-deriving locales any other way.
 - **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
   [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
   a store-wide-vs-per-locale fact this package respects end to end for weight, not just reads:

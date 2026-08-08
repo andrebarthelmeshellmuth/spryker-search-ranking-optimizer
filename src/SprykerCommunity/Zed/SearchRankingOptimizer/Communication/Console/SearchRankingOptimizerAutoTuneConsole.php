@@ -57,10 +57,18 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
         }
 
         foreach ($autoTuneResultTransfer->getMetricResults() as $metricResultTransfer) {
-            // Prefixed with the store, not just the metric name: a multi-store run checks the SAME
-            // metric name once per store, so "top_seller: ..." alone would be ambiguous about which
-            // store's result a given line describes.
-            $label = sprintf('[%s] %s', $metricResultTransfer->getStoreNameOrFail(), $metricResultTransfer->getMetricNameOrFail());
+            // Prefixed with store/locale, not just the metric name: a multi-store run checks the SAME
+            // metric name once per store, and a genuinely locale-scoped metric (search-ranking's own
+            // isLocaleScoped=true) gets checked once per real locale of that store too — "top_seller: ..."
+            // alone would be ambiguous about which result a given line describes. Always includes the
+            // locale now, even for a store-wide metric (checked at just its store's own default locale),
+            // for a consistent label shape across every line.
+            $label = sprintf(
+                '[%s/%s] %s',
+                $metricResultTransfer->getStoreNameOrFail(),
+                $metricResultTransfer->getLocaleNameOrFail(),
+                $metricResultTransfer->getMetricNameOrFail(),
+            );
 
             if ($metricResultTransfer->getErrorMessage() !== null) {
                 $output->writeln(sprintf(
@@ -111,11 +119,15 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
     }
 
     /**
-     * Purely informational: this run only ever checks/refits the store's default locale (see
-     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}'s own
-     * docblock), so nothing here acts differently per locale yet -- this only tells a curator when a
-     * store-wide formula quietly fits one locale meaningfully worse than another, which the single
-     * before/after R² lines above can't show (they only ever reflect the store's own default locale).
+     * Purely informational, and only ever prints for a store-wide metric (search-ranking's own
+     * `isLocaleScoped=false`): {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}
+     * only populates `fitRSquaredByLocale` on that kind of result row (a genuinely locale-scoped metric
+     * gets its own full result row per real locale instead, so a divergence warning on top of those would
+     * be redundant noise, not a new finding) -- this `count($fitByLocale) < 2` guard is what makes an
+     * unpopulated map for a locale-scoped row a silent no-op, without this method needing to ask
+     * `isLocaleScoped` itself. Tells a curator when a store-wide formula quietly fits one locale
+     * meaningfully worse than another — the evidence for whether that metric should become locale-scoped
+     * in the first place — which the single before/after R² line above can't show on its own.
      *
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param string $label

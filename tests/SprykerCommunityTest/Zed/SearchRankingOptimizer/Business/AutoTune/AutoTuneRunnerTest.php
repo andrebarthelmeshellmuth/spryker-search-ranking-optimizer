@@ -46,7 +46,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->with(7)->willReturn(null);
-        $searchRankingFacadeMock->expects($this->never())->method('evaluateCurrentMetricFit');
+        $searchRankingFacadeMock->expects($this->never())->method('evaluateCurrentMetricFitAcrossLocales');
 
         $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock);
 
@@ -58,7 +58,7 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
-    public function testSkipsAMetricWithNoDigestYet(): void
+    public function testSkipsAMetricWithNoDigestYetAtTheDefaultLocale(): void
     {
         // Arrange
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
@@ -68,7 +68,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->with(7)->willReturn(null);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->with(7, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME)->willReturn(['de_DE' => null]);
 
         $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock);
 
@@ -89,7 +89,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.9);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.9]);
         $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(7);
         $searchRankingFacadeMock->expects($this->never())->method('getFitCandidates');
         $searchRankingFacadeMock->expects($this->never())->method('saveMetricFormula');
@@ -103,17 +103,19 @@ class AutoTuneRunnerTest extends Unit
         // isNotifyEnabled is on.
         $metricResults = $result->getMetricResults();
         $this->assertCount(1, $metricResults);
+        $this->assertSame('de_DE', $metricResults[0]->getLocaleName());
         $this->assertTrue($metricResults[0]->getWasThresholdMet());
         $this->assertFalse($metricResults[0]->getWasApplied());
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
     /**
-     * fitRSquaredByLocale is purely informational (formula stays store-only, refit/threshold logic is
-     * unaffected) -- this proves the result transfer actually carries what
-     * evaluateCurrentMetricFitAcrossLocales() returns, not just that the run still completes.
+     * For a store-wide metric, evaluateCurrentMetricFitAcrossLocales() is the SINGLE source of
+     * beforeFitRSquared too (the store's own default locale's entry in that same map) — this proves the
+     * result transfer's beforeFitRSquared and fitRSquaredByLocale both genuinely come from that one call,
+     * not from a separate now-removed evaluateCurrentMetricFit() call.
      */
-    public function testPopulatesFitRSquaredByLocaleFromTheAcrossLocalesCall(): void
+    public function testPopulatesFitRSquaredByLocaleAndSourcesBeforeFitFromTheSameAcrossLocalesCall(): void
     {
         // Arrange
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
@@ -123,7 +125,6 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.9);
         $searchRankingFacadeMock->expects($this->once())
             ->method('evaluateCurrentMetricFitAcrossLocales')
             ->with(7, 'DE')
@@ -137,6 +138,7 @@ class AutoTuneRunnerTest extends Unit
         // Assert
         $metricResults = $result->getMetricResults();
         $this->assertSame(['de_DE' => 0.91, 'en_US' => 0.62], $metricResults[0]->getFitRSquaredByLocale());
+        $this->assertSame(0.91, $metricResults[0]->getBeforeFitRSquared());
     }
 
     public function testRecordsACheckOnlyRowAndNeverRefitsWhenTheFormulaIsNonDeterministic(): void
@@ -158,8 +160,9 @@ class AutoTuneRunnerTest extends Unit
             'formula' => 'random()',
             'isHigherBetter' => true,
             'shape' => null,
+            'isLocaleScoped' => false,
         ]);
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(-1.08);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => -1.08]);
         $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(7);
         $searchRankingFacadeMock->expects($this->never())->method('getFitCandidates');
         $searchRankingFacadeMock->expects($this->never())->method('saveMetricFormula');
@@ -187,7 +190,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, 'atan'));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'atan', 'formula' => 'atan(x / 5)', 'rSquared' => 0.7, 'isWinner' => false],
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
@@ -217,7 +220,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, 'atan'));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
         ]);
@@ -250,7 +253,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, 'atan'));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'atan', 'formula' => 'atan(x / 9)', 'rSquared' => 0.7, 'isWinner' => false],
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
@@ -279,7 +282,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, null));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'atan', 'formula' => 'atan(x / 9)', 'rSquared' => 0.7, 'isWinner' => false],
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
@@ -304,7 +307,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
         ]);
@@ -334,7 +337,7 @@ class AutoTuneRunnerTest extends Unit
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.5);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.5]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturn([
             ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
         ]);
@@ -356,8 +359,8 @@ class AutoTuneRunnerTest extends Unit
 
     public function testAnExceptionWhileProcessingOneMetricDoesNotAbortTheOthers(): void
     {
-        // Arrange -- metric 7 blows up (e.g. a transient ES failure inside evaluateCurrentMetricFit()),
-        // metric 8 must still be checked normally in the same run.
+        // Arrange -- metric 7 blows up (e.g. a transient ES failure inside
+        // evaluateCurrentMetricFitAcrossLocales()), metric 8 must still be checked normally in the same run.
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
         $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
             $this->createConfigTransfer(7, 0.8),
@@ -369,13 +372,13 @@ class AutoTuneRunnerTest extends Unit
             [7, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(7)],
             [8, SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME, SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(8)],
         ]);
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturnCallback(
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturnCallback(
             function (int $idSearchRankingMetric) {
                 if ($idSearchRankingMetric === 7) {
                     throw new RuntimeException('Elasticsearch unreachable.');
                 }
 
-                return 0.9;
+                return ['de_DE' => 0.9];
             },
         );
         $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(8);
@@ -391,6 +394,7 @@ class AutoTuneRunnerTest extends Unit
 
         $this->assertSame(7, $metricResults[0]->getIdSearchRankingMetric());
         $this->assertSame('Elasticsearch unreachable.', $metricResults[0]->getErrorMessage());
+        $this->assertSame('de_DE', $metricResults[0]->getLocaleName());
 
         $this->assertSame(8, $metricResults[1]->getIdSearchRankingMetric());
         $this->assertNull($metricResults[1]->getErrorMessage());
@@ -443,14 +447,19 @@ class AutoTuneRunnerTest extends Unit
             [7, 'DE', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(7)],
             [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, $this->createMetricDetail(7)],
         ]);
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturnMap([
-            [7, 'DE', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, 0.9],
-            [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, 0.5],
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturnMap([
+            [7, 'DE', ['de_DE' => 0.9]],
+            [7, 'AT', ['de_DE' => 0.5]],
         ]);
         $searchRankingFacadeMock->method('getFitCandidates')->willReturnMap([
-            [7, 'AT', SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME, [
-                ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
-            ]],
+            [
+                7,
+                'AT',
+                SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
+                [
+                    ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.9, 'isWinner' => true],
+                ],
+            ],
         ]);
 
         $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, storeFacade: $this->createStoreFacadeMock(['DE', 'AT']));
@@ -489,7 +498,7 @@ class AutoTuneRunnerTest extends Unit
             ['AT', false],
         ]);
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
-        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.9);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn(['de_DE' => 0.9]);
 
         $runner = $this->createRunner(
             $repositoryMock,
@@ -505,6 +514,89 @@ class AutoTuneRunnerTest extends Unit
         $metricResults = $result->getMetricResults();
         $this->assertCount(1, $metricResults);
         $this->assertSame('DE', $metricResults[0]->getStoreName());
+    }
+
+    /**
+     * The core new behavior: a genuinely locale-scoped metric (`isLocaleScoped=true`) gets one fully
+     * independent result per real locale of the store, each with its own formula/fit/refit outcome — not
+     * one result for the whole store. de_DE's fit is already adequate (no refit); en_US's has dropped and
+     * gets refit and applied — proving the two locales are processed completely independently, not sharing
+     * a single check the way a store-wide metric would.
+     */
+    public function testFansOutOverEveryRealLocaleWhenTheMetricIsLocaleScoped(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8, true, false),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
+            [7, 'DE', 'de_DE', $this->createMetricDetail(7, 'atan', true)],
+            [7, 'DE', 'en_US', $this->createMetricDetail(7, 'atan', true)],
+        ]);
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->with(7, 'DE')->willReturn([
+            'de_DE' => 0.9,
+            'en_US' => 0.4,
+        ]);
+        $searchRankingFacadeMock->method('getFitCandidates')->with(7, 'DE', 'en_US')->willReturn([
+            ['shape' => 'hyperbolic', 'formula' => 'x / (x + 3)', 'rSquared' => 0.92, 'isWinner' => true],
+        ]);
+        $searchRankingFacadeMock->expects($this->once())
+            ->method('saveMetricFormula')
+            ->with(7, 'x / (x + 3)', 'DE', 'en_US')
+            ->willReturn(true);
+        $searchRankingFacadeMock->expects($this->once())->method('recordMetricCheckOnly')->with(7, 'DE', 'de_DE');
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, storeFacade: $this->createStoreFacadeMock(['DE']));
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(2, $metricResults);
+
+        $this->assertSame('de_DE', $metricResults[0]->getLocaleName());
+        $this->assertTrue($metricResults[0]->getWasThresholdMet());
+        $this->assertFalse($metricResults[0]->getWasApplied());
+
+        $this->assertSame('en_US', $metricResults[1]->getLocaleName());
+        $this->assertFalse($metricResults[1]->getWasThresholdMet());
+        $this->assertTrue($metricResults[1]->getWasApplied());
+        $this->assertSame('x / (x + 3)', $metricResults[1]->getAfterFormula());
+    }
+
+    /**
+     * A locale with no digest yet (e.g. a market added after this metric became locale-scoped) is skipped
+     * for that locale only — same "safe absence" contract the store-wide path already has — without that
+     * missing digest dropping the metric's OTHER, real locale.
+     */
+    public function testSkipsOnlyTheLocaleWithNoDigestYetForALocaleScopedMetric(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, 'atan', true));
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn([
+            'de_DE' => 0.9,
+            'en_US' => null,
+        ]);
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, storeFacade: $this->createStoreFacadeMock(['DE']));
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(1, $metricResults);
+        $this->assertSame('de_DE', $metricResults[0]->getLocaleName());
     }
 
     /**
@@ -581,10 +673,11 @@ class AutoTuneRunnerTest extends Unit
     /**
      * @param int $idSearchRankingMetric
      * @param string|null $shape
+     * @param bool $isLocaleScoped
      *
-     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}
      */
-    protected function createMetricDetail(int $idSearchRankingMetric, ?string $shape = 'hyperbolic'): array
+    protected function createMetricDetail(int $idSearchRankingMetric, ?string $shape = 'hyperbolic', bool $isLocaleScoped = false): array
     {
         return [
             'idSearchRankingMetric' => $idSearchRankingMetric,
@@ -592,6 +685,7 @@ class AutoTuneRunnerTest extends Unit
             'formula' => 'x / (x + 6.42)',
             'isHigherBetter' => true,
             'shape' => $shape,
+            'isLocaleScoped' => $isLocaleScoped,
         ];
     }
 }

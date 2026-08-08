@@ -167,9 +167,9 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
      * Deliberately returns a plain array, not `search-ranking`'s own
      * `SearchRankingMetricTransfer`/`SearchRankingMetricCollectionTransfer` — same discipline as
      * {@see getMetricWeights()}, keeps this interface free of any compile-time reference to a class that
-     * only exists when `search-ranking` is actually installed. `isActive` IS store-scoped on
-     * `search-ranking`'s own side (its store-scoped-formula migration, see that package's own project
-     * memory) — pass the real scope you mean to check, `name` is the only field here that's still global.
+     * only exists when `search-ranking` is actually installed. `isActive` is (store,locale)-scoped on
+     * `search-ranking`'s own side — pass the real scope you mean to check, `name` is the only field here
+     * that's still global.
      *
      * @param string $storeName
      * @param string $localeName
@@ -213,9 +213,11 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
     /**
      * Deliberately returns a plain array, not `search-ranking`'s own `SearchRankingMetricTransfer` — same
      * discipline as {@see getMetricWeights()}. Returns null when the metric no longer exists.
-     * formula/isActive/shape ARE store-scoped on `search-ranking`'s own side (its store-scoped-formula
-     * migration) — this returns the values for the given $storeName specifically, not a global fact.
-     * name/isHigherBetter are the only fields here still genuinely global.
+     * formula/isActive/shape are (store,locale)-scoped on `search-ranking`'s own side — this returns the
+     * values for the given ($storeName, $localeName) specifically, not a global fact; `isLocaleScoped`
+     * tells you whether that value is genuinely independent per locale or fanned out identically across
+     * every real locale of the store (see `search-ranking`'s own `SCOPING.md`). name/isHigherBetter are
+     * the only fields here still genuinely global.
      *
      * @param int $idSearchRankingMetric
      * @param string $storeName

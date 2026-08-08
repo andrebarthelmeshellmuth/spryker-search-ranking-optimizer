@@ -6,6 +6,7 @@
     <thead>
         <tr>
             <th>Store</th>
+            <th>Locale</th>
             <th>Metric</th>
             <th>Before</th>
             <th>After{{ mail.autoTuneAnyApplied ? ' (applied)' : ' (proposed only)' }}</th>
@@ -15,6 +16,7 @@
         {% for metricResult in mail.autoTuneMetricResults %}
             <tr>
                 <td>{{ metricResult.storeName }}</td>
+                <td>{{ metricResult.localeName }}</td>
                 <td>{{ metricResult.metricName }}</td>
                 {% if metricResult.errorMessage %}
                     <td colspan="2">FAILED to check — {{ metricResult.errorMessage }}</td>
