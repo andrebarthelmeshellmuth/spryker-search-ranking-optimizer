@@ -138,7 +138,9 @@ interface SearchRankingOptimizerEntityManagerInterface
     public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Upserts by `(idSearchRankingMetric, storeName)` — at most one config row per metric+store.
+     * Upserts by `(idSearchRankingMetric, storeName, localeName)` — at most one config row per
+     * metric+store+locale. Writes exactly the one row named on the transfer; fanning out to every real
+     * locale of a store-wide metric is the caller's job (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface}).
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */

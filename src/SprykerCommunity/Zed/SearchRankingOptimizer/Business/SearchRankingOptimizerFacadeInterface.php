@@ -62,21 +62,28 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Returns the most recently finished (status=calculated) calibration run, or null when none has
-     *   ever finished.
+     * - Returns the most recently finished (status=calculated) calibration run for this (store, locale),
+     *   or null when none has ever finished there.
      *
      * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer;
+    public function findLatestCalculatedCalibration(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * Specification:
-     * - Returns the run currently in status=calculating, if any — at most one at a time by design. Backs
-     *   the Calibration page's live progress counter.
+     * - Returns the run for this (store, locale) currently in status=calculating, if any — at most one
+     *   SYSTEM-WIDE at a time by design, but that one run may be for a different scope than the one asked
+     *   about here. Backs the Calibration page's live progress counter.
      *
      * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer;
+    public function findCalibrationInProgress(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * Specification:
@@ -248,23 +255,31 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Returns null when the metric has no auto-tune config yet FOR THIS STORE (has never had a
-     *   threshold set here) — a safe, expected state for most metric+store combinations, not an error.
-     *   Auto-tune config is store-scoped, not locale-scoped — matches `search-ranking`'s own formula/shape
-     *   store-scoping.
+     * - Returns null when the metric has no auto-tune config yet FOR THIS (store, locale) — a safe,
+     *   expected state for most metric+store+locale combinations, not an error. Auto-tune config is
+     *   store+locale scoped, matching `search-ranking`'s own formula/shape scoping: for an
+     *   `isLocaleScoped=false` metric (the common case) {@see saveAutoTuneMetricConfig()} fans one save out
+     *   to every real locale of the store, so any locale's row reflects the same config; for an
+     *   `isLocaleScoped=true` metric each locale is independent and may simply have no row yet.
      *
      * @api
      *
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     * @param string $localeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer;
+    public function findAutoTuneMetricConfigByMetricId(
+        int $idSearchRankingMetric,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingAutoTuneMetricConfigTransfer;
 
     /**
      * Specification:
-     * - Only configs with a real threshold set for THIS store — a metric with no config row for this
-     *   store, or an explicit NULL threshold, has opted out of auto-tune entirely (for this store) and is
-     *   simply absent here.
+     * - Only configs with a real threshold set for THIS store — a metric with no config row for a given
+     *   (store, locale), or an explicit NULL threshold, has opted out of auto-tune entirely for that scope
+     *   and is simply absent here. Store-scoped only, not locale-filtered — can return several rows for
+     *   the same metric, one per locale it's been independently configured at.
      *
      * @api
      *
@@ -276,7 +291,12 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Upserts by `idSearchRankingMetric` — at most one config row per metric.
+     * - Upserts by `(idSearchRankingMetric, storeName, localeName)` — at most one config row per
+     *   metric+store+locale, but a single call here can write MORE than one row: for an
+     *   `isLocaleScoped=false` metric (the common case), the given config is fanned out to every real
+     *   locale of the store (same fan-out `search-ranking` itself already applies to formula/isActive/shape/
+     *   weight); for an `isLocaleScoped=true` metric, only the one named (store, locale) is written. The
+     *   returned transfer is always the one for the caller's own requested (store, locale).
      *
      * @api
      *

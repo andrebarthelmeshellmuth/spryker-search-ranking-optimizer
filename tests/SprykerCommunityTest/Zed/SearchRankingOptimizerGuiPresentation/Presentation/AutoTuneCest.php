@@ -113,4 +113,38 @@ class AutoTuneCest
         $i->click(AutoTunePage::saveButtonXpath($metricName));
         $i->see(AutoTunePage::FLASH_MESSAGE_SAVED);
     }
+
+    /**
+     * `pdp_impressions` is store-wide (search-ranking's own isLocaleScoped=false) — a threshold saved
+     * while de_DE is selected must fan out to every real locale of the store, so it also shows up after
+     * switching to en_US without saving anything there. Proves AutoTuneMetricConfigWriterInterface's
+     * fan-out reaches the real Zed page, not just the unit-tested business layer. Deliberately NOT
+     * `top_seller` — this demoshop instance has that one flipped to isLocaleScoped=true from earlier live
+     * verification of that feature, which would make it independent per locale instead.
+     *
+     * @param \SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\SearchRankingOptimizerGuiPresentationTester $i
+     */
+    public function savingAThresholdAtOneLocaleFansOutToTheStoresOtherRealLocale(SearchRankingOptimizerGuiPresentationTester $i): void
+    {
+        $metricName = 'pdp_impressions';
+
+        $i->amOnPage(AutoTunePage::URL . '?localeName=de_DE');
+        $i->waitForElementVisible(AutoTunePage::rowXpath($metricName), 10);
+
+        $i->fillField(AutoTunePage::thresholdFieldXpath($metricName), '0.93');
+        $i->scrollTo(AutoTunePage::saveButtonXpath($metricName), 0, -150);
+        $i->click(AutoTunePage::saveButtonXpath($metricName));
+        $i->see(AutoTunePage::FLASH_MESSAGE_SAVED);
+
+        $i->amOnPage(AutoTunePage::URL . '?localeName=en_US');
+        $i->waitForElementVisible(AutoTunePage::thresholdFieldXpath($metricName), 10);
+        $i->assertSame(0.93, (float)$i->grabValueFrom(AutoTunePage::thresholdFieldXpath($metricName)));
+
+        // Round-trip: opt back out from en_US — since the metric is store-wide, this fans out too and
+        // clears de_DE's row as well, leaving the environment as found.
+        $i->fillField(AutoTunePage::thresholdFieldXpath($metricName), '');
+        $i->scrollTo(AutoTunePage::saveButtonXpath($metricName), 0, -150);
+        $i->click(AutoTunePage::saveButtonXpath($metricName));
+        $i->see(AutoTunePage::FLASH_MESSAGE_SAVED);
+    }
 }

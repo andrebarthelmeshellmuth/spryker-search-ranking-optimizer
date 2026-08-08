@@ -140,7 +140,8 @@
     <table name="spy_search_ranking_auto_tune_metric_config" idMethod="native" identifierQuoting="true">
         <column name="id_search_ranking_auto_tune_metric_config" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
         <column name="fk_search_ranking_metric" type="INTEGER" required="true" description="Soft reference to search-ranking's own metric id — no hard foreign key, same discipline as spy_search_ranking_weight_checkpoint.metric_weights: the metric could be deleted between config edits and a later run, handled as a safe skip."/>
-        <column name="store_name" type="VARCHAR" size="64" required="true" description="e.g. DE — a metric's formula/shape is a store-level fact on search-ranking's own spy_search_ranking_metric_store_config, so auto-tune's own threshold/auto-update/notify settings are store-scoped too, the same way. Deliberately NOT locale-scoped, matching that table's own reasoning. Auto-Tune used to operate on a single hardcoded store regardless of how many real stores existed; this column is what makes every configured store get its own independent monthly check."/>
+        <column name="store_name" type="VARCHAR" size="64" required="true" description="e.g. DE — what auto-tune is checking (a metric's formula/shape) lives on search-ranking's own spy_search_ranking_metric_store_config, which is store+locale scoped since that package's isLocaleScoped unification; this table matches that grain now, same as store_name+locale_name below. Auto-Tune used to operate on a single hardcoded store regardless of how many real stores existed; this column is what makes every configured store get its own independent monthly check."/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true" description="e.g. de_DE. Saving via AutoTuneMetricConfigWriterInterface fans the SAME threshold/auto-update/notify settings out to every real locale of the store when the metric is search-ranking's own isLocaleScoped=false (the common case, matching how formula/weight already fan out there) — one row per locale unconditionally, but usually all identical. For an isLocaleScoped=true metric, each locale is saved and read fully independently; a locale never explicitly configured has no row here and is simply skipped by the monthly run, same 'absence means opted out' contract auto_tune_threshold itself already has."/>
         <column name="auto_tune_threshold" type="DOUBLE" required="false" description="R² floor below which the metric is flagged as needing attention. NULL opts the metric out of auto-tune entirely — the default for every metric until an admin explicitly sets one."/>
         <column name="is_auto_update_enabled" type="BOOLEAN" required="true" defaultValue="false" description="Whether crossing the threshold triggers an automatic refit, or only a proposal/notification."/>
         <column name="auto_update_scope" type="VARCHAR" size="32" required="true" defaultValue="program_choice" description="SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_* — only consulted when is_auto_update_enabled is true."/>
@@ -149,9 +150,10 @@
         <behavior name="timestampable"/>
         <id-method-parameter value="spy_search_ranking_auto_tune_metric_config_pk_seq"/>
 
-        <unique name="spy_srtmc-metric_store">
+        <unique name="spy_srtmc-metric_store_locale">
             <unique-column name="fk_search_ranking_metric"/>
             <unique-column name="store_name"/>
+            <unique-column name="locale_name"/>
         </unique>
     </table>
 

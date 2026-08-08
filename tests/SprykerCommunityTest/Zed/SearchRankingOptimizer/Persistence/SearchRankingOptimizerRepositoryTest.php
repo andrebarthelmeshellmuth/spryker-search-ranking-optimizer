@@ -167,7 +167,8 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindLatestCalculatedCalibrationReturnsTheMostRecentlyCalculatedRow(): void
     {
         // Arrange — "newer" uses a far-future date so it outranks any pre-existing real calibration row
-        // in this shared demo database, not just the "older" row created alongside it in this test.
+        // for this same (store, locale) in this shared demo database, not just the "older" row created
+        // alongside it in this test.
         $older = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
         $older->setCalculatedAt('2026-01-01 00:00:00');
         $older->save();
@@ -179,11 +180,33 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('DE', 'en_US');
 
         // Assert
         $this->assertNotNull($resultTransfer);
         $this->assertSame($newer->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
+    }
+
+    /**
+     * A calculated run for a DIFFERENT (store, locale) must never be returned as if it were the asked-about
+     * scope's own latest run — the real regression this whole store/locale-scoping extension is for.
+     * Isolated store names (not 'DE'/'AT') so this is self-contained regardless of real calibration rows
+     * already present in this shared demo database.
+     */
+    public function testFindLatestCalculatedCalibrationIsScopedByStoreAndLocale(): void
+    {
+        // Arrange
+        $matching = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, 'DE-TEST-CALIBRATION-SCOPE', 'de_DE');
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, 'AT-TEST-CALIBRATION-SCOPE', 'de_AT');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('DE-TEST-CALIBRATION-SCOPE', 'de_DE');
+        $wrongStoreResultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('AT-TEST-CALIBRATION-SCOPE', 'de_DE');
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($matching->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
+        $this->assertNull($wrongStoreResultTransfer, 'Right locale, wrong store must not match.');
     }
 
     public function testFindCalibrationInProgressReturnsTheCalculatingRowWithItsProgressCounts(): void
@@ -195,7 +218,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $inProgress->save();
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE', 'en_US');
 
         // Assert
         $this->assertNotNull($resultTransfer);
@@ -211,7 +234,25 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE', 'en_US');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * A calculating run for a DIFFERENT (store, locale) must never be reported as the asked-about scope's
+     * own in-progress run — otherwise the Calibration page's progress widget could show another store's
+     * run as if it belonged to the one being viewed. Isolated store name for the same reason as
+     * {@see testFindLatestCalculatedCalibrationIsScopedByStoreAndLocale()}.
+     */
+    public function testFindCalibrationInProgressIsScopedByStoreAndLocale(): void
+    {
+        // Arrange
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING, 'AT-TEST-CALIBRATION-SCOPE', 'de_AT');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE-TEST-CALIBRATION-SCOPE', 'de_DE');
 
         // Assert
         $this->assertNull($resultTransfer);
@@ -354,15 +395,16 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
     {
         // Arrange
-        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE');
+        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE', 'de_DE');
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101, 'DE');
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101, 'DE', 'de_DE');
 
         // Assert
         $this->assertNotNull($resultTransfer);
         $this->assertSame(90101, $resultTransfer->getIdSearchRankingMetric());
         $this->assertSame('DE', $resultTransfer->getStoreName());
+        $this->assertSame('de_DE', $resultTransfer->getLocaleName());
         $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
         $this->assertFalse($resultTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, $resultTransfer->getAutoUpdateScope());
@@ -372,7 +414,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigByMetricIdReturnsNullWhenTheMetricHasNoConfigYet(): void
     {
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102, 'DE');
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102, 'DE', 'de_DE');
 
         // Assert
         $this->assertNull($resultTransfer);
@@ -385,10 +427,27 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigByMetricIdIsScopedByStore(): void
     {
         // Arrange
-        $this->createTestAutoTuneMetricConfig(90105, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
+        $this->createTestAutoTuneMetricConfig(90105, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90105, 'AT');
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90105, 'AT', 'de_DE');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * A config saved for one locale of a store must be invisible when looking up the SAME metric+store
+     * under a different locale — proves lookups are genuinely scoped by (metric, store, locale), the real
+     * point of this whole extension, not just (metric, store).
+     */
+    public function testFindAutoTuneMetricConfigByMetricIdIsScopedByLocale(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90107, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90107, 'DE', 'en_US');
 
         // Assert
         $this->assertNull($resultTransfer);
@@ -397,8 +456,8 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigsWithThresholdSetExcludesConfigsWithNoThreshold(): void
     {
         // Arrange
-        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
-        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
+        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
 
         // Act
         $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
@@ -416,8 +475,8 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     public function testFindAutoTuneMetricConfigsWithThresholdSetIsScopedByStore(): void
     {
         // Arrange
-        $deConfig = $this->createTestAutoTuneMetricConfig(90106, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE');
-        $this->createTestAutoTuneMetricConfig(90106, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'AT');
+        $deConfig = $this->createTestAutoTuneMetricConfig(90106, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $this->createTestAutoTuneMetricConfig(90106, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'AT', 'de_AT');
 
         // Act
         $deResultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
@@ -429,12 +488,35 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * Not locale-filtered: a metric with a threshold set at two different locales of the SAME store must
+     * come back as two separate rows — proves the list genuinely reflects (metric, locale) granularity now,
+     * not one row per metric.
+     */
+    public function testFindAutoTuneMetricConfigsWithThresholdSetReturnsOneRowPerConfiguredLocale(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90108, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $this->createTestAutoTuneMetricConfig(90108, 0.7, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'en_US');
+
+        // Act
+        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
+        $localeNamesForMetric = array_map(
+            fn ($transfer) => $transfer->getLocaleName(),
+            array_filter($resultTransfers, fn ($transfer) => $transfer->getIdSearchRankingMetric() === 90108),
+        );
+
+        // Assert
+        $this->assertEqualsCanonicalizing(['de_DE', 'en_US'], array_values($localeNamesForMetric));
+    }
+
+    /**
      * @param int $idSearchRankingMetric
      * @param float|null $autoTuneThreshold
      * @param bool $isAutoUpdateEnabled
      * @param string $autoUpdateScope
      * @param bool $isNotifyEnabled
      * @param string $storeName
+     * @param string $localeName
      */
     protected function createTestAutoTuneMetricConfig(
         int $idSearchRankingMetric,
@@ -443,10 +525,12 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         string $autoUpdateScope,
         bool $isNotifyEnabled,
         string $storeName = 'DE',
+        string $localeName = 'de_DE',
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($idSearchRankingMetric);
         $autoTuneMetricConfigEntity->setStoreName($storeName);
+        $autoTuneMetricConfigEntity->setLocaleName($localeName);
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneThreshold);
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($isAutoUpdateEnabled);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoUpdateScope);
@@ -479,12 +563,12 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     /**
      * @param string $status
      */
-    protected function createTestCalibration(string $status): SpySearchRankingSaturationPointCalibration
+    protected function createTestCalibration(string $status, string $storeName = 'DE', string $localeName = 'en_US'): SpySearchRankingSaturationPointCalibration
     {
         $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setRelevantProductCount(6);
-        $calibrationEntity->setStoreName('DE');
-        $calibrationEntity->setLocaleName('en_US');
+        $calibrationEntity->setStoreName($storeName);
+        $calibrationEntity->setLocaleName($localeName);
         $calibrationEntity->setStatus($status);
         $calibrationEntity->save();
 

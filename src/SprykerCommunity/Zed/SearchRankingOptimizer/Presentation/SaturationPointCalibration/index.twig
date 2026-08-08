@@ -4,8 +4,31 @@
 {% block section_title %}{{ widget_title | trans }}{% endblock %}
 
 {% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Viewing' } %}
+        {% block widget_content %}
+            <form method="get" class="form-inline">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        {% endblock %}
+    {% endembed %}
+
     {% if inProgressCalibration %}
-        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Saturation Point Calibration In Progress' } %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Saturation Point Calibration In Progress (' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName ~ ')' } %}
             {% block widget_content %}
                 {# Polled by the script at the bottom of this page — the counts printed here are only the
                    first paint; every update after that comes from progressAction()'s JSON, not a page
@@ -22,11 +45,15 @@
         {% endembed %}
     {% endif %}
 
-    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k)' } %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k) — ' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName } %}
         {% block widget_content %}
             <p>Live relevance-score value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
             <p>Live specificity value: <strong>{{ currentSpecificitySaturationPoint }}</strong></p>
+        {% endblock %}
+    {% endembed %}
 
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Latest Calibration Run — ' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName } %}
+        {% block widget_content %}
             {% if latestCalibration %}
                 <table class="table">
                     <tbody>
@@ -74,7 +101,7 @@
                 </div>
                 {{ form_end(applyForm) }}
             {% else %}
-                <p>No calibration run has finished yet — upload one below.</p>
+                <p>No calibration run has finished yet for {{ selectedStoreName }} / {{ selectedLocaleName }} — upload one below, or switch scope above if you expected to see one here.</p>
             {% endif %}
         {% endblock %}
     {% endembed %}
@@ -145,7 +172,9 @@
                 var progressBarElement = document.querySelector('[data-role="calibration-progress"] [data-role="progress-bar"]');
 
                 function poll() {
-                    fetch('/search-ranking-optimizer/saturation-point-calibration/progress', { headers: { Accept: 'application/json' } })
+                    // Same scope this page itself was rendered with — a run for a different store/locale
+                    // must never be reported as this page's own progress.
+                    fetch('/search-ranking-optimizer/saturation-point-calibration/progress?storeName={{ selectedStoreName }}&localeName={{ selectedLocaleName }}', { headers: { Accept: 'application/json' } })
                         .then(function (response) { return response.json(); })
                         .then(function (progress) {
                             if (progress.status !== 'calculating') {

@@ -29,12 +29,28 @@ class SaturationPointCalibrationController extends AbstractController
     protected const URL_CALIBRATION = '/search-ranking-optimizer/saturation-point-calibration';
 
     /**
+     * Public (not just this class's own internal picker) so {@see SaturationPointCalibrationApplyController}
+     * can build a redirect back to the exact scope being viewed, using the same query param names.
+     *
+     * @var string
+     */
+    public const PARAM_STORE_NAME = 'storeName';
+
+    /**
+     * @var string
+     */
+    public const PARAM_LOCALE_NAME = 'localeName';
+
+    /**
      * @param \Symfony\Component\HttpFoundation\Request $request
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse|array<string, mixed>
      */
     public function indexAction(Request $request)
     {
+        $storeName = $this->resolveStoreName($request);
+        $localeName = $this->resolveLocaleName($request);
+
         $uploadForm = $this->getFactory()->createCalibrationUploadForm()->handleRequest($request);
 
         if ($uploadForm->isSubmitted() && $uploadForm->isValid()) {
@@ -56,15 +72,15 @@ class SaturationPointCalibrationController extends AbstractController
                 'Calibration run uploaded — the next "search-ranking-optimizer:calibrate" cron tick will calculate it.',
             );
 
-            return $this->redirectResponse(static::URL_CALIBRATION);
+            // Stays on whichever scope was being VIEWED, not necessarily the one the upload form's own
+            // (independent) store/locale pickers targeted — the two are allowed to differ, e.g. bootstrapping
+            // AT while still reviewing DE's own latest run.
+            return $this->redirectResponse($this->buildCalibrationUrl($storeName, $localeName));
         }
 
-        $latestCalibrationTransfer = $this->getFacade()->findLatestCalculatedCalibration();
-        // The calibration this page is about to offer applying (if any) is what determines which
-        // store+locale the saturation point actually gets written to — never the hardcoded default,
-        // since Zed has no implicit current store to fall back on.
-        $storeName = $latestCalibrationTransfer?->getStoreName() ?? SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
-        $localeName = $latestCalibrationTransfer?->getLocaleName() ?? SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+        $latestCalibrationTransfer = $this->getFacade()->findLatestCalculatedCalibration($storeName, $localeName);
+        $inProgressCalibrationTransfer = $this->getFacade()->findCalibrationInProgress($storeName, $localeName);
+
         $currentRelevanceSaturationPoint = $this->getFactory()->getSearchRankingFacade()->getRelevanceSaturationPoint($storeName, $localeName);
         $currentSpecificitySaturationPoint = $this->getFactory()->getSearchRankingFacade()->getSpecificitySaturationPoint($storeName, $localeName);
 
@@ -83,23 +99,34 @@ class SaturationPointCalibrationController extends AbstractController
             ->createView();
 
         return $this->viewResponse([
+            'stores' => $this->getFactory()->getAllStoreNames(),
+            'locales' => $this->getFactory()->getAllLocaleNames(),
+            'selectedStoreName' => $storeName,
+            'selectedLocaleName' => $localeName,
             'currentRelevanceSaturationPoint' => $currentRelevanceSaturationPoint,
             'currentSpecificitySaturationPoint' => $currentSpecificitySaturationPoint,
             'latestCalibration' => $latestCalibrationTransfer,
-            'inProgressCalibration' => $this->getFacade()->findCalibrationInProgress(),
+            'inProgressCalibration' => $inProgressCalibrationTransfer,
             'uploadForm' => $uploadForm->createView(),
             'applyForm' => $applyForm,
         ]);
     }
 
     /**
-     * Polled by the Saturation Point Calibration page's own JS while a run is in status=calculating — deliberately tiny
-     * (id/status/counts only, no search terms) since this fires roughly once a second for however long
-     * the run takes.
+     * Polled by the Saturation Point Calibration page's own JS while a run is in status=calculating for
+     * the scope being viewed — deliberately tiny (id/status/counts only, no search terms) since this
+     * fires roughly once a second for however long the run takes. Scoped the same way indexAction() is,
+     * via the same query params, so a run for a DIFFERENT store/locale never shows up as if it were the
+     * viewed scope's own progress.
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
      */
-    public function progressAction(): JsonResponse
+    public function progressAction(Request $request): JsonResponse
     {
-        $inProgressCalibrationTransfer = $this->getFacade()->findCalibrationInProgress();
+        $inProgressCalibrationTransfer = $this->getFacade()->findCalibrationInProgress(
+            $this->resolveStoreName($request),
+            $this->resolveLocaleName($request),
+        );
 
         if ($inProgressCalibrationTransfer === null) {
             return $this->jsonResponse([
@@ -120,5 +147,30 @@ class SaturationPointCalibrationController extends AbstractController
     protected function readUploadedFileContent(UploadedFile $uploadedFile): string
     {
         return (string)file_get_contents($uploadedFile->getPathname());
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveStoreName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_STORE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveLocaleName(Request $request): string
+    {
+        return (string)$request->query->get(static::PARAM_LOCALE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    protected function buildCalibrationUrl(string $storeName, string $localeName): string
+    {
+        return sprintf('%s?%s=%s&%s=%s', static::URL_CALIBRATION, static::PARAM_STORE_NAME, $storeName, static::PARAM_LOCALE_NAME, $localeName);
     }
 }

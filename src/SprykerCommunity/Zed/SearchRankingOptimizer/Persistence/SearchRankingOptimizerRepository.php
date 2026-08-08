@@ -78,11 +78,17 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
         return $calibrationTransfer;
     }
 
-    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function findLatestCalculatedCalibration(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer
     {
         $calibrationEntity = $this->getFactory()
             ->createSearchRankingSaturationPointCalibrationQuery()
             ->filterByStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED)
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
             ->orderByCalculatedAt(Criteria::DESC)
             ->findOne();
 
@@ -96,16 +102,23 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
-     * The run `ScoreCalibrator::calculate()` is currently working through, if any — at most one at a
-     * time by design (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\ScoreCalibrator::runNextCalibration()}'s
-     * own skip-older-uploads step). Backs the Calibration page's live progress counter; polled, so
-     * deliberately cheap — no search terms loaded.
+     * The run `ScoreCalibrator::calculate()` is currently working through FOR THIS (store, locale), if
+     * any — at most one at a time SYSTEM-WIDE by design (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\ScoreCalibrator::runNextCalibration()}'s
+     * own skip-older-uploads step), but that system-wide run may be for a DIFFERENT scope than the one
+     * being viewed here — filtered so the Calibration page's progress widget never shows another store's
+     * run as if it were the viewed scope's own. Backs the Calibration page's live progress counter;
+     * polled, so deliberately cheap — no search terms loaded.
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer
+    public function findCalibrationInProgress(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer
     {
         $calibrationEntity = $this->getFactory()
             ->createSearchRankingSaturationPointCalibrationQuery()
             ->filterByStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING)
+            ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
             ->findOne();
 
         if ($calibrationEntity === null) {
@@ -364,13 +377,18 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     /**
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     * @param string $localeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer
-    {
+    public function findAutoTuneMetricConfigByMetricId(
+        int $idSearchRankingMetric,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingAutoTuneMetricConfigTransfer {
         $autoTuneMetricConfigEntity = $this->getFactory()
             ->createSearchRankingAutoTuneMetricConfigQuery()
             ->filterByFkSearchRankingMetric($idSearchRankingMetric)
             ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
             ->findOne();
 
         if ($autoTuneMetricConfigEntity === null) {
@@ -383,9 +401,15 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
-     * Only configs with a real threshold set for THIS store — a metric with no config row for this
-     * store, or an explicit NULL threshold, has opted out of auto-tune entirely (for this store) and is
-     * simply absent here, per this feature's own design (see the package README).
+     * Only configs with a real threshold set for THIS store — a metric with no config row for a given
+     * (store, locale), or an explicit NULL threshold, has opted out of auto-tune entirely for that scope
+     * and is simply absent here, per this feature's own design (see the package README). Store-scoped
+     * only, deliberately NOT filtered by locale: for an `isLocaleScoped=false` metric (the common case)
+     * saving fans the same config out to every real locale of the store, so ANY of its locale rows proves
+     * it's opted in; for an `isLocaleScoped=true` metric this can return several independent rows for the
+     * SAME metric, one per locale that's been individually configured — see
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface} for how
+     * the caller groups these back up by metric.
      *
      * @param string $storeName
      *

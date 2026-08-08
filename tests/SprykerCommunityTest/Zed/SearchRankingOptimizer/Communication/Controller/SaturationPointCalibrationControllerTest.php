@@ -16,6 +16,7 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\SaturationPointCalibrationController;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * INTEGRATION TEST — {@see SaturationPointCalibrationController::progressAction()} is polled by the
@@ -39,7 +40,7 @@ class SaturationPointCalibrationControllerTest extends Unit
     public function testProgressReturnsNullStatusWhenNothingIsInProgress(): void
     {
         // Act
-        $jsonResponse = (new SaturationPointCalibrationController())->progressAction();
+        $jsonResponse = (new SaturationPointCalibrationController())->progressAction(new Request());
 
         // Assert
         $this->assertNull(json_decode((string)$jsonResponse->getContent(), true)['status']);
@@ -51,14 +52,40 @@ class SaturationPointCalibrationControllerTest extends Unit
         $idCalibration = $this->createCalculatingCalibration(searchTermCount: 12, processedCount: 5);
 
         try {
-            // Act
-            $jsonResponse = (new SaturationPointCalibrationController())->progressAction();
+            // Act — scope must match createCalculatingCalibration()'s own DE/en_US, same as
+            // indexAction()/the page's own JS would send for the scope actually being viewed.
+            $jsonResponse = (new SaturationPointCalibrationController())->progressAction(
+                new Request(['storeName' => 'DE', 'localeName' => 'en_US']),
+            );
 
             // Assert
             $payload = json_decode((string)$jsonResponse->getContent(), true);
             $this->assertSame(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING, $payload['status']);
             $this->assertSame(5, $payload['processedCount']);
             $this->assertSame(12, $payload['totalCount']);
+        } finally {
+            (new SearchRankingOptimizerEntityManager())->markCalibrationFailed($idCalibration, 'Cleaned up by SaturationPointCalibrationControllerTest.');
+        }
+    }
+
+    /**
+     * A calculating run for a DIFFERENT scope than the one the page's JS is polling for must not be
+     * reported — proves progressAction() genuinely filters by the request's own storeName/localeName,
+     * not just happens to find the one calculating row system-wide.
+     */
+    public function testProgressReturnsNullStatusWhenTheCalculatingRunIsForADifferentScope(): void
+    {
+        // Arrange — createCalculatingCalibration() always creates DE/en_US.
+        $idCalibration = $this->createCalculatingCalibration(searchTermCount: 4, processedCount: 1);
+
+        try {
+            // Act
+            $jsonResponse = (new SaturationPointCalibrationController())->progressAction(
+                new Request(['storeName' => 'AT', 'localeName' => 'de_AT']),
+            );
+
+            // Assert
+            $this->assertNull(json_decode((string)$jsonResponse->getContent(), true)['status']);
         } finally {
             (new SearchRankingOptimizerEntityManager())->markCalibrationFailed($idCalibration, 'Cleaned up by SaturationPointCalibrationControllerTest.');
         }
@@ -89,7 +116,7 @@ class SaturationPointCalibrationControllerTest extends Unit
         }
 
         $this->assertNotNull(
-            (new SearchRankingOptimizerRepository())->findCalibrationInProgress(),
+            (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE', 'en_US'),
             'Setup: the row must be readable back as in-progress before progressAction() is exercised.',
         );
 

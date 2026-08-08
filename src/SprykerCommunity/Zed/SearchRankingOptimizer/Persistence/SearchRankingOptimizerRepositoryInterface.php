@@ -32,15 +32,23 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findCalibrationWithSearchTerms(int $idSearchRankingSaturationPointCalibration): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * The most recent calibration run with status=calculated, or null when none has ever finished.
+     * The most recent calibration run with status=calculated for this (store, locale), or null when none
+     * has ever finished there.
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer;
+    public function findLatestCalculatedCalibration(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * The run currently in status=calculating, if any — at most one at a time by design. Backs the
-     * Calibration page's live progress counter.
+     * The run for this (store, locale) currently in status=calculating, if any — at most one SYSTEM-WIDE
+     * at a time by design, but that one run may be for a different scope than the one asked about here.
+     * Backs the Calibration page's live progress counter.
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer;
+    public function findCalibrationInProgress(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * Looks up a query by its exact canonical (searchTerm, storeName, localeName) key — the same key
@@ -148,18 +156,24 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Returns null when the metric has no auto-tune config yet for this store (has never had a
-     * threshold set here) — a safe, expected state for most metric+store combinations, not an error.
+     * Returns null when the metric has no auto-tune config yet for this (store, locale) — a safe,
+     * expected state for most metric+store+locale combinations, not an error.
      *
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     * @param string $localeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer;
+    public function findAutoTuneMetricConfigByMetricId(
+        int $idSearchRankingMetric,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingAutoTuneMetricConfigTransfer;
 
     /**
-     * Only configs with a real threshold set for THIS store — a metric with no config row for this
-     * store, or an explicit NULL threshold, has opted out of auto-tune entirely (for this store) and is
-     * simply absent here.
+     * Only configs with a real threshold set for THIS store — a metric with no config row for a given
+     * (store, locale), or an explicit NULL threshold, has opted out of auto-tune entirely for that scope
+     * and is simply absent here. Store-scoped only, NOT locale-filtered — can return several rows for the
+     * same metric (one per locale it's been configured at).
      *
      * @param string $storeName
      *

@@ -299,6 +299,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric(90001)
             ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setAutoTuneThreshold(0.8)
             ->setIsAutoUpdateEnabled(true)
             ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
@@ -312,6 +313,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertNotNull($resultTransfer->getIdSearchRankingAutoTuneMetricConfig());
         $this->assertSame(90001, $resultTransfer->getIdSearchRankingMetric());
         $this->assertSame('DE', $resultTransfer->getStoreName());
+        $this->assertSame('de_DE', $resultTransfer->getLocaleName());
         $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
         $this->assertTrue($resultTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $resultTransfer->getAutoUpdateScope());
@@ -325,6 +327,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
             (new SearchRankingAutoTuneMetricConfigTransfer())
                 ->setIdSearchRankingMetric(90002)
                 ->setStoreName('DE')
+                ->setLocaleName('de_DE')
                 ->setAutoTuneThreshold(0.8)
                 ->setIsAutoUpdateEnabled(false)
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
@@ -337,6 +340,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
             (new SearchRankingAutoTuneMetricConfigTransfer())
                 ->setIdSearchRankingMetric(90002)
                 ->setStoreName('DE')
+                ->setLocaleName('de_DE')
                 ->setAutoTuneThreshold(0.6)
                 ->setIsAutoUpdateEnabled(true)
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
@@ -363,6 +367,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
             (new SearchRankingAutoTuneMetricConfigTransfer())
                 ->setIdSearchRankingMetric(90003)
                 ->setStoreName('DE')
+                ->setLocaleName('de_DE')
                 ->setAutoTuneThreshold(0.8)
                 ->setIsAutoUpdateEnabled(false)
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
@@ -375,6 +380,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
             (new SearchRankingAutoTuneMetricConfigTransfer())
                 ->setIdSearchRankingMetric(90003)
                 ->setStoreName('AT')
+                ->setLocaleName('de_AT')
                 ->setAutoTuneThreshold(0.5)
                 ->setIsAutoUpdateEnabled(false)
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
@@ -387,6 +393,47 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(0.8, $deSaveTransfer->getAutoTuneThreshold());
         $this->assertSame(0.5, $atSaveTransfer->getAutoTuneThreshold());
         $this->assertSame(2, SpySearchRankingAutoTuneMetricConfigQuery::create()->filterByFkSearchRankingMetric(90003)->count());
+    }
+
+    /**
+     * The SAME metric+store saved for two different locales must create TWO rows, not upsert into one —
+     * proves the save is keyed by (metric, store, locale), not by (metric, store) alone. The real
+     * regression this guards: a genuinely locale-scoped metric independently configured per locale must
+     * never have one locale's save silently clobber another's.
+     */
+    public function testSaveAutoTuneMetricConfigCreatesASeparateRowPerLocaleForTheSameMetricAndStore(): void
+    {
+        // Arrange
+        $deDeSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
+            (new SearchRankingAutoTuneMetricConfigTransfer())
+                ->setIdSearchRankingMetric(90007)
+                ->setStoreName('DE')
+                ->setLocaleName('de_DE')
+                ->setAutoTuneThreshold(0.8)
+                ->setIsAutoUpdateEnabled(false)
+                ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
+                ->setIsNotifyEnabled(false),
+        );
+        $this->autoTuneMetricConfigIds[] = $deDeSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
+
+        // Act
+        $enUsSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
+            (new SearchRankingAutoTuneMetricConfigTransfer())
+                ->setIdSearchRankingMetric(90007)
+                ->setStoreName('DE')
+                ->setLocaleName('en_US')
+                ->setAutoTuneThreshold(0.5)
+                ->setIsAutoUpdateEnabled(false)
+                ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
+                ->setIsNotifyEnabled(false),
+        );
+        $this->autoTuneMetricConfigIds[] = $enUsSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
+
+        // Assert
+        $this->assertNotSame($deDeSaveTransfer->getIdSearchRankingAutoTuneMetricConfig(), $enUsSaveTransfer->getIdSearchRankingAutoTuneMetricConfig());
+        $this->assertSame(0.8, $deDeSaveTransfer->getAutoTuneThreshold());
+        $this->assertSame(0.5, $enUsSaveTransfer->getAutoTuneThreshold());
+        $this->assertSame(2, SpySearchRankingAutoTuneMetricConfigQuery::create()->filterByFkSearchRankingMetric(90007)->count());
     }
 
     /**

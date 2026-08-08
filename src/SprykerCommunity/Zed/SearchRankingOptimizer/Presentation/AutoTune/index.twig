@@ -30,10 +30,14 @@
                 </select>
             </form>
             <p class="text-muted">
-                <strong>Current fit (R²)</strong> below, and the settings you save, both apply to the
-                <strong>store</strong> selected above — the automated monthly refit checks every real
-                store independently. Locale only affects which fit is previewed here (formula/shape
-                aren't locale-scoped).
+                <strong>Current fit (R²)</strong> below is always for the exact store+locale selected
+                above. The settings you save follow search-ranking's own per-metric scoping: for most
+                metrics (store-wide — the default) saving here fans the same threshold/auto-update/notify
+                settings out to every real locale of the selected store, so it doesn't matter which one you
+                had picked when you saved. For a metric explicitly flagged locale-scoped, saving only
+                touches the one locale selected above — switch locale to configure another independently,
+                and a locale never explicitly saved simply stays opted out of auto-tune for itself, even if
+                the metric is opted in elsewhere in the same store.
             </p>
             {% if rows %}
                 <table class="table">

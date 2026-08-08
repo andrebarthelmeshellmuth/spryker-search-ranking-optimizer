@@ -59,6 +59,15 @@ class SaturationPointCalibrationApplyController extends AbstractController
             $this->addSuccessMessage('Relevance saturation point (k) was updated.');
         }
 
-        return $this->redirectResponse(static::URL_CALIBRATION);
+        // Back to the exact scope this calibration was for — not the bare URL, which would silently reset
+        // the view to the hardcoded default store/locale regardless of what was actually just applied.
+        return $this->redirectResponse(sprintf(
+            '%s?%s=%s&%s=%s',
+            static::URL_CALIBRATION,
+            SaturationPointCalibrationController::PARAM_STORE_NAME,
+            $storeName,
+            SaturationPointCalibrationController::PARAM_LOCALE_NAME,
+            $localeName,
+        ));
     }
 }

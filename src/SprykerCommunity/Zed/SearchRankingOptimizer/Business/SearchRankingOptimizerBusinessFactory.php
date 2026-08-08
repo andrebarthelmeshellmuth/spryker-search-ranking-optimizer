@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriter;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolver;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
@@ -204,6 +206,14 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function createFormulaDeterminismChecker(): FormulaDeterminismCheckerInterface
     {
         return new FormulaDeterminismChecker();
+    }
+
+    public function createAutoTuneMetricConfigWriter(): AutoTuneMetricConfigWriterInterface
+    {
+        return new AutoTuneMetricConfigWriter(
+            $this->getEntityManager(),
+            $this->getSearchRankingFacade(),
+        );
     }
 
     public function createOptimizationRunner(): OptimizationRunnerInterface

@@ -55,4 +55,27 @@ class CalibrationPage
      * @var string
      */
     public const CONSOLE_COMMAND_CALIBRATE = 'search-ranking-optimizer:calibrate';
+
+    /**
+     * The page's own VIEW scope picker — independent of FIELD_STORE_NAME/FIELD_LOCALE_NAME above, which
+     * belong to the "Start New Calibration Run" upload form specifically.
+     *
+     * @var string
+     */
+    public const VIEW_STORE_SELECT_ID = 'storeName';
+
+    /**
+     * @var string
+     */
+    public const VIEW_LOCALE_SELECT_ID = 'localeName';
+
+    /**
+     * @var string
+     */
+    public const LATEST_CALIBRATION_RUN_HEADING_TEXT = 'Latest Calibration Run';
+
+    /**
+     * @var string
+     */
+    public const NO_CALIBRATION_YET_TEXT = 'No calibration run has finished yet for';
 }

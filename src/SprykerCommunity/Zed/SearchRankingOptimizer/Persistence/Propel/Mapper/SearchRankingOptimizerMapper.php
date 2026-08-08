@@ -228,6 +228,7 @@ class SearchRankingOptimizerMapper
             ->setIdSearchRankingAutoTuneMetricConfig($autoTuneMetricConfigEntity->getIdSearchRankingAutoTuneMetricConfig())
             ->setIdSearchRankingMetric($autoTuneMetricConfigEntity->getFkSearchRankingMetric())
             ->setStoreName($autoTuneMetricConfigEntity->getStoreName())
+            ->setLocaleName($autoTuneMetricConfigEntity->getLocaleName())
             ->setAutoTuneThreshold($autoTuneMetricConfigEntity->getAutoTuneThreshold())
             ->setIsAutoUpdateEnabled($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled())
             ->setAutoUpdateScope($autoTuneMetricConfigEntity->getAutoUpdateScope())
@@ -244,6 +245,7 @@ class SearchRankingOptimizerMapper
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail());
         $autoTuneMetricConfigEntity->setStoreName($autoTuneMetricConfigTransfer->getStoreNameOrFail());
+        $autoTuneMetricConfigEntity->setLocaleName($autoTuneMetricConfigTransfer->getLocaleNameOrFail());
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneMetricConfigTransfer->getAutoTuneThreshold());
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled() ?? false);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail());

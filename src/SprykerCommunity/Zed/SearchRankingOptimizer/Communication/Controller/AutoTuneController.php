@@ -62,7 +62,7 @@ class AutoTuneController extends AbstractController
             }
 
             $idSearchRankingMetric = $metric['idSearchRankingMetric'];
-            $autoTuneMetricConfigTransfer = $this->getFacade()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName);
+            $autoTuneMetricConfigTransfer = $this->getFacade()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName, $localeName);
 
             $rows[] = [
                 'metricName' => $metric['name'],
@@ -96,7 +96,8 @@ class AutoTuneController extends AbstractController
     public function saveAction(Request $request): RedirectResponse
     {
         $storeName = $this->resolveStoreName($request);
-        $redirectUrl = $this->buildAutoTuneUrl($storeName, $this->resolveLocaleName($request));
+        $localeName = $this->resolveLocaleName($request);
+        $redirectUrl = $this->buildAutoTuneUrl($storeName, $localeName);
 
         $autoTuneMetricConfigForm = $this->getFactory()
             ->createAutoTuneMetricConfigForm(0, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false)
@@ -113,6 +114,7 @@ class AutoTuneController extends AbstractController
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric((int)$formData[AutoTuneMetricConfigForm::FIELD_ID_SEARCH_RANKING_METRIC])
             ->setStoreName($storeName)
+            ->setLocaleName($localeName)
             ->setAutoTuneThreshold($formData[AutoTuneMetricConfigForm::FIELD_AUTO_TUNE_THRESHOLD] !== null ? (float)$formData[AutoTuneMetricConfigForm::FIELD_AUTO_TUNE_THRESHOLD] : null)
             ->setIsAutoUpdateEnabled((bool)$formData[AutoTuneMetricConfigForm::FIELD_IS_AUTO_UPDATE_ENABLED])
             ->setAutoUpdateScope((string)$formData[AutoTuneMetricConfigForm::FIELD_AUTO_UPDATE_SCOPE])

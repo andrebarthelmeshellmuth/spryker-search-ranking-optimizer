@@ -525,10 +525,13 @@ class AutoTuneRunnerTest extends Unit
      */
     public function testFansOutOverEveryRealLocaleWhenTheMetricIsLocaleScoped(): void
     {
-        // Arrange
+        // Arrange — a locale-scoped metric's config is independent per locale now; both real locales are
+        // explicitly configured here so both get checked (see testSkipsALocaleScopedMetricsLocaleThatHasNoConfigOfItsOwn
+        // for the "one locale never configured" case).
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
         $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
-            $this->createConfigTransfer(7, 0.8, true, false),
+            $this->createConfigTransfer(7, 0.8, true, false, localeName: 'de_DE'),
+            $this->createConfigTransfer(7, 0.8, true, false, localeName: 'en_US'),
         ]);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
@@ -600,6 +603,40 @@ class AutoTuneRunnerTest extends Unit
     }
 
     /**
+     * The real new behavior this whole extension is for: a locale-scoped metric's auto-tune config is now
+     * per-locale, not inherited from the store's default locale. en_US has a real digest (unlike the "no
+     * digest yet" test above) but was simply never individually configured — it must still be skipped,
+     * proving there is no silent fallback to de_DE's threshold/auto-update/notify settings.
+     */
+    public function testSkipsALocaleScopedMetricsLocaleThatHasNoConfigOfItsOwn(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8, localeName: 'de_DE'),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7, 'atan', true));
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFitAcrossLocales')->willReturn([
+            'de_DE' => 0.9,
+            'en_US' => 0.4,
+        ]);
+        $searchRankingFacadeMock->expects($this->never())->method('getFitCandidates');
+        $searchRankingFacadeMock->expects($this->never())->method('saveMetricFormula');
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock, storeFacade: $this->createStoreFacadeMock(['DE']));
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertCount(1, $metricResults);
+        $this->assertSame('de_DE', $metricResults[0]->getLocaleName());
+    }
+
+    /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \PHPUnit\Framework\MockObject\MockObject&\SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface|null $recipientResolver
@@ -652,6 +689,7 @@ class AutoTuneRunnerTest extends Unit
      * @param bool $isNotifyEnabled
      * @param string $autoUpdateScope
      * @param string $storeName
+     * @param string $localeName
      */
     protected function createConfigTransfer(
         int $idSearchRankingMetric,
@@ -660,10 +698,12 @@ class AutoTuneRunnerTest extends Unit
         bool $isNotifyEnabled = false,
         string $autoUpdateScope = SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE,
         string $storeName = SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME,
+        string $localeName = SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME,
     ): SearchRankingAutoTuneMetricConfigTransfer {
         return (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric($idSearchRankingMetric)
             ->setStoreName($storeName)
+            ->setLocaleName($localeName)
             ->setAutoTuneThreshold($autoTuneThreshold)
             ->setIsAutoUpdateEnabled($isAutoUpdateEnabled)
             ->setIsNotifyEnabled($isNotifyEnabled)

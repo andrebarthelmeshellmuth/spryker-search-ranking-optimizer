@@ -248,6 +248,7 @@
         <property name="idSearchRankingAutoTuneMetricConfig" type="int"/>
         <property name="idSearchRankingMetric" type="int"/>
         <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="autoTuneThreshold" type="float"/>
         <property name="isAutoUpdateEnabled" type="bool"/>
         <property name="autoUpdateScope" type="string"/>

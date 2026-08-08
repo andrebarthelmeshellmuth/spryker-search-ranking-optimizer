@@ -355,8 +355,12 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     }
 
     /**
-     * Upserts by `(idSearchRankingMetric, storeName)` — at most one config row per metric+store, same
-     * "find existing or create new, then overwrite the editable fields" shape as {@see upsertRating()}.
+     * Upserts by `(idSearchRankingMetric, storeName, localeName)` — at most one config row per
+     * metric+store+locale, same "find existing or create new, then overwrite the editable fields" shape
+     * as {@see upsertRating()}. Writes exactly the one (store, locale) row named on the transfer — fanning
+     * the same config out to every real locale of a store-wide metric is
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface}'s
+     * job, one call to this method per locale, not this method's own.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */
@@ -364,11 +368,13 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
     {
         $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
         $storeName = $autoTuneMetricConfigTransfer->getStoreNameOrFail();
+        $localeName = $autoTuneMetricConfigTransfer->getLocaleNameOrFail();
 
         $autoTuneMetricConfigEntity = $this->getFactory()
             ->createSearchRankingAutoTuneMetricConfigQuery()
             ->filterByFkSearchRankingMetric($idSearchRankingMetric)
             ->filterByStoreName($storeName)
+            ->filterByLocaleName($localeName)
             ->findOne();
 
         if ($autoTuneMetricConfigEntity === null) {

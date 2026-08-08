@@ -64,20 +64,26 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * {@inheritDoc}
      *
      * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingSaturationPointCalibrationTransfer
+    public function findLatestCalculatedCalibration(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer
     {
-        return $this->getRepository()->findLatestCalculatedCalibration();
+        return $this->getRepository()->findLatestCalculatedCalibration($storeName, $localeName);
     }
 
     /**
      * {@inheritDoc}
      *
      * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findCalibrationInProgress(): ?SearchRankingSaturationPointCalibrationTransfer
+    public function findCalibrationInProgress(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer
     {
-        return $this->getRepository()->findCalibrationInProgress();
+        return $this->getRepository()->findCalibrationInProgress($storeName, $localeName);
     }
 
     /**
@@ -245,10 +251,14 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     * @param string $localeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric, string $storeName): ?SearchRankingAutoTuneMetricConfigTransfer
-    {
-        return $this->getRepository()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName);
+    public function findAutoTuneMetricConfigByMetricId(
+        int $idSearchRankingMetric,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingAutoTuneMetricConfigTransfer {
+        return $this->getRepository()->findAutoTuneMetricConfigByMetricId($idSearchRankingMetric, $storeName, $localeName);
     }
 
     /**
@@ -275,7 +285,9 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function saveAutoTuneMetricConfig(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
     ): SearchRankingAutoTuneMetricConfigTransfer {
-        return $this->getEntityManager()->saveAutoTuneMetricConfig($autoTuneMetricConfigTransfer);
+        $savedTransfersByLocale = $this->getFactory()->createAutoTuneMetricConfigWriter()->save($autoTuneMetricConfigTransfer);
+
+        return $savedTransfersByLocale[$autoTuneMetricConfigTransfer->getLocaleNameOrFail()];
     }
 
     /**

@@ -71,11 +71,17 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
                 continue;
             }
 
-            foreach ($this->repository->findAutoTuneMetricConfigsWithThresholdSet($storeName) as $autoTuneMetricConfigTransfer) {
-                foreach ($this->processMetricSafely($autoTuneMetricConfigTransfer, $storeTransfer) as $metricResultTransfer) {
+            $configsByMetricAndLocale = $this->groupConfigsByMetric(
+                $this->repository->findAutoTuneMetricConfigsWithThresholdSet($storeName),
+            );
+
+            foreach ($configsByMetricAndLocale as $autoTuneMetricConfigsByLocale) {
+                foreach ($this->processMetricSafely($autoTuneMetricConfigsByLocale, $storeTransfer) as $metricResultTransfer) {
                     $resultTransfer->addMetricResult($metricResultTransfer);
 
-                    if ($metricResultTransfer->getWasThresholdMet() || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
+                    $autoTuneMetricConfigTransfer = $autoTuneMetricConfigsByLocale[$metricResultTransfer->getLocaleNameOrFail()] ?? null;
+
+                    if ($metricResultTransfer->getWasThresholdMet() || $autoTuneMetricConfigTransfer === null || !$autoTuneMetricConfigTransfer->getIsNotifyEnabledOrFail()) {
                         continue;
                     }
 
@@ -90,6 +96,29 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
     }
 
     /**
+     * {@see SearchRankingOptimizerRepositoryInterface::findAutoTuneMetricConfigsWithThresholdSet()} returns
+     * one row per (metric, locale) with a threshold set, flat across the whole store — grouped back up
+     * here by metric, keyed by locale within each group, so {@see processMetric()} can look up exactly the
+     * locale it's currently checking instead of assuming a single config applies everywhere.
+     *
+     * @phpstan-return array<int, non-empty-array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>>
+     *
+     * @param array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigTransfers
+     *
+     * @return array<int, array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>>
+     */
+    protected function groupConfigsByMetric(array $autoTuneMetricConfigTransfers): array
+    {
+        $configsByMetricAndLocale = [];
+
+        foreach ($autoTuneMetricConfigTransfers as $autoTuneMetricConfigTransfer) {
+            $configsByMetricAndLocale[$autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()][$autoTuneMetricConfigTransfer->getLocaleNameOrFail()] = $autoTuneMetricConfigTransfer;
+        }
+
+        return $configsByMetricAndLocale;
+    }
+
+    /**
      * One metric's `evaluateCurrentMetricFitAcrossLocales()`/`getFitCandidates()`/`saveMetricFormula()`
      * calls all reach out to search-ranking's own facade (ultimately Elasticsearch/Propel) -- an
      * unexpected failure there (e.g. ES temporarily unreachable) must never abort the whole run: every
@@ -99,26 +128,31 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * result is anchored to the store's own default locale — a failure this early (e.g. the very first
      * facade call) means isLocaleScoped isn't known yet, so there is no real per-locale fan-out to report
      * against; a single error entry is enough to surface the failure without inventing scope it doesn't
-     * have.
+     * have. $autoTuneMetricConfigsByLocale is never empty ({@see groupConfigsByMetric()} only ever creates
+     * non-empty groups), so `reset()` always finds a real config to read the metric id from.
      *
-     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @phpstan-param non-empty-array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigsByLocale
+     *
+     * @param array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigsByLocale
      * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer>
      */
     protected function processMetricSafely(
-        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        array $autoTuneMetricConfigsByLocale,
         StoreTransfer $storeTransfer,
     ): array {
         try {
-            return $this->processMetric($autoTuneMetricConfigTransfer, $storeTransfer);
+            return $this->processMetric($autoTuneMetricConfigsByLocale, $storeTransfer);
         } catch (Throwable $throwable) {
+            $idSearchRankingMetric = reset($autoTuneMetricConfigsByLocale)->getIdSearchRankingMetricOrFail();
+
             return [
                 (new SearchRankingAutoTuneMetricResultTransfer())
-                    ->setIdSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail())
+                    ->setIdSearchRankingMetric($idSearchRankingMetric)
                     ->setStoreName($storeTransfer->getNameOrFail())
                     ->setLocaleName($storeTransfer->getDefaultLocaleIsoCodeOrFail())
-                    ->setMetricName(sprintf('metric #%d', $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail()))
+                    ->setMetricName(sprintf('metric #%d', $idSearchRankingMetric))
                     ->setErrorMessage($throwable->getMessage()),
             ];
         }
@@ -134,24 +168,32 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * independently would be redundant work, AND actively wrong: an independent refit per locale would
      * refit against each locale's own digest and re-fan-out on every iteration, leaving whichever locale
      * was processed LAST to silently overwrite every earlier one — an order-dependent, non-deterministic
-     * final formula, not a real improvement.
+     * final formula, not a real improvement. Its config is read from $autoTuneMetricConfigsByLocale's own
+     * default-locale entry — guaranteed present if the metric is in this group at all, since
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface}
+     * always fans a store-wide metric's save out to every real locale, default included.
      *
      * For a genuinely locale-scoped metric (`isLocaleScoped=true`, rare), returns one result per REAL
-     * locale of the store that has a digest — each checked/refit/applied fully independently, since a save
-     * for one locale never touches another on search-ranking's own side any more. A locale with no digest
-     * yet is skipped for that locale only (same "safe absence" contract as the store-wide case), not
-     * treated as a reason to skip the whole metric.
+     * locale of the store that BOTH has a digest AND has its own config in $autoTuneMetricConfigsByLocale —
+     * each checked/refit/applied fully independently, since a save for one locale never touches another on
+     * search-ranking's own side any more, and neither does an auto-tune config save now. A locale with no
+     * digest yet, or no config of its own (never individually opted in — same "absence means opted out"
+     * contract $autoTuneMetricConfigsByLocale's own presence-per-metric already relies on, deliberately NOT
+     * falling back to the default locale's config here), is skipped for that locale only, not treated as a
+     * reason to skip the whole metric.
      *
-     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
+     * @phpstan-param non-empty-array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigsByLocale
+     *
+     * @param array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigsByLocale
      * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer>
      */
     protected function processMetric(
-        SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
+        array $autoTuneMetricConfigsByLocale,
         StoreTransfer $storeTransfer,
     ): array {
-        $idSearchRankingMetric = $autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail();
+        $idSearchRankingMetric = reset($autoTuneMetricConfigsByLocale)->getIdSearchRankingMetricOrFail();
         $storeName = $storeTransfer->getNameOrFail();
         $defaultLocaleName = $storeTransfer->getDefaultLocaleIsoCodeOrFail();
 
@@ -169,8 +211,9 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
         if (!$metric['isLocaleScoped']) {
             $currentFitRSquared = $fitRSquaredByLocale[$defaultLocaleName] ?? null;
+            $autoTuneMetricConfigTransfer = $autoTuneMetricConfigsByLocale[$defaultLocaleName] ?? null;
 
-            if ($currentFitRSquared === null) {
+            if ($currentFitRSquared === null || $autoTuneMetricConfigTransfer === null) {
                 return [];
             }
 
@@ -190,6 +233,12 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
 
         foreach ($fitRSquaredByLocale as $localeName => $currentFitRSquared) {
             if ($currentFitRSquared === null) {
+                continue;
+            }
+
+            $autoTuneMetricConfigTransfer = $autoTuneMetricConfigsByLocale[$localeName] ?? null;
+
+            if ($autoTuneMetricConfigTransfer === null) {
                 continue;
             }
 
