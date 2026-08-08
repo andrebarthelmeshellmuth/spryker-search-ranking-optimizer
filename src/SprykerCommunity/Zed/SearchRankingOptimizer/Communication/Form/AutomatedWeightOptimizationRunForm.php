@@ -12,8 +12,11 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form;
 use Spryker\Zed\Kernel\Communication\Form\AbstractType;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\GreaterThanOrEqual;
+use Symfony\Component\Validator\Constraints\LessThanOrEqual;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 /**
@@ -35,6 +38,16 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
      * @var string
      */
     public const FIELD_ALGORITHM = 'algorithm';
+
+    /**
+     * @var string
+     */
+    public const FIELD_IS_TERMINATION_CRITERIA_TRUSTED = 'isTerminationCriteriaTrusted';
+
+    /**
+     * @var string
+     */
+    public const FIELD_WARM_START_FRACTION_PERCENT = 'warmStartFractionPercent';
 
     /**
      * @var string
@@ -78,6 +91,35 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
             'help' => $this->buildAlgorithmHelp($options[static::OPTION_ALGORITHMS]),
             'choices' => $this->buildAlgorithmChoices($options[static::OPTION_ALGORITHMS]),
             'constraints' => [new NotBlank()],
+        ]);
+
+        $builder->add(static::FIELD_IS_TERMINATION_CRITERIA_TRUSTED, ChoiceType::class, [
+            'label' => 'Trust termination criteria',
+            'help' => 'Off (default): run the full generation budget, the same fixed-length exploration '
+                . 'run as always. On: stop as soon as the algorithm\'s own convergence/divergence/plateau '
+                . 'detection fires instead of exhausting the budget — faster when the search already '
+                . 'converges well before the budget runs out, no different otherwise.',
+            'choices' => ['Off' => false, 'On' => true],
+            'data' => false,
+        ]);
+
+        $builder->add(static::FIELD_WARM_START_FRACTION_PERCENT, IntegerType::class, [
+            'label' => 'Warm start (%)',
+            'help' => '0 (default): start from scratch, the same from-random-or-midpoint exploration run '
+                . 'as always — the right choice for periodically checking whether a genuinely different '
+                . 'configuration beats the current one. Above 0: bias the search toward the CURRENT live '
+                . 'configuration instead, converging faster but with a higher chance of settling into a '
+                . 'local optimum near it rather than finding a better region elsewhere — the right choice '
+                . 'for quickly verifying whether a specific tweak helps.',
+            'attr' => [
+                'min' => 0,
+                'max' => 100,
+            ],
+            'constraints' => [
+                new GreaterThanOrEqual(0),
+                new LessThanOrEqual(100),
+            ],
+            'data' => 0,
         ]);
     }
 

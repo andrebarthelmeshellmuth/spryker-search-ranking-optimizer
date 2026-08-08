@@ -391,6 +391,8 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setStoreName($optimizerRunTransfer->getStoreNameOrFail());
         $optimizerRunEntity->setLocaleName($optimizerRunTransfer->getLocaleNameOrFail());
         $optimizerRunEntity->setAlgorithm($optimizerRunTransfer->getAlgorithmOrFail());
+        $optimizerRunEntity->setIsTerminationCriteriaTrusted($optimizerRunTransfer->getIsTerminationCriteriaTrusted() ?? false);
+        $optimizerRunEntity->setWarmStartFraction($optimizerRunTransfer->getWarmStartFraction() ?? 0.0);
         $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
         $optimizerRunEntity->save();
 
@@ -447,6 +449,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param float $bestSpecificityCurveExponent
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
+     * @param int $generationsUsed
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
@@ -457,6 +460,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         float $bestSpecificityCurveExponent,
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
+        int $generationsUsed,
     ): void {
         $optimizerRunEntity = $this->getFactory()
             ->createSearchRankingOptimizerRunQuery()
@@ -474,6 +478,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setBestSpecificityCurveExponent($bestSpecificityCurveExponent);
         $optimizerRunEntity->setBestSpecificityWeightExponent($bestSpecificityWeightExponent);
         $optimizerRunEntity->setBestSpecificityWeightShiftMagnitude($bestSpecificityWeightShiftMagnitude);
+        $optimizerRunEntity->setGenerationsUsed($generationsUsed);
         $optimizerRunEntity->setCompletedAt(new DateTime());
         $optimizerRunEntity->save();
     }

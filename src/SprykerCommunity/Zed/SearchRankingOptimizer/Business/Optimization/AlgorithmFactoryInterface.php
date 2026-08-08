@@ -35,6 +35,22 @@ interface AlgorithmFactoryInterface
      * @param string $algorithmName One of `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*`.
      * @param int $populationSize
      * @param int $maxGenerations
+     * @param bool $isTerminationCriteriaTrusted Calls the built algorithm's own `trustTerminationCriteria()`
+     *   when true, governing the run by its own convergence/divergence/plateau detection instead of
+     *   $maxGenerations.
+     * @param array<int, float>|null $warmStartVector Same length/order as the problem this algorithm will
+     *   optimize (i.e. `ParameterVectorMapperInterface::mapConfigurationToVector()`'s own output). Null (the
+     *   default) or a non-positive $warmStartFraction leaves the built algorithm entirely unconfigured for
+     *   warm start, same as never calling `setWarmStart()` at all.
+     * @param float $warmStartFraction Passed through to the built algorithm's own `setWarmStart()` --
+     *   see that method's own docblock. Ignored when $warmStartVector is null.
      */
-    public function create(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface;
+    public function create(
+        string $algorithmName,
+        int $populationSize,
+        int $maxGenerations,
+        bool $isTerminationCriteriaTrusted = false,
+        ?array $warmStartVector = null,
+        float $warmStartFraction = 0.0,
+    ): OptimizerAlgorithmInterface;
 }

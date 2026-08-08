@@ -306,8 +306,20 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
+     * @param bool $isTerminationCriteriaTrusted Governs the run by the algorithm's own convergence/
+     *   divergence/plateau detection instead of the fixed maxGenerations budget. Defaults to false,
+     *   preserving the original fixed-budget behavior.
+     * @param float $warmStartFraction How much of the search is seeded from the live configuration instead
+     *   of starting cold, between 0.0 and 1.0. Defaults to 0.0, preserving the original from-scratch
+     *   behavior.
      */
-    public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer;
+    public function queueOptimizationRun(
+        string $storeName,
+        string $localeName,
+        string $algorithm,
+        bool $isTerminationCriteriaTrusted = false,
+        float $warmStartFraction = 0.0,
+    ): SearchRankingOptimizerRunTransfer;
 
     /**
      * Specification:

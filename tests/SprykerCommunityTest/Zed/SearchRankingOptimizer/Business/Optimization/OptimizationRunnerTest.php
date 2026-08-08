@@ -306,6 +306,141 @@ class OptimizationRunnerTest extends Unit
         $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
     }
 
+    /**
+     * generations_used must be the real number of generations blackbox-optimizer's own
+     * OptimizationResult::getBestValueHistory() reports, independent of the totalCount/processedCount
+     * candidate-evaluation counters -- captures completeOptimizerRun()'s new 9th argument directly rather
+     * than inferring it, since it's a plain int with no further behavioral signature to probe.
+     */
+    public function testRunNextPersistsGenerationsUsedOnCompletion(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedGenerationsUsed = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must match
+        // completeOptimizerRun()'s real 9 arguments; only the last (generationsUsed) is used below.
+        $captureCallback = function (
+            int $idOptimizerRun,
+            float $bestRelevanceWeight,
+            array $bestMetricWeightTransfers,
+            float $bestScore,
+            float $bestSpecificityBlendWeight,
+            float $bestSpecificityCurveExponent,
+            float $bestSpecificityWeightExponent,
+            float $bestSpecificityWeightShiftMagnitude,
+            int $generationsUsed,
+        ) use (&$capturedGenerationsUsed): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedGenerationsUsed = $generationsUsed;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert -- createRunner() uses a deliberately tiny maxGenerations=2 (DE's own initial-population
+        // batch plus up to 2 generations), so generationsUsed is bounded above by that same real behavior.
+        $this->assertGreaterThanOrEqual(1, $capturedGenerationsUsed);
+        $this->assertLessThanOrEqual(3, $capturedGenerationsUsed);
+    }
+
+    /**
+     * Proves isTerminationCriteriaTrusted actually reaches the built algorithm, not just that
+     * AlgorithmFactory::create() itself honors the flag (already covered by AlgorithmFactoryTest) --
+     * createRunner()'s deliberately tiny maxGenerations=2 override must be ignored once this run's own
+     * isTerminationCriteriaTrusted is true, the same "exceeds the tiny budget" proof
+     * blackbox-optimizer's own algorithm tests use for trustTerminationCriteria() itself.
+     */
+    public function testRunNextPassesIsTerminationCriteriaTrustedFromTheQueuedRunToTheAlgorithm(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(isTerminationCriteriaTrusted: true),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- see the DE test above.
+        $objectiveCallback = fn (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer): float => $configurationTransfer->getRelevanceWeightOrFail();
+        // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturnCallback($objectiveCallback);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedGenerationsUsed = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- see the capture test above.
+        $captureCallback = function (
+            int $idOptimizerRun,
+            float $bestRelevanceWeight,
+            array $bestMetricWeightTransfers,
+            float $bestScore,
+            float $bestSpecificityBlendWeight,
+            float $bestSpecificityCurveExponent,
+            float $bestSpecificityWeightExponent,
+            float $bestSpecificityWeightShiftMagnitude,
+            int $generationsUsed,
+        ) use (&$capturedGenerationsUsed): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedGenerationsUsed = $generationsUsed;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertGreaterThan(3, $capturedGenerationsUsed, 'The 2-generation cap from maxGenerations must be ignored once this run\'s own isTerminationCriteriaTrusted is true.');
+    }
+
+    /**
+     * Structural, not statistical: proves the mapConfigurationToVector()-to-setWarmStart() plumbing (a real
+     * array shape/count match between ParameterVectorMapper's own output and what the built algorithm
+     * accepts) doesn't break the run end to end. The actual warm-start ARITHMETIC is already proven
+     * correct and precisely, deterministically at the AlgorithmFactoryTest level -- this only needs to show
+     * the orchestration wires it through without error.
+     */
+    public function testRunNextPassesWarmStartFractionFromTheQueuedRunToTheAlgorithmWithoutError(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(warmStartFraction: 1.0),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun');
+        $entityManagerMock->expects($this->never())->method('failOptimizerRun');
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+    }
+
     public function testRunNextSeedsTheBaselineWithTheLiveSpecificitySettingsAndKeepsEveryCandidateWithinTheirTrustRegion(): void
     {
         // Arrange -- the live facade reports specificityWeightExponent=1.5, specificityWeightShiftMagnitude=0.25,
@@ -408,14 +543,19 @@ class OptimizationRunnerTest extends Unit
         return $searchRankingFacadeMock;
     }
 
-    protected function createQueuedRunTransfer(?string $algorithm = null): SearchRankingOptimizerRunTransfer
-    {
+    protected function createQueuedRunTransfer(
+        ?string $algorithm = null,
+        bool $isTerminationCriteriaTrusted = false,
+        float $warmStartFraction = 0.0,
+    ): SearchRankingOptimizerRunTransfer {
         return (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
             ->setStoreName('DE')
             ->setLocaleName('en_US')
             ->setAlgorithm($algorithm ?? SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
-            ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
+            ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED)
+            ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
+            ->setWarmStartFraction($warmStartFraction);
     }
 
     protected function createDoneRunTransfer(): SearchRankingOptimizerRunTransfer

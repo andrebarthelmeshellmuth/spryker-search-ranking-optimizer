@@ -440,6 +440,27 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED, $resultTransfer->getStatus());
         $this->assertSame(0, $resultTransfer->getTotalCount());
         $this->assertSame(0, $resultTransfer->getProcessedCount());
+        $this->assertFalse($resultTransfer->getIsTerminationCriteriaTrusted(), 'Defaults to false when the given transfer never set it.');
+        $this->assertSame(0.0, $resultTransfer->getWarmStartFraction(), 'Defaults to 0.0 when the given transfer never set it.');
+    }
+
+    public function testCreateOptimizerRunPersistsAnExplicitTrustAndWarmStartFraction(): void
+    {
+        // Arrange
+        $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES)
+            ->setIsTerminationCriteriaTrusted(true)
+            ->setWarmStartFraction(0.5);
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun($optimizerRunTransfer);
+        $this->optimizerRunIds[] = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
+
+        // Assert
+        $this->assertTrue($resultTransfer->getIsTerminationCriteriaTrusted());
+        $this->assertSame(0.5, $resultTransfer->getWarmStartFraction());
     }
 
     public function testStartOptimizerRunTransitionsToRunningAndSetsTotalCountAndBaselineScore(): void
@@ -492,7 +513,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         ];
 
         // Act
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 0.75, 1.4, 1.2, 0.25);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun($idSearchRankingOptimizerRun, 0.8, $bestMetricWeightTransfers, 0.91, 0.75, 1.4, 1.2, 0.25, 189);
 
         // Assert
         $entity = SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun);
@@ -503,13 +524,14 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(1.4, $entity->getBestSpecificityCurveExponent());
         $this->assertSame(1.2, $entity->getBestSpecificityWeightExponent());
         $this->assertSame(0.25, $entity->getBestSpecificityWeightShiftMagnitude());
+        $this->assertSame(189, $entity->getGenerationsUsed());
         $this->assertNotNull($entity->getCompletedAt());
         $this->assertStringContainsString('top_seller', (string)$entity->getBestMetricWeights());
     }
 
     public function testCompleteOptimizerRunIsASafeNoOpForANonExistentId(): void
     {
-        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.4, 1.2, 0.25);
+        (new SearchRankingOptimizerEntityManager())->completeOptimizerRun(999999999, 0.8, [], 0.91, 0.75, 1.4, 1.2, 0.25, 189);
         $this->addToAssertionCount(1);
     }
 

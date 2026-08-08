@@ -189,6 +189,9 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param float $bestSpecificityCurveExponent
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
+     * @param int $generationsUsed The real number of generations the algorithm actually ran (count of
+     *   OptimizationResult::getBestValueHistory()) -- independent of totalCount/processedCount, which count
+     *   candidate evaluations, not generations.
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
@@ -199,6 +202,7 @@ interface SearchRankingOptimizerEntityManagerInterface
         float $bestSpecificityCurveExponent,
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
+        int $generationsUsed,
     ): void;
 
     /**

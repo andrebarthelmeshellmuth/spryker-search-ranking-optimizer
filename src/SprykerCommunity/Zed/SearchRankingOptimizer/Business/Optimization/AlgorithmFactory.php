@@ -37,12 +37,30 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param string $algorithmName
      * @param int $populationSize
      * @param int $maxGenerations
+     * @param bool $isTerminationCriteriaTrusted
+     * @param array<int, float>|null $warmStartVector
+     * @param float $warmStartFraction
      */
-    public function create(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface
-    {
+    public function create(
+        string $algorithmName,
+        int $populationSize,
+        int $maxGenerations,
+        bool $isTerminationCriteriaTrusted = false,
+        ?array $warmStartVector = null,
+        float $warmStartFraction = 0.0,
+    ): OptimizerAlgorithmInterface {
         $algorithm = $this->createAll()[$algorithmName] ?? $this->createCmaEs();
+        $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
 
-        return $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
+        if ($isTerminationCriteriaTrusted) {
+            $algorithm->trustTerminationCriteria();
+        }
+
+        if ($warmStartVector !== null && $warmStartFraction > 0.0) {
+            $algorithm->setWarmStart($warmStartVector, $warmStartFraction);
+        }
+
+        return $algorithm;
     }
 
     protected function createCmaEs(): CmaEsAlgorithm

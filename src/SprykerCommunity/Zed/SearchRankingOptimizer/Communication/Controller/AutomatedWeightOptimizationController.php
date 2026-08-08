@@ -9,10 +9,12 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
+use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -36,25 +38,7 @@ class AutomatedWeightOptimizationController extends AbstractController
         $optimizeRunForm = $this->getFactory()->createOptimizeRunForm()->handleRequest($request);
 
         if ($optimizeRunForm->isSubmitted() && $optimizeRunForm->isValid()) {
-            $formData = $optimizeRunForm->getData();
-            $storeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME];
-            $localeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME];
-            $algorithm = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM];
-
-            $this->getFacade()->queueOptimizationRun($storeName, $localeName, $algorithm);
-
-            $this->addSuccessMessage(
-                'Optimization run queued — the next "search-ranking-optimizer:optimize" cron tick will process it.',
-            );
-
-            return $this->redirectResponse(sprintf(
-                '%s?%s=%s&%s=%s',
-                static::URL_OPTIMIZATION,
-                AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME,
-                $storeName,
-                AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME,
-                $localeName,
-            ));
+            return $this->queueOptimizationRunFromFormData($optimizeRunForm->getData());
         }
 
         $storeName = (string)$request->query->get(AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME, '');
@@ -64,32 +48,7 @@ class AutomatedWeightOptimizationController extends AbstractController
             : null;
         $currentConfigurationStoreName = $storeName !== '' ? $storeName : SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME;
         $currentConfigurationLocaleName = $localeName !== '' ? $localeName : SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
-
-        // A store-wide metric's winning weight applies to this run's own (store, locale) same as any
-        // other, but Apply writes it through search-ranking's own saveMetricWeight(), which fans that
-        // write out to every real locale of the store too. Resolved per metric (same
-        // resolveEffectiveWeightLocales() call CheckpointController already uses for its own Restore
-        // warning) so the Apply button below can disclose the real blast radius before it's clicked.
-        $applySiblingLocalesByMetric = [];
-
-        if ($latestOptimizerRunTransfer !== null) {
-            foreach ($latestOptimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
-                $siblingLocales = array_values(array_diff(
-                    $this->getFactory()->getSearchRankingFacade()->resolveEffectiveWeightLocales(
-                        $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
-                        $currentConfigurationStoreName,
-                        $currentConfigurationLocaleName,
-                    ),
-                    [$currentConfigurationLocaleName],
-                ));
-
-                if ($siblingLocales === []) {
-                    continue;
-                }
-
-                $applySiblingLocalesByMetric[$metricWeightTransfer->getNameOrFail()] = $siblingLocales;
-            }
-        }
+        $applySiblingLocalesByMetric = $this->resolveApplySiblingLocalesByMetric($latestOptimizerRunTransfer, $currentConfigurationStoreName, $currentConfigurationLocaleName);
 
         return $this->viewResponse([
             'optimizeRunForm' => $optimizeRunForm->createView(),
@@ -107,6 +66,77 @@ class AutomatedWeightOptimizationController extends AbstractController
                 ? $this->getFactory()->createOptimizationApplyForm($latestOptimizerRunTransfer->getIdSearchRankingOptimizerRunOrFail())->createView()
                 : null,
         ]);
+    }
+
+    /**
+     * A store-wide metric's winning weight applies to this run's own (store, locale) same as any other,
+     * but Apply writes it through search-ranking's own saveMetricWeight(), which fans that write out to
+     * every real locale of the store too. Resolved per metric (same resolveEffectiveWeightLocales() call
+     * CheckpointController already uses for its own Restore warning) so the Apply button below can
+     * disclose the real blast radius before it's clicked.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null $latestOptimizerRunTransfer
+     * @param string $currentConfigurationStoreName
+     * @param string $currentConfigurationLocaleName
+     *
+     * @return array<string, array<int, string>>
+     */
+    protected function resolveApplySiblingLocalesByMetric(
+        ?SearchRankingOptimizerRunTransfer $latestOptimizerRunTransfer,
+        string $currentConfigurationStoreName,
+        string $currentConfigurationLocaleName,
+    ): array {
+        $applySiblingLocalesByMetric = [];
+
+        if ($latestOptimizerRunTransfer === null) {
+            return $applySiblingLocalesByMetric;
+        }
+
+        foreach ($latestOptimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
+            $siblingLocales = array_values(array_diff(
+                $this->getFactory()->getSearchRankingFacade()->resolveEffectiveWeightLocales(
+                    $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
+                    $currentConfigurationStoreName,
+                    $currentConfigurationLocaleName,
+                ),
+                [$currentConfigurationLocaleName],
+            ));
+
+            if ($siblingLocales === []) {
+                continue;
+            }
+
+            $applySiblingLocalesByMetric[$metricWeightTransfer->getNameOrFail()] = $siblingLocales;
+        }
+
+        return $applySiblingLocalesByMetric;
+    }
+
+    /**
+     * @param array<string, mixed> $formData
+     */
+    protected function queueOptimizationRunFromFormData(array $formData): RedirectResponse
+    {
+        $storeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME];
+        $localeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME];
+        $algorithm = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM];
+        $isTerminationCriteriaTrusted = (bool)$formData[AutomatedWeightOptimizationRunForm::FIELD_IS_TERMINATION_CRITERIA_TRUSTED];
+        $warmStartFraction = (int)$formData[AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT] / 100;
+
+        $this->getFacade()->queueOptimizationRun($storeName, $localeName, $algorithm, $isTerminationCriteriaTrusted, $warmStartFraction);
+
+        $this->addSuccessMessage(
+            'Optimization run queued — the next "search-ranking-optimizer:optimize" cron tick will process it.',
+        );
+
+        return $this->redirectResponse(sprintf(
+            '%s?%s=%s&%s=%s',
+            static::URL_OPTIMIZATION,
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME,
+            $storeName,
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME,
+            $localeName,
+        ));
     }
 
     /**

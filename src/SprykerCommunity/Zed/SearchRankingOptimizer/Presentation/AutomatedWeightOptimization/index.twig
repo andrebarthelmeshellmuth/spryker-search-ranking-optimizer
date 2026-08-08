@@ -13,9 +13,17 @@
                 <div class="search-ranking-optimizer-optimization-progress" data-role="optimization-progress">
                     <p>
                         Run #{{ inProgressOptimizerRun.idSearchRankingOptimizerRun }} ({{ inProgressOptimizerRun.algorithm }}):
-                        <span data-role="processed">{{ inProgressOptimizerRun.processedCount }}</span> /
+                        <span data-role="processed">{{ inProgressOptimizerRun.processedCount }}</span>
+                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
+                            {{ 'of up to' | trans }}
+                        {% else %}
+                            /
+                        {% endif %}
                         <span data-role="total">{{ inProgressOptimizerRun.totalCount }}</span>
                         {{ 'candidates evaluated' | trans }}
+                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
+                            <span class="text-muted" style="font-size: 11px;">(trusting termination criteria — likely to stop well short of this ceiling)</span>
+                        {% endif %}
                     </p>
                     <progress data-role="progress-bar" value="{{ inProgressOptimizerRun.processedCount }}" max="{{ inProgressOptimizerRun.totalCount|default(1) }}" style="width: 100%;"></progress>
                 </div>
@@ -53,6 +61,15 @@
                         {% endif %}
 
                         {% if latestOptimizerRun.status == 'done' %}
+                            <tr>
+                                <th>Generations used</th>
+                                <td>
+                                    {{ latestOptimizerRun.generationsUsed }}
+                                    {% if latestOptimizerRun.isTerminationCriteriaTrusted %}
+                                        <span class="text-muted" style="font-size: 11px;">(trusted termination criteria — stopped on convergence/divergence/plateau, not a fixed budget)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
                             <tr>
                                 <th>Baseline weighted nDCG@10 (live configuration)</th>
                                 <td>{{ latestOptimizerRun.baselineScore }}</td>
@@ -149,6 +166,8 @@
             {{ form_row(optimizeRunForm.storeName) }}
             {{ form_row(optimizeRunForm.localeName) }}
             {{ form_row(optimizeRunForm.algorithm) }}
+            {{ form_row(optimizeRunForm.isTerminationCriteriaTrusted) }}
+            {{ form_row(optimizeRunForm.warmStartFractionPercent) }}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ 'Run now' | trans }}</button>
             </div>

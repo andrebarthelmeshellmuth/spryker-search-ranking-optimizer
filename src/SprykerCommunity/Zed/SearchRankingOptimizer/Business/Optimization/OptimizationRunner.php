@@ -131,7 +131,16 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
-        $algorithm = $this->algorithmFactory->create($algorithmName, $populationSize, $maxGenerations);
+        $warmStartFraction = $queuedRunTransfer->getWarmStartFraction() ?? 0.0;
+        $warmStartVector = $warmStartFraction > 0.0 ? $mapper->mapConfigurationToVector($liveConfigurationTransfer) : null;
+        $algorithm = $this->algorithmFactory->create(
+            $algorithmName,
+            $populationSize,
+            $maxGenerations,
+            $queuedRunTransfer->getIsTerminationCriteriaTrusted() ?? false,
+            $warmStartVector,
+            $warmStartFraction,
+        );
 
         $this->entityManager->startOptimizerRun(
             $idOptimizerRun,
@@ -154,6 +163,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $bestConfigurationTransfer->getSpecificityCurveExponentOrFail(),
             $bestConfigurationTransfer->getSpecificityWeightExponentOrFail(),
             $bestConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            count($result->getBestValueHistory()),
         );
     }
 

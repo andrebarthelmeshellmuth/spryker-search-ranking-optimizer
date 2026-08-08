@@ -296,14 +296,23 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm
+     * @param bool $isTerminationCriteriaTrusted
+     * @param float $warmStartFraction
      */
-    public function queueOptimizationRun(string $storeName, string $localeName, string $algorithm): SearchRankingOptimizerRunTransfer
-    {
+    public function queueOptimizationRun(
+        string $storeName,
+        string $localeName,
+        string $algorithm,
+        bool $isTerminationCriteriaTrusted = false,
+        float $warmStartFraction = 0.0,
+    ): SearchRankingOptimizerRunTransfer {
         return $this->getEntityManager()->createOptimizerRun(
             (new SearchRankingOptimizerRunTransfer())
                 ->setStoreName($storeName)
                 ->setLocaleName($localeName)
-                ->setAlgorithm($algorithm),
+                ->setAlgorithm($algorithm)
+                ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
+                ->setWarmStartFraction($warmStartFraction),
         );
     }
 
