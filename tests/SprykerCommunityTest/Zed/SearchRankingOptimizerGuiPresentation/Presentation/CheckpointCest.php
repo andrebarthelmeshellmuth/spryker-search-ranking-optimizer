@@ -86,7 +86,13 @@ class CheckpointCest
         $rowCountBeforeRestore = count($i->grabMultiple(CheckpointPage::SELECTOR_ANY_HISTORY_ROW));
         $i->waitForElementVisible(CheckpointPage::SELECTOR_FIRST_HISTORY_ROW_RESTORE_BUTTON, 10);
         $i->click(CheckpointPage::SELECTOR_FIRST_HISTORY_ROW_RESTORE_BUTTON);
-        $i->see('recorded as new checkpoint');
+        // The restore button's onclick fires a native confirm() warning about the store-wide fan-out
+        // (see index.twig) — must be accepted before any further command, or WebDriver throws
+        // UnexpectedAlertOpenException on the very next one. The form's own POST + redirect only
+        // actually fires once the dialog is dismissed, so a plain see() right after acceptPopup() can
+        // race the navigation — waitForText gives it a moment instead of asserting on a stale DOM.
+        $i->acceptPopup();
+        $i->waitForText('recorded as new checkpoint', 10);
 
         // Restoring is itself an apply: a brand-new checkpoint row exists recording the restored state,
         // not just a special undo with no audit trail of its own.

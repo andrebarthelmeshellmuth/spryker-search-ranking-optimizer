@@ -59,6 +59,19 @@ class OptimizationCest
 
         $i->amOnPage(SearchRankingSettingsPage::URL);
         $i->seeInField('#' . SearchRankingSettingsPage::FIELD_RELEVANCE_WEIGHT, $relevanceWeightBefore);
+
+        // This test only ever proves queuing doesn't apply live — left alone, the row it just queued sits
+        // in status=queued forever (unlike Calibration's upload, which self-cleans by marking every OLDER
+        // uploaded run "skipped" the next time any calibration processes), and the next real "optimize"
+        // run anywhere — this suite's own processingAndApplyingWritesThroughAndAutoCheckpoints, a real
+        // cron tick, or a future run of this same test — would pick up THIS stale row via
+        // findOldestQueuedOptimizerRun() instead of its own. Direct Persistence-class access isn't
+        // available from this WebDriver suite's own bootstrap (unlike the Zed/SearchRankingOptimizer
+        // integration suite), so cleanup runs the real console command instead — the same one
+        // processingAndApplyingWritesThroughAndAutoCheckpoints already uses for real; it only computes and
+        // marks the run "done", it does not itself apply anything live, so this stays pure cleanup with no
+        // bearing on the assertion above.
+        $i->runConsoleCommand(OptimizationPage::CONSOLE_COMMAND_OPTIMIZE);
     }
 
     /**
