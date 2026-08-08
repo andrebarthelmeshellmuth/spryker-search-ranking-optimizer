@@ -53,10 +53,8 @@ class AutoTuneMetricConfigWriterTest extends Unit
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->exactly(2))
             ->method('saveAutoTuneMetricConfig')
-            ->with($this->callback(function (SearchRankingAutoTuneMetricConfigTransfer $transfer): bool {
-                return $transfer->getIdSearchRankingAutoTuneMetricConfig() === null
-                    && $transfer->getAutoTuneThreshold() === 0.8;
-            }))
+            ->with($this->callback(fn (SearchRankingAutoTuneMetricConfigTransfer $transfer): bool => $transfer->getIdSearchRankingAutoTuneMetricConfig() === null
+                && $transfer->getAutoTuneThreshold() === 0.8))
             ->willReturnCallback(fn (SearchRankingAutoTuneMetricConfigTransfer $transfer) => $transfer);
 
         $writer = new AutoTuneMetricConfigWriter($entityManagerMock, $searchRankingFacadeMock);

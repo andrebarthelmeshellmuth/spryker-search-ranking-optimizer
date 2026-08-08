@@ -210,23 +210,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         $fitRSquaredByLocale = $this->searchRankingFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
 
         if (!$metric['isLocaleScoped']) {
-            $currentFitRSquared = $fitRSquaredByLocale[$defaultLocaleName] ?? null;
-            $autoTuneMetricConfigTransfer = $autoTuneMetricConfigsByLocale[$defaultLocaleName] ?? null;
-
-            if ($currentFitRSquared === null || $autoTuneMetricConfigTransfer === null) {
-                return [];
-            }
-
-            return [
-                $this->processMetricAtScope(
-                    $autoTuneMetricConfigTransfer,
-                    $metric,
-                    $storeName,
-                    $defaultLocaleName,
-                    $currentFitRSquared,
-                    $fitRSquaredByLocale,
-                ),
-            ];
+            return $this->processStoreWideMetric($autoTuneMetricConfigsByLocale, $metric, $storeName, $defaultLocaleName, $fitRSquaredByLocale);
         }
 
         $metricResultTransfers = [];
@@ -271,6 +255,45 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
     }
 
     // phpcs:disable Spryker.Commenting.DocBlockParamAllowDefaultValue.Typehint -- misreads this shaped array docblock as a default-value typehint check
+
+    /**
+     * The store-wide (`isLocaleScoped=false`) branch of {@see processMetric()}, extracted purely to keep
+     * that method's own cyclomatic complexity down — see {@see processMetric()}'s own docblock for why a
+     * store-wide metric only ever produces exactly one result, at the store's default locale.
+     *
+     * @param array<string, \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer> $autoTuneMetricConfigsByLocale
+     * @param array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool} $metric
+     * @param string $storeName
+     * @param string $defaultLocaleName
+     * @param array<string, float|null> $fitRSquaredByLocale
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer>
+     */
+    protected function processStoreWideMetric(
+        array $autoTuneMetricConfigsByLocale,
+        array $metric,
+        string $storeName,
+        string $defaultLocaleName,
+        array $fitRSquaredByLocale,
+    ): array {
+        $currentFitRSquared = $fitRSquaredByLocale[$defaultLocaleName] ?? null;
+        $autoTuneMetricConfigTransfer = $autoTuneMetricConfigsByLocale[$defaultLocaleName] ?? null;
+
+        if ($currentFitRSquared === null || $autoTuneMetricConfigTransfer === null) {
+            return [];
+        }
+
+        return [
+            $this->processMetricAtScope(
+                $autoTuneMetricConfigTransfer,
+                $metric,
+                $storeName,
+                $defaultLocaleName,
+                $currentFitRSquared,
+                $fitRSquaredByLocale,
+            ),
+        ];
+    }
 
     /**
      * The threshold-check / determinism-check / refit body shared by every (metric, store, locale) this

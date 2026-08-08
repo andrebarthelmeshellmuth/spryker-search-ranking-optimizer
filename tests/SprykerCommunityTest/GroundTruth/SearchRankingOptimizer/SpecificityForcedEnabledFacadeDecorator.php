@@ -235,6 +235,25 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     /**
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     *
+     * @return array<string, float|null>
+     */
+    public function evaluateCurrentMetricFitAcrossLocales(int $idSearchRankingMetric, string $storeName): array
+    {
+        return $this->realFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
+    }
+
+    /**
+     * @param string $storeName
+     */
+    public function hasStoreConfiguration(string $storeName): bool
+    {
+        return $this->realFacade->hasStoreConfiguration($storeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
      * @param string $localeName
      *
      * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null
