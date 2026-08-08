@@ -121,6 +121,58 @@ class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
     }
 
     /**
+     * A spread at or above SearchRankingOptimizerConfig::getLocaleFitDivergenceWarningThreshold() (0.1)
+     * gets an extra warning line -- purely informational, formula/threshold/refit logic is unaffected.
+     */
+    public function testReportsALocaleFitDivergenceWarningWhenTheSpreadExceedsTheThreshold(): void
+    {
+        // Arrange
+        $metricResults = [
+            (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('DE')
+                ->setMetricNameOrFail('pdp_impressions')
+                ->setWasThresholdMetOrFail(true)
+                ->setBeforeFitRSquaredOrFail(0.91)
+                ->setFitRSquaredByLocale(['de_DE' => 0.91, 'en_US' => 0.62]),
+        ];
+
+        $commandTester = $this->createCommandTester($this->createResultTransfer($metricResults, 0));
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchRankingOptimizerAutoTuneConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('[DE] pdp_impressions:   ⚠ fit varies by locale (spread 0.2900): de_DE=0.9100, en_US=0.6200', $commandTester->getDisplay());
+    }
+
+    /**
+     * A spread below the threshold (or fewer than two real locales with a digest) must stay silent --
+     * proves this isn't printed unconditionally for every metric.
+     */
+    public function testStaysSilentAboutLocaleFitWhenTheSpreadIsBelowTheThreshold(): void
+    {
+        // Arrange
+        $metricResults = [
+            (new SearchRankingAutoTuneMetricResultTransfer())
+                ->setStoreNameOrFail('DE')
+                ->setMetricNameOrFail('pdp_impressions')
+                ->setWasThresholdMetOrFail(true)
+                ->setBeforeFitRSquaredOrFail(0.91)
+                ->setFitRSquaredByLocale(['de_DE' => 0.91, 'en_US' => 0.89]),
+        ];
+
+        $commandTester = $this->createCommandTester($this->createResultTransfer($metricResults, 0));
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchRankingOptimizerAutoTuneConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringNotContainsString('varies by locale', $commandTester->getDisplay());
+    }
+
+    /**
      * @param array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer> $metricResults
      * @param int $notifiedEmailCount
      */

@@ -123,11 +123,12 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * Returns null when the metric has been deleted since its config was set, or has no digest yet —
      * both safe, silent skips, never an error.
      *
-     * The store to check is $storeTransfer, resolved by the caller from every real configured store —
-     * formula/shape are store-only on `search-ranking`'s own side (not locale-scoped), but the digest
-     * fit computation still needs A locale, so this uses the store's own configured default
-     * ({@see \Generated\Shared\Transfer\StoreTransfer::getDefaultLocaleIsoCodeOrFail()}) rather than
-     * re-deriving one from project config.
+     * The store to check is $storeTransfer, resolved by the caller from every real configured store.
+     * `search-ranking` now supports a genuinely per-locale formula (`isLocaleScoped=true`, rare), but this
+     * runner still only ever checks/refits ONE locale per store — its own configured default
+     * ({@see \Generated\Shared\Transfer\StoreTransfer::getDefaultLocaleIsoCodeOrFail()}) — never any other
+     * real locale, even for a metric that is genuinely locale-scoped on the other side. A known, tracked
+     * gap (see this package's own README), not yet closed here.
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param \Generated\Shared\Transfer\StoreTransfer $storeTransfer
@@ -152,12 +153,21 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
             return null;
         }
 
+        // Informational only -- this runner still only checks/refits the store's default locale (see this
+        // method's own docblock), so nothing here or downstream acts on a per-locale gap yet, even though
+        // search-ranking's own formula CAN genuinely differ per locale now. Surfaces the diagnostic in the
+        // summary email/result so a curator can
+        // see whether the store-wide formula is quietly a worse fit for some locale than for the one
+        // (the store's own default) refit/apply decisions are actually based on.
+        $fitRSquaredByLocale = $this->searchRankingFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
+
         $metricResultTransfer = (new SearchRankingAutoTuneMetricResultTransfer())
             ->setIdSearchRankingMetric($idSearchRankingMetric)
             ->setStoreName($storeName)
             ->setMetricName($metric['name'])
             ->setBeforeFormula($metric['formula'])
             ->setBeforeFitRSquared($currentFitRSquared)
+            ->setFitRSquaredByLocale($fitRSquaredByLocale)
             ->setWasSkippedNonDeterministic(false);
 
         if ($currentFitRSquared >= $autoTuneMetricConfigTransfer->getAutoTuneThresholdOrFail()) {

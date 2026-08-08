@@ -276,6 +276,7 @@
         <property name="wasSkippedNonDeterministic" type="bool"/>
         <property name="beforeFormula" type="string"/>
         <property name="beforeFitRSquared" type="float"/>
+        <property name="fitRSquaredByLocale" type="array" singular="fitRSquared" associative="true"/>
         <property name="afterFormula" type="string"/>
         <property name="afterShape" type="string"/>
         <property name="afterFitRSquared" type="float"/>

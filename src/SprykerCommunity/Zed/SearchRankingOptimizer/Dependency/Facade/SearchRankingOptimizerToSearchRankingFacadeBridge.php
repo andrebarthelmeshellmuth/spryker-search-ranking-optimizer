@@ -259,6 +259,17 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     /**
      * @param int $idSearchRankingMetric
      * @param string $storeName
+     *
+     * @return array<string, float|null>
+     */
+    public function evaluateCurrentMetricFitAcrossLocales(int $idSearchRankingMetric, string $storeName): array
+    {
+        return $this->searchRankingFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
      * @param string $localeName
      *
      * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null

@@ -9,7 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console;
 
+use Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer;
 use Spryker\Zed\Kernel\Communication\Console\Console;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -38,6 +40,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
     }
 
     // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
+
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
@@ -75,6 +78,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
                     $label,
                     $metricResultTransfer->getBeforeFitRSquaredOrFail(),
                 ));
+                $this->reportLocaleDivergence($output, $label, $metricResultTransfer);
 
                 continue;
             }
@@ -85,6 +89,7 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
                     $label,
                     $metricResultTransfer->getBeforeFitRSquaredOrFail(),
                 ));
+                $this->reportLocaleDivergence($output, $label, $metricResultTransfer);
 
                 continue;
             }
@@ -97,10 +102,50 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
                 $metricResultTransfer->getAfterFormula() ?? '(no candidate found)',
                 $metricResultTransfer->getAfterFitRSquared() ?? 0.0,
             ));
+            $this->reportLocaleDivergence($output, $label, $metricResultTransfer);
         }
 
         $output->writeln(sprintf('Notified %d admin(s) by email.', $autoTuneResultTransfer->getNotifiedEmailCountOrFail()));
 
         return static::CODE_SUCCESS;
+    }
+
+    /**
+     * Purely informational: this run only ever checks/refits the store's default locale (see
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}'s own
+     * docblock), so nothing here acts differently per locale yet -- this only tells a curator when a
+     * store-wide formula quietly fits one locale meaningfully worse than another, which the single
+     * before/after R² lines above can't show (they only ever reflect the store's own default locale).
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param string $label
+     * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer
+     */
+    protected function reportLocaleDivergence(OutputInterface $output, string $label, SearchRankingAutoTuneMetricResultTransfer $metricResultTransfer): void
+    {
+        $fitByLocale = array_filter($metricResultTransfer->getFitRSquaredByLocale(), static fn (?float $fit): bool => $fit !== null);
+
+        if (count($fitByLocale) < 2) {
+            return;
+        }
+
+        $spread = max($fitByLocale) - min($fitByLocale);
+
+        if ($spread < SearchRankingOptimizerConfig::getLocaleFitDivergenceWarningThreshold()) {
+            return;
+        }
+
+        $localeSummary = implode(', ', array_map(
+            static fn (string $locale, float $fit): string => sprintf('%s=%.4f', $locale, $fit),
+            array_keys($fitByLocale),
+            array_values($fitByLocale),
+        ));
+
+        $output->writeln(sprintf(
+            '%s:   ⚠ fit varies by locale (spread %.4f): %s — this store-wide formula may not fit every locale equally well.',
+            $label,
+            $spread,
+            $localeSummary,
+        ));
     }
 }

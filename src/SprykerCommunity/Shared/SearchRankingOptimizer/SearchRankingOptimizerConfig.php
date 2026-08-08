@@ -476,6 +476,26 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
+     * - Minimum spread (max R² − min R²) across a metric's real locales, within one store, before
+     *   `search-ranking-optimizer:auto-tune`'s own console report flags it as a real per-locale fit
+     *   divergence worth a human's attention. Purely informational today — Auto-Tune itself still only
+     *   checks/refits each store's default locale (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}'s
+     *   own docblock), so nothing here acts on a flagged divergence automatically; it exists so a curator
+     *   can see when a store-wide formula is quietly a much worse fit for one locale than another — the
+     *   evidence `search-ranking`'s own `isLocaleScoped` flag asks for before a metric should be flipped
+     *   to genuinely per-locale. 0.1 is a coarse "this is probably not just noise" starting point, not a
+     *   validated statistical threshold — adjust per project once real multi-locale data exists to judge
+     *   it against.
+     *
+     * @api
+     */
+    public static function getLocaleFitDivergenceWarningThreshold(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
      * - An optimization run just queued (via the Zed "Run now" button or a future cron tick), waiting for
      *   `search-ranking-optimizer:optimize` to pick it up. At most one run is ever processed per console
      *   invocation — the oldest queued — same "at most one at a time" discipline as Calibration.

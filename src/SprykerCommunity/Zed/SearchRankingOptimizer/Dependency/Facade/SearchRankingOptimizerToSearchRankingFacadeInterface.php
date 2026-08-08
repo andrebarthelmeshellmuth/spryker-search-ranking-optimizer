@@ -197,6 +197,20 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
     public function evaluateCurrentMetricFit(int $idSearchRankingMetric, string $storeName, string $localeName): ?float;
 
     /**
+     * Same fit check as {@see evaluateCurrentMetricFit()}, run once per real locale of $storeName —
+     * `search-ranking` now supports a genuinely per-locale formula (`isLocaleScoped=true`, rare; most
+     * metrics stay store-wide), so this is the evidence a curator uses to decide whether a metric should
+     * flip that flag, as well as the diagnostic for whether a store-wide formula still fits every locale's
+     * own real data comparably well. Keyed by locale name; a locale with no digest yet maps to null.
+     *
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     *
+     * @return array<string, float|null>
+     */
+    public function evaluateCurrentMetricFitAcrossLocales(int $idSearchRankingMetric, string $storeName): array;
+
+    /**
      * Deliberately returns a plain array, not `search-ranking`'s own `SearchRankingMetricTransfer` — same
      * discipline as {@see getMetricWeights()}. Returns null when the metric no longer exists.
      * formula/isActive/shape ARE store-scoped on `search-ranking`'s own side (its store-scoped-formula

@@ -334,13 +334,33 @@ package's own README). Auto-tune is the monthly job that watches that axis and, 
 applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
 specificity knobs, so it has no reason to write a weight checkpoint of its own.
 
-**Auto-tune runs independently for every real configured store** — `search-ranking`'s own metric
-formula/active-flag are store-scoped (see that package's README), and Auto-Tune's own settings table
-(`spy_search_ranking_auto_tune_metric_config`) is scoped the same way: one threshold/auto-update/notify
-config per (metric, store), not per metric alone. The monthly job enumerates every store the Store
-facade reports and checks each one's own thresholds against that store's own fit — a store that has
-never had `search-ranking` configured for it is skipped entirely, never evaluated against empty/default
-state. Deliberately NOT locale-scoped, matching `search-ranking`'s own formula/shape.
+**Auto-tune runs independently for every real configured store, but only ever against ONE locale per
+store — that store's own default.** Auto-Tune's own settings table
+(`spy_search_ranking_auto_tune_metric_config`) is scoped per (metric, store), not per metric alone, and
+the monthly job enumerates every store the Store facade reports and checks each one's own thresholds
+against that store's own default-locale fit — a store that has never had `search-ranking` configured for
+it is skipped entirely, never evaluated against empty/default state.
+
+**Known limitation:** `search-ranking` itself now supports a genuinely per-locale formula for a metric
+explicitly flagged `isLocaleScoped=true` (rare — most metrics stay store-wide; see that package's own
+README and `SCOPING.md`). Auto-Tune here does **not** yet extend to that case: it still only ever
+checks/refits a store's default locale, even for a metric that is locale-scoped on the other side — any
+non-default locale of a locale-scoped metric is neither checked nor refit by this job today. What Auto-Tune
+DOES do is surface the evidence for *whether* a metric should become locale-scoped in the first place: each
+line's before/after fit is followed, when the spread across a metric's real locales exceeds
+`SearchRankingOptimizerConfig::getLocaleFitDivergenceWarningThreshold()` (0.1 by default), by a warning
+line showing every real locale's own current fit:
+
+```
+[DE] top_seller: fit still adequate (R² = 0.9883), no change.
+[DE] top_seller:   ⚠ fit varies by locale (spread 0.3861): de_DE=0.9883, en_US=0.6022 — this store-wide formula may not fit every locale equally well.
+```
+
+That divergence is purely informational — nothing here or downstream acts on it automatically. It exists so
+a curator can decide, from real evidence, whether to flip a metric's `isLocaleScoped` flag on
+`search-ranking`'s own Metrics page and then author a genuinely different formula per locale by hand;
+extending Auto-Tune itself to check/refit every real locale of a locale-scoped metric is a real gap, not
+yet closed.
 
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
@@ -528,23 +548,29 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   storefront search would, rather than reimplementing either (only the `_termvectors` IO itself is
   reimplemented, for the same Zed/console execution-context reasons documented in `RankEvalRunner`'s own
   docblock).
-- **`search-ranking`'s metric formula/active-flag/shape are store-scoped**, not global (see that package's
-  own README). The bridge methods this package calls through
+- **`search-ranking`'s metric formula/active-flag/shape are (store, locale)-scoped**, same tier as weight
+  (see that package's own README) — but for the common `isLocaleScoped=false` metric, a save at any one
+  locale fans out to every real locale of the store, so it's effectively still store-wide in outcome. The
+  bridge methods this package calls through
   (`SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()`/`findMetricDetail()`/
   `saveMetricFormula()`) all require explicit `$storeName`/`$localeName` accordingly. Automated weight
   optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
   scope; Auto-tune (genuinely per-store — see above) passes the real store it's currently checking, and
-  that store's own configured default locale (`StoreTransfer::getDefaultLocaleIsoCodeOrFail()`) — formula
-  fit is evaluated against one real locale per store, since formula/shape themselves aren't locale-scoped.
+  that store's own configured default locale (`StoreTransfer::getDefaultLocaleIsoCodeOrFail()`) — Auto-Tune
+  itself still only ever checks/refits that ONE locale per store, even for a metric explicitly flagged
+  `isLocaleScoped=true` on `search-ranking`'s side; see
+  [Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric)'s own "Known limitation" note.
 - **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
   [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
-  a store-wide-vs-per-locale fact this package respects end to end, not just reads: `getActiveMetrics()`/
-  `getMetricWeights()`/`findMetricDetail()` all surface it, and `resolveEffectiveWeightLocales()` — a thin
-  passthrough to `search-ranking`'s own method of the same name — lets this package ask which locales a
-  given weight write would actually touch before committing one. Two independent callers use it for the
-  same purpose: the Weight Checkpoints restore warning, and the Automated Weight Optimization Apply
-  disclosure (see above) — both surface the real blast radius of a store-wide metric's write before a human
-  clicks the button, rather than treating `OptimizationRunner` as needing to exclude such a metric at all.
+  a store-wide-vs-per-locale fact this package respects end to end for weight, not just reads:
+  `getActiveMetrics()`/`getMetricWeights()`/`findMetricDetail()` all surface it, and
+  `resolveEffectiveWeightLocales()` — a thin passthrough to `search-ranking`'s own method of the same name
+  (which now also governs formula/active/shape fan-out on that side, not just weight) — lets this package
+  ask which locales a given weight write would actually touch before committing one. Two independent
+  callers use it for the same purpose: the Weight Checkpoints restore warning, and the Automated Weight
+  Optimization Apply disclosure (see above) — both surface the real blast radius of a store-wide metric's
+  write before a human clicks the button, rather than treating `OptimizationRunner` as needing to exclude
+  such a metric at all.
 
 ## Requirements
 

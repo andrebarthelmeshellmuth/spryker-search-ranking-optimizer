@@ -108,6 +108,37 @@ class AutoTuneRunnerTest extends Unit
         $this->assertSame(0, $result->getNotifiedEmailCount());
     }
 
+    /**
+     * fitRSquaredByLocale is purely informational (formula stays store-only, refit/threshold logic is
+     * unaffected) -- this proves the result transfer actually carries what
+     * evaluateCurrentMetricFitAcrossLocales() returns, not just that the run still completes.
+     */
+    public function testPopulatesFitRSquaredByLocaleFromTheAcrossLocalesCall(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findAutoTuneMetricConfigsWithThresholdSet')->willReturn([
+            $this->createConfigTransfer(7, 0.8, true, true),
+        ]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('findMetricDetail')->willReturn($this->createMetricDetail(7));
+        $searchRankingFacadeMock->method('evaluateCurrentMetricFit')->willReturn(0.9);
+        $searchRankingFacadeMock->expects($this->once())
+            ->method('evaluateCurrentMetricFitAcrossLocales')
+            ->with(7, 'DE')
+            ->willReturn(['de_DE' => 0.91, 'en_US' => 0.62]);
+
+        $runner = $this->createRunner($repositoryMock, $searchRankingFacadeMock);
+
+        // Act
+        $result = $runner->run();
+
+        // Assert
+        $metricResults = $result->getMetricResults();
+        $this->assertSame(['de_DE' => 0.91, 'en_US' => 0.62], $metricResults[0]->getFitRSquaredByLocale());
+    }
+
     public function testRecordsACheckOnlyRowAndNeverRefitsWhenTheFormulaIsNonDeterministic(): void
     {
         // Arrange -- a placeholder/noise metric (formula calls random()) with a genuinely bad fit, well
