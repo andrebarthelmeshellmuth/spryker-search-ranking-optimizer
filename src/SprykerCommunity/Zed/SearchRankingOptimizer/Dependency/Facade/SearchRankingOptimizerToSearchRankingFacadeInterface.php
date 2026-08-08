@@ -243,8 +243,11 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
 
     /**
      * Writes a single metric's formula through `search-ranking`'s own facade, preserving every other
-     * field already on the transfer this reads first (name/isActive/isHigherBetter). formula is
-     * store-scoped on `search-ranking`'s own side — writes for $storeName specifically, not globally.
+     * field already on the transfer this reads first (name/isActive/isHigherBetter). Never writes to
+     * another store — and, depending on the metric's own isLocaleScoped flag on `search-ranking`'s own
+     * side, either fans out to every real locale of $storeName (isLocaleScoped=false, the common case) or
+     * stays scoped to exactly $storeName/$localeName (isLocaleScoped=true); this bridge doesn't decide
+     * which, `search-ranking`'s own MetricWriter does.
      *
      * @param int $idSearchRankingMetric
      * @param string $formula

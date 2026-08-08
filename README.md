@@ -24,6 +24,7 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [Auto-tune — a monthly fit-quality check per metric](#auto-tune--a-monthly-fit-quality-check-per-metric)
   - [Automated weight optimization — searching relevanceWeight and metric weights algorithmically](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
 - [Relationship to search-ranking](#relationship-to-search-ranking)
+- [Bootstrapping one store/locale, then fanning out everywhere](#bootstrapping-one-storelocale-then-fanning-out-everywhere)
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [1. Install the package](#1-install-the-package)
@@ -53,6 +54,10 @@ for the fuller explanation given where each is first introduced in context. `sea
 has its own [Terminology](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#terminology)
 section for the terms it owns (metric, weight, relevanceWeight, relevanceSaturationPoint, digest, signal,
 raw/normalized value) — not repeated here.
+
+For the full store/locale scoping picture across every feature this package owns — including exactly which
+ones fan a save out to sibling locales and which never do — see [SCOPING.md](SCOPING.md); it builds on
+`search-ranking`'s own [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md).
 
 ### rating / judgment
 
@@ -159,28 +164,37 @@ size, and typical query shapes. Saturation Point Calibration is the one tool, wi
 
 ![The Saturation Point Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/saturation-point-calibration.png)
 
-The workflow, all from the **Search Ranking Optimizer → Saturation Point Calibration** Zed page:
+The workflow, all from the **Search Ranking Optimizer → Saturation Point Calibration** Zed page, which has
+its own **Viewing** Store+Locale picker at the top — independent of the "Start New Calibration Run"
+form's own store/locale fields below (bootstrapping AT while still reviewing DE's own latest run is a
+normal, supported thing to do). Everything else on the page is scoped to whatever the Viewing picker is
+currently set to: the two live `k` values, which calibration run (if any) counts as "latest", and which
+in-progress run (if any) the progress poll reports — a run for a different store/locale never leaks into
+either:
 
 1. **Start a run.** Pick the **calibration type** (`Relevance score` or `Specificity`), the store and
-   locale to run against (Zed has no implicit current store, so both are picked explicitly), and the
-   number of top results per term to sample (X) — ignored for `Specificity`, which always samples exactly
-   one value per term regardless of X. By default, search terms come from the distinct queries already
-   organically rated via the SRP widget below for that store/locale — no upload needed. Check **"Bootstrap
-   from CSV upload instead"** to bypass those and provide a CSV (one term per line) instead — useful to
-   bootstrap calibration before real ratings exist, or for testing. Either way, the run is persisted in
-   status `uploaded`.
+   locale to run against (Zed has no implicit current store, so both are picked explicitly — independent of
+   the Viewing picker above), and the number of top results per term to sample (X) — ignored for
+   `Specificity`, which always samples exactly one value per term regardless of X. By default, search terms
+   come from the distinct queries already organically rated via the SRP widget below for that store/locale
+   — no upload needed. Check **"Bootstrap from CSV upload instead"** to bypass those and provide a CSV (one
+   term per line) instead — useful to bootstrap calibration before real ratings exist, or for testing.
+   Either way, the run is persisted in status `uploaded`.
 2. **Calculate.** The `search-ranking-optimizer:calibrate` console command (run on a cron, or by hand)
-   picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, and — branching on the
-   run's own `calibrationType` — either fires the **live catalog search-string query** for each term
-   (`relevance_score`) or a single lightweight `_termvectors` probe per term (`specificity`), pools the
-   sampled values across all terms, and computes a suggested `k` from that pool. The run moves to
-   `calculated` (or `failed`, with a stored error message). While it's running, the Saturation Point Calibration page shows
-   a live "X / Y search terms processed" counter (a small `progressAction()` JSON endpoint the page polls
-   once a second) — no fake/indeterminate spinner, since the console command's own per-term loop is a
-   genuinely trackable count.
-3. **Apply.** Back on the Saturation Point Calibration page, review the suggested `k` against the current live value and
-   click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` or
-   `specificitySaturationPoint` setting (routed by the run's own `calibrationType`) — through
+   picks up the newest `uploaded` run SYSTEM-WIDE (across every store/locale, not just the one being
+   viewed), marks any older uploaded runs `skipped`, and — branching on the run's own `calibrationType` —
+   either fires the **live catalog search-string query** for each term (`relevance_score`) or a single
+   lightweight `_termvectors` probe per term (`specificity`), pools the sampled values across all terms,
+   and computes a suggested `k` from that pool. The run moves to `calculated` (or `failed`, with a stored
+   error message). While it's running, the Saturation Point Calibration page shows a live "X / Y search
+   terms processed" counter in its own box — but only when the in-progress run's own store/locale matches
+   the Viewing picker; a run for a different scope is still processing, just not shown on this page while
+   you're looking at a different one.
+3. **Apply.** Back on the Saturation Point Calibration page's own **"Latest Calibration Run"** box (kept
+   deliberately separate from the **"Current Saturation Point (k)"** box above it, so the live values and
+   the specific run being offered for Apply are never visually conflated), review the suggested `k` against
+   the current live value and click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint`
+   or `specificitySaturationPoint` setting (routed by the run's own `calibrationType`) — through
    `search-ranking`'s own facade, which republishes the ranking configuration exactly as a manual edit on
    its Settings page would. Applying is a deliberate, separate step: calibration *suggests*, a human
    *decides*.
@@ -344,11 +358,22 @@ locale triggered it, so checking every locale independently would be redundant A
 independent refit per locale would refit against each locale's own digest and re-fan-out on every
 iteration, leaving whichever locale was processed last to silently overwrite every earlier one. For a
 genuinely locale-scoped metric, this job instead checks/refits/applies EVERY real locale of the store
-fully independently, since a save for one locale never touches another there. Auto-Tune's own settings
-table (`spy_search_ranking_auto_tune_metric_config`) stays scoped per (metric, store), not per (metric,
-store, locale) — the same threshold/auto-update/notify settings apply to every locale of a locale-scoped
-metric within a store. A store that has never had `search-ranking` configured for it is skipped entirely,
-never evaluated against empty/default state.
+fully independently, since a save for one locale never touches another there.
+
+Auto-Tune's own settings table (`spy_search_ranking_auto_tune_metric_config`) is store+locale scoped, the
+same grain `search-ranking`'s own formula/isActive/shape settled on — an earlier version of this table was
+deliberately store-only ("what auto-tune tunes is locale-scoped, but its own threshold doesn't need to
+be"), but that stopped being coherent once a metric's formula can genuinely diverge per locale: a curator
+tuning `de_DE` and `en_US` independently has no way to give them independent thresholds if the config
+itself can't tell the two apart. `AutoTuneMetricConfigWriterInterface::save()` reuses `search-ranking`'s
+own `resolveEffectiveWeightLocales()` to decide the real footprint of a save, exactly mirroring how that
+package's own formula/weight writes work: for a store-wide metric, saving at ANY one locale of a store
+fans the same threshold/auto-update/notify settings out to every real locale of it, so it doesn't matter
+which locale was selected when you saved; for a genuinely locale-scoped metric, only the one locale
+selected is touched, and a sibling locale never explicitly configured simply has no row and is treated as
+opted out for itself — same "absence means opted out" contract `autoTuneThreshold=null` already has, now
+applied per locale too, not just per metric. A store that has never had `search-ranking` configured for it
+is skipped entirely, never evaluated against empty/default state.
 
 For a store-wide metric, this job also surfaces the evidence for *whether* it should become locale-scoped
 in the first place: its one result line is followed, when the spread across its real locales exceeds
@@ -365,8 +390,7 @@ full result line per locale instead):
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
 From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page — like every other scoped page in
-this package, with its own **Store + Locale selector** at the top (locale only affects which fit is
-previewed; the settings themselves are per-store) — per active metric:
+this package, with its own **Store + Locale selector** at the top — per active metric:
 
 - **Auto-tune threshold (R²)** — left blank by default, meaning the metric is opted OUT of auto-tune
   entirely. Setting a value opts it in: the monthly job compares the metric's CURRENT fit (evaluated
@@ -571,6 +595,57 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   Optimization Apply disclosure (see above) — both surface the real blast radius of a store-wide metric's
   write before a human clicks the button, rather than treating `OptimizationRunner` as needing to exclude
   such a metric at all.
+
+## Bootstrapping one store/locale, then fanning out everywhere
+
+A common way to roll this package out across a multi-store, multi-locale shop: do the real tuning work
+once, against one (store, locale), then let `search-ranking`'s own Scope Copy/Lock carry the *result* to
+every other scope — rather than repeating ratings/calibration/optimization independently per scope, most of
+which would just re-derive the same answer at real cost (query traffic, admin rating effort, optimizer
+runs).
+
+1. **Rate and gather data for exactly one (store, locale)** — e.g. `DE`/`de_DE`. Collect real SRP
+   heart/check/x ratings via the storefront widget, and make sure `search-ranking`'s own product-metric raw
+   values are imported for that scope (see that package's README).
+2. **Calibrate `k` for that one scope** — run Saturation Point Calibration (feature 1 in
+   [SCOPING.md](SCOPING.md)) and Apply, so the relevance-score curve is on a sane footing before optimizing
+   against it.
+3. **Let the black-box optimizer tune `relevanceWeight` and every metric weight for that one scope** —
+   queue an [Automated weight optimization](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+   run against `DE`/`de_DE`'s own real ratings, review the winning candidate against baseline, and Apply.
+4. **Fan the result out via `search-ranking`'s own Scope Copy/Lock** — from `search-ranking`'s Scope Copy
+   page, copy (or Lock, for an ongoing daily resync) `DE`/`de_DE`'s now-tuned weight, the 6 settings
+   (`relevanceWeight`/`relevanceSaturationPoint`/4 specificity knobs), and formula/isActive/shape out to
+   every other real store and locale. One Lock covers everything Scope Copy's combined action copies — see
+   that package's own [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md#quick-reference).
+
+That's the whole loop: tune once for real, replicate everywhere else. It's not free of manual steps, though
+— the known exceptions, all things Scope Copy/Lock simply cannot touch because they're not part of
+`search-ranking`'s own copyable configuration at all:
+
+- **Saturation Point Calibration itself doesn't fan out** (see [SCOPING.md](SCOPING.md), feature 1) — a
+  copied/locked `k` value is exactly as good as the scope it was calibrated for, but if a target locale's
+  own score distribution genuinely differs (a real risk once vocabulary/catalog density diverges enough),
+  its `k` is now a copy of a value calibrated for different data. Locked scopes don't re-calibrate
+  themselves; recalibrating a specific target scope once real traffic exists there is a manual, deliberate
+  follow-up, not something this workflow does automatically.
+- **SRP ratings and rank evaluation never fan out** (SCOPING.md, features 2/3) — a target scope with real
+  customers of its own will need its own real ratings to eventually evaluate or re-optimize against; copied
+  weights don't come with copied ratings, by design (ratings reflect real buyer judgment for that scope,
+  which can't legitimately be assumed identical elsewhere).
+- **Auto-Tune's own config only fans out by `isLocaleScoped`, not by Scope Copy/Lock** (SCOPING.md, feature
+  5) — turning on auto-tune's threshold/notify settings for `DE`/`de_DE` does NOT get copied to `AT`/`de_DE`
+  by Scope Copy or Lock; that's a separate, independent save (though for a store-wide metric, saving it once
+  per *store* still fans across that store's own locales the normal way — see SCOPING.md).
+- **`search-ranking`'s own metric `name`/`isHigherBetter`/`isLocaleScoped` are global already** — nothing to
+  copy there; they're the same everywhere a metric exists at all, by definition (see that package's own
+  SCOPING.md step 4/5).
+- **One index per store, not per locale, is Spryker's own real ES/OpenSearch convention** — this package
+  and `search-ranking` don't control or enforce it, but it means specificity/idf-style signals that read off
+  term statistics are computed from an index shared across every locale of a store, not isolated per locale
+  — a real, accepted blending limitation worth knowing about when interpreting a specificity-related
+  calibration or optimization result for a multi-locale store (see `SpecificitySearcher`/`RankEvalRunner`'s
+  own docblocks in `search-ranking` for where this is documented at the code level).
 
 ## Requirements
 
