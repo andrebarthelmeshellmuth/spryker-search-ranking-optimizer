@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCa
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -37,6 +38,8 @@ class SaturationPointCalibrationUploadHandler implements SaturationPointCalibrat
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
+     *
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException
      */
     public function createCalibration(
         string $calibrationType,
@@ -45,16 +48,24 @@ class SaturationPointCalibrationUploadHandler implements SaturationPointCalibrat
         string $localeName,
         ?string $csvContent = null,
     ): SearchRankingSaturationPointCalibrationTransfer {
+        $searchTerms = $csvContent !== null
+            ? $this->csvSearchTermParser->parse($csvContent)
+            : $this->repository->findDistinctSearchTermsByStoreLocale($storeName, $localeName);
+
+        if ($searchTerms === []) {
+            throw new NoSearchTermsAvailableException(sprintf(
+                'No rated search terms are available yet for store "%s", locale "%s" -- rate some products via the search-debug overlay first, or upload a CSV.',
+                $storeName,
+                $localeName,
+            ));
+        }
+
         $calibrationTransfer = (new SearchRankingSaturationPointCalibrationTransfer())
             ->setCalibrationType($calibrationType)
             ->setRelevantProductCount($relevantProductCount)
             ->setStoreName($storeName)
             ->setLocaleName($localeName)
             ->setStatus(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
-
-        $searchTerms = $csvContent !== null
-            ? $this->csvSearchTermParser->parse($csvContent)
-            : $this->repository->findDistinctSearchTermsByStoreLocale($storeName, $localeName);
 
         foreach ($searchTerms as $searchTerm) {
             $calibrationTransfer->addSearchTerm(

@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\SaturationPointCalibrationUploadForm;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -60,17 +61,21 @@ class SaturationPointCalibrationController extends AbstractController
             $uploadedFile = $uploadForm->get(SaturationPointCalibrationUploadForm::FIELD_FILE)->getData();
             $useCsvUpload = (bool)$uploadData[SaturationPointCalibrationUploadForm::FIELD_USE_CSV_UPLOAD];
 
-            $this->getFacade()->createCalibration(
-                (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_CALIBRATION_TYPE],
-                (int)$uploadData[SaturationPointCalibrationUploadForm::FIELD_RELEVANT_PRODUCT_COUNT],
-                (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_STORE_NAME],
-                (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_LOCALE_NAME],
-                $useCsvUpload && $uploadedFile !== null ? $this->readUploadedFileContent($uploadedFile) : null,
-            );
+            try {
+                $this->getFacade()->createCalibration(
+                    (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_CALIBRATION_TYPE],
+                    (int)$uploadData[SaturationPointCalibrationUploadForm::FIELD_RELEVANT_PRODUCT_COUNT],
+                    (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_STORE_NAME],
+                    (string)$uploadData[SaturationPointCalibrationUploadForm::FIELD_LOCALE_NAME],
+                    $useCsvUpload && $uploadedFile !== null ? $this->readUploadedFileContent($uploadedFile) : null,
+                );
 
-            $this->addSuccessMessage(
-                'Calibration run uploaded — the next "search-ranking-optimizer:calibrate" cron tick will calculate it.',
-            );
+                $this->addSuccessMessage(
+                    'Calibration run uploaded — the next "search-ranking-optimizer:calibrate" cron tick will calculate it.',
+                );
+            } catch (NoSearchTermsAvailableException $noSearchTermsAvailableException) {
+                $this->addErrorMessage($noSearchTermsAvailableException->getMessage());
+            }
 
             // Stays on whichever scope was being VIEWED, not necessarily the one the upload form's own
             // (independent) store/locale pickers targeted — the two are allowed to differ, e.g. bootstrapping

@@ -20,6 +20,8 @@ interface SaturationPointCalibrationUploadHandlerInterface
      * - When $csvContent is given (the bootstrap/test path, behind an explicit opt-in checkbox in the Zed
      *   form), parses it into search terms instead, bypassing organic queries entirely.
      * - Either way, creates a new calibration run in status=uploaded, with one child row per search term.
+     * - Refuses to create a run with zero search terms — throws instead of silently queuing a run that
+     *   would only fail later, on the next `search-ranking-optimizer:calibrate` tick.
      * - Does not fire any search queries — that happens later, when `search-ranking-optimizer:calibrate`
      *   picks this run up.
      * - $calibrationType is one of `SearchRankingOptimizerConfig::CALIBRATION_TYPE_*` — decides which
@@ -31,6 +33,8 @@ interface SaturationPointCalibrationUploadHandlerInterface
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
+     *
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException
      */
     public function createCalibration(
         string $calibrationType,

@@ -40,6 +40,8 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string|null $csvContent
+     *
+     * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException
      */
     public function createCalibration(
         string $calibrationType,
