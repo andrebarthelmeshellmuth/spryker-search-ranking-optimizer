@@ -137,6 +137,23 @@ class AutomatedWeightOptimizationController extends AbstractController
         $warmStartFraction = (int)$formData[AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT] / 100;
 
         $fixedScalars = $this->parseFixedScalarsFromRequest($request);
+        $fixedMetricWeightTransfers = $this->parseFixedMetricWeightsFromRequest($request);
+        $redirectResponse = $this->redirectResponse(sprintf(
+            '%s?%s=%s&%s=%s',
+            static::URL_OPTIMIZATION,
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME,
+            $storeName,
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME,
+            $localeName,
+        ));
+
+        if ($this->isEveryParameterFixed($storeName, $localeName, $fixedScalars, $fixedMetricWeightTransfers)) {
+            $this->addErrorMessage(
+                'Every parameter was pinned — there would be nothing left to search, so nothing was queued. Leave at least one checked.',
+            );
+
+            return $redirectResponse;
+        }
 
         $this->getFacade()->queueOptimizationRun(
             $storeName,
@@ -149,21 +166,38 @@ class AutomatedWeightOptimizationController extends AbstractController
             $fixedScalars['specificityWeightExponent'],
             $fixedScalars['specificityWeightShiftMagnitude'],
             $fixedScalars['specificityBlendWeight'],
-            $this->parseFixedMetricWeightsFromRequest($request),
+            $fixedMetricWeightTransfers,
         );
 
         $this->addSuccessMessage(
             'Optimization run queued — the next "search-ranking-optimizer:optimize" cron tick will process it.',
         );
 
-        return $this->redirectResponse(sprintf(
-            '%s?%s=%s&%s=%s',
-            static::URL_OPTIMIZATION,
-            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME,
-            $storeName,
-            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME,
-            $localeName,
-        ));
+        return $redirectResponse;
+    }
+
+    /**
+     * A run with nothing left free reaches blackbox-optimizer with a zero-dimension problem and fails
+     * outright ("A problem must declare at least one parameter.") after already consuming a queue slot --
+     * the run form's own JS disables the submit button for this same case as a courtesy, but this is the
+     * real enforcement, since a request can always bypass client-side JS.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param array<string, float|null> $fixedScalars
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $fixedMetricWeightTransfers
+     */
+    protected function isEveryParameterFixed(
+        string $storeName,
+        string $localeName,
+        array $fixedScalars,
+        array $fixedMetricWeightTransfers,
+    ): bool {
+        $parameters = $this->getFacade()->listOptimizableParameters($storeName, $localeName);
+        $totalParameterCount = 1 + ($parameters['isSpecificityWeightingEnabled'] ? 4 : 0) + count($parameters['metrics']);
+        $fixedParameterCount = count(array_filter($fixedScalars, fn (?float $value): bool => $value !== null)) + count($fixedMetricWeightTransfers);
+
+        return $fixedParameterCount >= $totalParameterCount;
     }
 
     /**
@@ -201,8 +235,9 @@ class AutomatedWeightOptimizationController extends AbstractController
      * scalar: `optimizeMetric[<idSearchRankingMetric>]` (checkbox, checked = optimize),
      * `fixedMetricValue[<idSearchRankingMetric>]` (always-present number input), `metricName[<idSearchRankingMetric>]`
      * (always-present hidden input, so this never needs a second lookup to resolve id -> name). A metric
-     * the checklist showed read-only (non-deterministic formula, nothing for a human to choose) submits
-     * none of these three -- {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}'s
+     * the checklist omitted entirely (non-deterministic formula, nothing for a human to choose -- see
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterLister::list()})
+     * submits none of these three -- {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}'s
      * own determinism check holds it fixed regardless, exactly as it always has.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request

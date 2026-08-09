@@ -366,6 +366,8 @@ interface SearchRankingOptimizerFacadeInterface
      * - Read-only snapshot of every scalar/metric an optimization run for this (store, locale) would work
      *   with RIGHT NOW — feeds the Automated Weight Optimization run form's own parameter checklist
      *   (which one of these the human wants to search vs. pin), never creates or touches a run.
+     * - `metrics` omits any metric whose formula is non-deterministic: that metric is held fixed at its
+     *   live weight unconditionally, no checklist choice can ever change that.
      *
      * @api
      *
@@ -379,7 +381,7 @@ interface SearchRankingOptimizerFacadeInterface
      *     specificityWeightExponent: float,
      *     specificityWeightShiftMagnitude: float,
      *     specificityBlendWeight: float,
-     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float, isDeterministic: bool}>,
+     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float}>,
      * }
      */
     public function listOptimizableParameters(string $storeName, string $localeName): array;

@@ -16,7 +16,9 @@ interface OptimizableParameterListerInterface
      * with RIGHT NOW — feeds the Automated Weight Optimization run form's own parameter checklist, so a
      * human can see what's actually there before choosing what to fix. Mirrors, but does not share code
      * with, {@see OptimizationRunner}'s own determinism split — this is a pure read, no run is created or
-     * touched.
+     * touched. `metrics` omits any metric whose formula is non-deterministic: that metric is held fixed at
+     * its live weight unconditionally, no checklist choice can ever change that, so it isn't a real
+     * checklist item at all.
      *
      * @param string $storeName
      * @param string $localeName
@@ -28,7 +30,7 @@ interface OptimizableParameterListerInterface
      *     specificityWeightExponent: float,
      *     specificityWeightShiftMagnitude: float,
      *     specificityBlendWeight: float,
-     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float, isDeterministic: bool}>,
+     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float}>,
      * }
      */
     public function list(string $storeName, string $localeName): array;

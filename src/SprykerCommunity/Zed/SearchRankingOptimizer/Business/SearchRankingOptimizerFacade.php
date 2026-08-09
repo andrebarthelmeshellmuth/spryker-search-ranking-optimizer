@@ -366,7 +366,7 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *     specificityWeightExponent: float,
      *     specificityWeightShiftMagnitude: float,
      *     specificityBlendWeight: float,
-     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float, isDeterministic: bool}>,
+     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float}>,
      * }
      */
     public function listOptimizableParameters(string $storeName, string $localeName): array
