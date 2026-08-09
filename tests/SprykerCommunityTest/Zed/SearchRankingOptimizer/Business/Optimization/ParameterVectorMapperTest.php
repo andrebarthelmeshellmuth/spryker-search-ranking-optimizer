@@ -421,17 +421,142 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame(['random' => 1.0], $configurationTransfer->getMetricWeights());
     }
 
+    public function testGetDimensionCountOmitsRelevanceWeightWhenFixed(): void
+    {
+        $mapper = $this->buildMapper([], [], 0.75, true, 0.42);
+
+        $this->assertSame(4, $mapper->getDimensionCount(), '0 (relevanceWeight fixed) + 0 free z + 4 specificity dimensions.');
+    }
+
+    public function testGetDimensionCountOmitsAnIndividuallyFixedSpecificityKnob(): void
+    {
+        $mapper = $this->buildMapper([], [], 0.75, true, null, 0.9);
+
+        $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z + 3 free specificity dimensions (curve exponent fixed).');
+    }
+
+    public function testGetDimensionCountIgnoresFixedSpecificityValuesWhenWeightingIsDisabled(): void
+    {
+        // Arrange -- pinning individual knobs is meaningless once the whole block is disabled; the fixed
+        // values passed here must simply be ignored, same as the AtRunStart values already are elsewhere.
+        $mapper = $this->buildMapper([], [], 0.75, false, null, 0.9, 0.9, 0.9, 0.9);
+
+        $this->assertSame(1, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z + 0 specificity dimensions (block disabled).');
+    }
+
+    public function testFixingEveryScalarLeavesOnlyTheMetricSimplexDimensions(): void
+    {
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.5, 1.0, 1.0, 0.2, 0.7);
+
+        $this->assertSame(2, $mapper->getDimensionCount(), '0 (relevanceWeight fixed) + (3 - 1) free z + 0 specificity dimensions (all fixed).');
+        $this->assertCount(2, $mapper->getLowerBounds());
+        $this->assertCount(2, $mapper->getUpperBounds());
+    }
+
+    public function testGetBoundsOmitTheFixedRelevanceWeightBound(): void
+    {
+        // Arrange -- 0 metrics, specificity disabled, so with relevanceWeight fixed there is nothing left
+        // to bound at all.
+        $mapper = $this->buildMapper([], [], 0.75, false, 0.42);
+
+        $this->assertSame([], $mapper->getLowerBounds());
+        $this->assertSame([], $mapper->getUpperBounds());
+    }
+
+    public function testMapVectorToConfigurationUsesTheFixedRelevanceWeightInsteadOfReadingTheVector(): void
+    {
+        // Arrange -- relevanceWeight fixed, so the vector carries only the 4 (free) specificity dimensions.
+        $mapper = $this->buildMapper([], [], 0.75, true, 0.42);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([1.0, 1.0, 0.2, 0.7], 12.0);
+
+        // Assert
+        $this->assertSame(0.42, $configurationTransfer->getRelevanceWeight(), 'The fixed value, exactly as passed in -- never read off the vector.');
+        $this->assertSame([], $configurationTransfer->getMetricWeights());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.7, $configurationTransfer->getSpecificityBlendWeight());
+    }
+
+    public function testMapVectorToConfigurationUsesAFixedSpecificityKnobInsteadOfReadingTheVectorWhileLeavingSiblingsFree(): void
+    {
+        // Arrange -- only specificityBlendWeight fixed; relevanceWeight + the other 3 knobs stay free, so
+        // the vector carries exactly 4 values (no blend weight slot).
+        $mapper = $this->buildMapper([], [], 0.75, true, null, null, null, null, 0.65);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2], 12.0);
+
+        // Assert
+        $this->assertSame(0.75, $configurationTransfer->getRelevanceWeight());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.65, $configurationTransfer->getSpecificityBlendWeight(), 'The fixed value, exactly as passed in -- never read off the vector.');
+    }
+
+    public function testMapConfigurationToVectorOmitsAFixedRelevanceWeightAndAFixedSpecificityKnob(): void
+    {
+        // Arrange -- relevanceWeight AND specificityWeightExponent both fixed; the other 3 scalar slots
+        // (curve exponent, shift magnitude, blend weight) stay free, on top of the metric simplex's own
+        // free z.
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.42, null, 0.9);
+        $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.99)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setMetricWeights(['top_seller' => 0.4, 'pdp_impressions' => 0.3, 'random' => 0.3])
+            ->setSpecificityCurveExponent(1.1)
+            ->setSpecificityWeightExponent(0.9)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setSpecificityBlendWeight(0.7);
+
+        // Act
+        $vector = $mapper->mapConfigurationToVector($configurationTransfer);
+
+        // Assert -- 0 (relevanceWeight fixed) + 2 free z (3 metrics) + 3 free specificity (curve exponent,
+        // shift magnitude, blend weight) = 5. The fixed relevanceWeight (0.99 on the transfer, ignored) and
+        // fixed specificityWeightExponent are both absent from the vector entirely.
+        $this->assertCount(5, $vector);
+    }
+
+    public function testMapConfigurationToVectorIsTheInverseOfMapVectorToConfigurationWithMixedFixedAndFreeScalars(): void
+    {
+        // Arrange -- relevanceWeight and specificityBlendWeight fixed, the rest free: 2 free z (3 metrics)
+        // + 3 free specificity (curve exponent, weight exponent, shift magnitude) = 5.
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.6, null, null, null, 0.65);
+        $originalVector = [0.8, -1.3, 1.3, 1.0, 0.2];
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0);
+        $roundTrippedVector = $mapper->mapConfigurationToVector($configurationTransfer);
+
+        // Assert
+        $this->assertEqualsWithDelta($originalVector, $roundTrippedVector, 1e-9);
+    }
+
     /**
      * @param array<int, array{idSearchRankingMetric: int, name: string}> $metrics
      * @param array<string, float> $fixedMetricWeights
      * @param float $relevanceWeightAtRunStart
      * @param bool $specificityWeightingEnabled
+     * @param float|null $fixedRelevanceWeight
+     * @param float|null $fixedSpecificityCurveExponent
+     * @param float|null $fixedSpecificityWeightExponent
+     * @param float|null $fixedSpecificityWeightShiftMagnitude
+     * @param float|null $fixedSpecificityBlendWeight
      */
     protected function buildMapper(
         array $metrics,
         array $fixedMetricWeights = [],
         float $relevanceWeightAtRunStart = 0.75,
         bool $specificityWeightingEnabled = true,
+        ?float $fixedRelevanceWeight = null,
+        ?float $fixedSpecificityCurveExponent = null,
+        ?float $fixedSpecificityWeightExponent = null,
+        ?float $fixedSpecificityWeightShiftMagnitude = null,
+        ?float $fixedSpecificityBlendWeight = null,
     ): ParameterVectorMapper {
         return new ParameterVectorMapper(
             $metrics,
@@ -442,6 +567,11 @@ class ParameterVectorMapperTest extends Unit
             static::SPECIFICITY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START,
             static::SPECIFICITY_BLEND_WEIGHT_AT_RUN_START,
             $specificityWeightingEnabled,
+            $fixedRelevanceWeight,
+            $fixedSpecificityCurveExponent,
+            $fixedSpecificityWeightExponent,
+            $fixedSpecificityWeightShiftMagnitude,
+            $fixedSpecificityBlendWeight,
         );
     }
 

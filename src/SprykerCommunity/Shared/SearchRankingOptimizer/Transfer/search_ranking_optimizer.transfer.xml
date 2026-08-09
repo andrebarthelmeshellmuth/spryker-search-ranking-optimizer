@@ -322,6 +322,17 @@
          applied automatically, regardless of algorithm or score improvement — a human reviews it on the
          Zed page and explicitly clicks Apply, which goes through the SAME write-through-facade +
          checkpoint pipeline as any other weight change (see WeightCheckpointRestorer). -->
+    <!-- fixedRelevanceWeight/fixedSpecificity*/fixedMetricWeights: a human's own parameter-selection choice
+         at queue time (the Automated Weight Optimization run form's checklist) — null means that scalar was
+         left free for the search, same as every run before this field existed; a non-null value means the
+         human pinned it at exactly that value instead (not necessarily the value it happened to have live
+         at queue time — a human can search-and-fix at a hypothetical number just as easily as the current
+         one). fixedMetricWeights carries the same choice for individual metrics, reusing
+         SearchRankingWeightCheckpointMetricWeight's shape/JSON encoding identically to bestMetricWeights
+         (isLocaleScoped is left unset, same as bestMetricWeights already does). A metric a human did NOT
+         fix can still end up held constant anyway if its own formula turns out non-deterministic (see
+         FormulaDeterminismCheckerInterface) — that's OptimizationRunner's own orthogonal decision, not
+         recorded here. -->
     <transfer name="SearchRankingOptimizerRun" strict="true">
         <property name="idSearchRankingOptimizerRun" type="int"/>
         <property name="storeName" type="string"/>
@@ -329,6 +340,12 @@
         <property name="algorithm" type="string"/>
         <property name="isTerminationCriteriaTrusted" type="bool"/>
         <property name="warmStartFraction" type="float"/>
+        <property name="fixedRelevanceWeight" type="float"/>
+        <property name="fixedSpecificityCurveExponent" type="float"/>
+        <property name="fixedSpecificityWeightExponent" type="float"/>
+        <property name="fixedSpecificityWeightShiftMagnitude" type="float"/>
+        <property name="fixedSpecificityBlendWeight" type="float"/>
+        <property name="fixedMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="fixedMetricWeight"/>
         <property name="status" type="string"/>
         <property name="totalCount" type="int"/>
         <property name="processedCount" type="int"/>

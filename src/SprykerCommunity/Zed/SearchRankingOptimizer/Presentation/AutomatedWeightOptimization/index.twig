@@ -168,6 +168,12 @@
             {{ form_row(optimizeRunForm.algorithm) }}
             {{ form_row(optimizeRunForm.isTerminationCriteriaTrusted) }}
             {{ form_row(optimizeRunForm.warmStartFractionPercent) }}
+
+            <h4>{{ 'Parameters' | trans }}</h4>
+            <div data-role="parameter-checklist">
+                <p class="text-muted">{{ 'Loading...' | trans }}</p>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ 'Run now' | trans }}</button>
             </div>
@@ -178,6 +184,149 @@
 
 {% block footer_js %}
     {{ parent() }}
+    <script>
+        (function () {
+            'use strict';
+
+            // Populates the run form's own parameter checklist whenever store/locale change, via
+            // parametersAction() -- see AutomatedWeightOptimizationController. Unrelated to (and not
+            // gated by) the progress-polling script below.
+            var storeSelect = document.getElementById('search_ranking_optimizer_automated_weight_optimization_run_storeName');
+            var localeSelect = document.getElementById('search_ranking_optimizer_automated_weight_optimization_run_localeName');
+            var container = document.querySelector('[data-role="parameter-checklist"]');
+
+            if (!storeSelect || !localeSelect || !container) {
+                return;
+            }
+
+            var SPECIFICITY_KEYS = [
+                'specificityCurveExponent',
+                'specificityWeightExponent',
+                'specificityWeightShiftMagnitude',
+                'specificityBlendWeight',
+            ];
+
+            function escapeHtml(value) {
+                var div = document.createElement('div');
+                div.textContent = String(value);
+
+                return div.innerHTML;
+            }
+
+            function renderScalarRow(key, value) {
+                return '<tr>'
+                    + '<td><label><input type="checkbox" name="optimizeScalar[' + key + ']" checked data-role="optimize-checkbox"> ' + escapeHtml(key) + '</label></td>'
+                    + '<td><input type="number" step="any" class="form-control" name="fixedScalarValue[' + key + ']" value="' + value + '" disabled></td>'
+                    + '</tr>';
+            }
+
+            function renderMetricRow(metric) {
+                if (!metric.isDeterministic) {
+                    return '<tr>'
+                        + '<td>' + escapeHtml(metric.name) + ' <span class="text-muted" style="font-size: 11px;">(fixed — non-deterministic formula)</span></td>'
+                        + '<td>' + metric.weight + '</td>'
+                        + '</tr>';
+                }
+
+                return '<tr>'
+                    + '<td><label><input type="checkbox" name="optimizeMetric[' + metric.idSearchRankingMetric + ']" checked data-role="optimize-checkbox"> ' + escapeHtml(metric.name) + '</label>'
+                    + '<input type="hidden" name="metricName[' + metric.idSearchRankingMetric + ']" value="' + escapeHtml(metric.name) + '"></td>'
+                    + '<td><input type="number" step="any" class="form-control" data-role="fixed-metric-input" name="fixedMetricValue[' + metric.idSearchRankingMetric + ']" value="' + metric.weight + '" disabled></td>'
+                    + '</tr>';
+            }
+
+            function updateOverbudgetWarning() {
+                var warningElement = container.querySelector('[data-role="fixed-weight-warning"]');
+
+                if (!warningElement) {
+                    return;
+                }
+
+                var total = 0;
+
+                Array.prototype.forEach.call(container.querySelectorAll('[data-role="fixed-metric-input"]:not([disabled])'), function (input) {
+                    total += parseFloat(input.value) || 0;
+                });
+
+                warningElement.style.display = total > 1.0 ? '' : 'none';
+            }
+
+            function bindRow(row) {
+                var checkbox = row.querySelector('input[type="checkbox"]');
+                var input = row.querySelector('input[type="number"]');
+
+                if (!checkbox || !input) {
+                    return;
+                }
+
+                checkbox.addEventListener('change', function () {
+                    input.disabled = checkbox.checked;
+                    updateOverbudgetWarning();
+                });
+
+                input.addEventListener('input', updateOverbudgetWarning);
+            }
+
+            function render(parameters) {
+                var rows = renderScalarRow('relevanceWeight', parameters.relevanceWeight);
+
+                if (parameters.isSpecificityWeightingEnabled) {
+                    SPECIFICITY_KEYS.forEach(function (key) {
+                        rows += renderScalarRow(key, parameters[key]);
+                    });
+                }
+
+                rows += parameters.metrics.map(renderMetricRow).join('');
+
+                container.innerHTML = '<p class="text-muted" style="font-size: 12px;">'
+                    + 'Unchecking a row pins it at the value you enter instead of searching it — checked (the default) searches it exactly as before.'
+                    + '</p>'
+                    + '<div class="alert alert-warning" data-role="fixed-weight-warning" style="display: none;">'
+                    + 'The pinned metric weights above sum to more than 1.0 — they will be rescaled down proportionally when this run is applied.'
+                    + '</div>'
+                    + '<table class="table"><thead><tr><th>' + 'Parameter' + '</th><th>' + 'Value' + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+                Array.prototype.forEach.call(container.querySelectorAll('tbody tr'), bindRow);
+                updateOverbudgetWarning();
+            }
+
+            function fetchParameters() {
+                var storeName = storeSelect.value;
+                var localeName = localeSelect.value;
+
+                if (!storeName || !localeName) {
+                    container.innerHTML = '<p class="text-muted">Pick a store and locale above to see the parameters this run would search.</p>';
+
+                    return;
+                }
+
+                fetch(
+                    '/search-ranking-optimizer/automated-weight-optimization/parameters'
+                        + '?storeName=' + encodeURIComponent(storeName)
+                        + '&localeName=' + encodeURIComponent(localeName),
+                    { headers: { Accept: 'application/json' } },
+                )
+                    .then(function (response) { return response.json(); })
+                    .then(function (parameters) {
+                        if (parameters.error) {
+                            container.innerHTML = '<p class="text-danger">' + escapeHtml(parameters.error) + '</p>';
+
+                            return;
+                        }
+
+                        render(parameters);
+                    })
+                    .catch(function () {
+                        container.innerHTML = '<p class="text-danger">Could not load parameters — try changing store/locale again.</p>';
+                    });
+            }
+
+            storeSelect.addEventListener('change', fetchParameters);
+            localeSelect.addEventListener('change', fetchParameters);
+
+            fetchParameters();
+        }());
+    </script>
     {% if inProgressOptimizerRun %}
         <script>
             (function () {

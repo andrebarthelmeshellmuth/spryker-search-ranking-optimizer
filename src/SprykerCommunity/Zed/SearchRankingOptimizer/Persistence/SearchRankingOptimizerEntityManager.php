@@ -399,6 +399,16 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setAlgorithm($optimizerRunTransfer->getAlgorithmOrFail());
         $optimizerRunEntity->setIsTerminationCriteriaTrusted($optimizerRunTransfer->getIsTerminationCriteriaTrusted() ?? false);
         $optimizerRunEntity->setWarmStartFraction($optimizerRunTransfer->getWarmStartFraction() ?? 0.0);
+        $optimizerRunEntity->setFixedRelevanceWeight($optimizerRunTransfer->getFixedRelevanceWeight());
+        $optimizerRunEntity->setFixedSpecificityCurveExponent($optimizerRunTransfer->getFixedSpecificityCurveExponent());
+        $optimizerRunEntity->setFixedSpecificityWeightExponent($optimizerRunTransfer->getFixedSpecificityWeightExponent());
+        $optimizerRunEntity->setFixedSpecificityWeightShiftMagnitude($optimizerRunTransfer->getFixedSpecificityWeightShiftMagnitude());
+        $optimizerRunEntity->setFixedSpecificityBlendWeight($optimizerRunTransfer->getFixedSpecificityBlendWeight());
+        $optimizerRunEntity->setFixedMetricWeights(
+            $optimizerRunTransfer->getFixedMetricWeights()->count() > 0
+                ? $this->getFactory()->createSearchRankingOptimizerMapper()->encodeMetricWeights(iterator_to_array($optimizerRunTransfer->getFixedMetricWeights()))
+                : null,
+        );
         $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED);
         $optimizerRunEntity->save();
 

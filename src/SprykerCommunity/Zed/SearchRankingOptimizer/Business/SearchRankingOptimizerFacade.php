@@ -312,6 +312,12 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $algorithm
      * @param bool $isTerminationCriteriaTrusted
      * @param float $warmStartFraction
+     * @param float|null $fixedRelevanceWeight
+     * @param float|null $fixedSpecificityCurveExponent
+     * @param float|null $fixedSpecificityWeightExponent
+     * @param float|null $fixedSpecificityWeightShiftMagnitude
+     * @param float|null $fixedSpecificityBlendWeight
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $fixedMetricWeights
      */
     public function queueOptimizationRun(
         string $storeName,
@@ -319,15 +325,53 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
         string $algorithm,
         bool $isTerminationCriteriaTrusted = false,
         float $warmStartFraction = 0.0,
+        ?float $fixedRelevanceWeight = null,
+        ?float $fixedSpecificityCurveExponent = null,
+        ?float $fixedSpecificityWeightExponent = null,
+        ?float $fixedSpecificityWeightShiftMagnitude = null,
+        ?float $fixedSpecificityBlendWeight = null,
+        array $fixedMetricWeights = [],
     ): SearchRankingOptimizerRunTransfer {
-        return $this->getEntityManager()->createOptimizerRun(
-            (new SearchRankingOptimizerRunTransfer())
-                ->setStoreName($storeName)
-                ->setLocaleName($localeName)
-                ->setAlgorithm($algorithm)
-                ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
-                ->setWarmStartFraction($warmStartFraction),
-        );
+        $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
+            ->setStoreName($storeName)
+            ->setLocaleName($localeName)
+            ->setAlgorithm($algorithm)
+            ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
+            ->setWarmStartFraction($warmStartFraction)
+            ->setFixedRelevanceWeight($fixedRelevanceWeight)
+            ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)
+            ->setFixedSpecificityWeightExponent($fixedSpecificityWeightExponent)
+            ->setFixedSpecificityWeightShiftMagnitude($fixedSpecificityWeightShiftMagnitude)
+            ->setFixedSpecificityBlendWeight($fixedSpecificityBlendWeight);
+
+        foreach ($fixedMetricWeights as $fixedMetricWeightTransfer) {
+            $optimizerRunTransfer->addFixedMetricWeight($fixedMetricWeightTransfer);
+        }
+
+        return $this->getEntityManager()->createOptimizerRun($optimizerRunTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array{
+     *     relevanceWeight: float,
+     *     isSpecificityWeightingEnabled: bool,
+     *     specificityCurveExponent: float,
+     *     specificityWeightExponent: float,
+     *     specificityWeightShiftMagnitude: float,
+     *     specificityBlendWeight: float,
+     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float, isDeterministic: bool}>,
+     * }
+     */
+    public function listOptimizableParameters(string $storeName, string $localeName): array
+    {
+        return $this->getFactory()->createOptimizableParameterLister()->list($storeName, $localeName);
     }
 
     /**

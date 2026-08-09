@@ -334,6 +334,18 @@ interface SearchRankingOptimizerFacadeInterface
      * @param float $warmStartFraction How much of the search is seeded from the live configuration instead
      *   of starting cold, between 0.0 and 1.0. Defaults to 0.0, preserving the original from-scratch
      *   behavior.
+     * @param float|null $fixedRelevanceWeight A human's own choice, made on the run form's parameter
+     *   checklist, to pin relevanceWeight at exactly this value instead of searching it. Null (the default)
+     *   preserves the original always-free behavior.
+     * @param float|null $fixedSpecificityCurveExponent Same pin choice as $fixedRelevanceWeight, for
+     *   specificityCurveExponent. Meaningless (ignored) when specificity weighting is disabled.
+     * @param float|null $fixedSpecificityWeightExponent Same, for specificityWeightExponent.
+     * @param float|null $fixedSpecificityWeightShiftMagnitude Same, for specificityWeightShiftMagnitude.
+     * @param float|null $fixedSpecificityBlendWeight Same, for specificityBlendWeight.
+     * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $fixedMetricWeights
+     *   Metrics a human chose to pin at queue time, at whatever value they entered (not necessarily the
+     *   live one). A metric NOT listed here can still end up held constant anyway if its own formula turns
+     *   out non-deterministic — that's {@see runNextOptimization()}'s own orthogonal decision.
      */
     public function queueOptimizationRun(
         string $storeName,
@@ -341,7 +353,36 @@ interface SearchRankingOptimizerFacadeInterface
         string $algorithm,
         bool $isTerminationCriteriaTrusted = false,
         float $warmStartFraction = 0.0,
+        ?float $fixedRelevanceWeight = null,
+        ?float $fixedSpecificityCurveExponent = null,
+        ?float $fixedSpecificityWeightExponent = null,
+        ?float $fixedSpecificityWeightShiftMagnitude = null,
+        ?float $fixedSpecificityBlendWeight = null,
+        array $fixedMetricWeights = [],
     ): SearchRankingOptimizerRunTransfer;
+
+    /**
+     * Specification:
+     * - Read-only snapshot of every scalar/metric an optimization run for this (store, locale) would work
+     *   with RIGHT NOW — feeds the Automated Weight Optimization run form's own parameter checklist
+     *   (which one of these the human wants to search vs. pin), never creates or touches a run.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array{
+     *     relevanceWeight: float,
+     *     isSpecificityWeightingEnabled: bool,
+     *     specificityCurveExponent: float,
+     *     specificityWeightExponent: float,
+     *     specificityWeightShiftMagnitude: float,
+     *     specificityBlendWeight: float,
+     *     metrics: array<int, array{idSearchRankingMetric: int, name: string, weight: float, isDeterministic: bool}>,
+     * }
+     */
+    public function listOptimizableParameters(string $storeName, string $localeName): array;
 
     /**
      * Specification:

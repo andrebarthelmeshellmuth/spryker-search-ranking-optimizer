@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
@@ -38,7 +39,7 @@ class AutomatedWeightOptimizationController extends AbstractController
         $optimizeRunForm = $this->getFactory()->createOptimizeRunForm()->handleRequest($request);
 
         if ($optimizeRunForm->isSubmitted() && $optimizeRunForm->isValid()) {
-            return $this->queueOptimizationRunFromFormData($optimizeRunForm->getData());
+            return $this->queueOptimizationRunFromFormData($optimizeRunForm->getData(), $request);
         }
 
         $storeName = (string)$request->query->get(AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME, '');
@@ -113,9 +114,21 @@ class AutomatedWeightOptimizationController extends AbstractController
     }
 
     /**
-     * @param array<string, mixed> $formData
+     * @var array<int, string>
      */
-    protected function queueOptimizationRunFromFormData(array $formData): RedirectResponse
+    protected const FIXED_SCALAR_KEYS = [
+        'relevanceWeight',
+        'specificityCurveExponent',
+        'specificityWeightExponent',
+        'specificityWeightShiftMagnitude',
+        'specificityBlendWeight',
+    ];
+
+    /**
+     * @param array<string, mixed> $formData
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function queueOptimizationRunFromFormData(array $formData, Request $request): RedirectResponse
     {
         $storeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME];
         $localeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME];
@@ -123,7 +136,21 @@ class AutomatedWeightOptimizationController extends AbstractController
         $isTerminationCriteriaTrusted = (bool)$formData[AutomatedWeightOptimizationRunForm::FIELD_IS_TERMINATION_CRITERIA_TRUSTED];
         $warmStartFraction = (int)$formData[AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT] / 100;
 
-        $this->getFacade()->queueOptimizationRun($storeName, $localeName, $algorithm, $isTerminationCriteriaTrusted, $warmStartFraction);
+        $fixedScalars = $this->parseFixedScalarsFromRequest($request);
+
+        $this->getFacade()->queueOptimizationRun(
+            $storeName,
+            $localeName,
+            $algorithm,
+            $isTerminationCriteriaTrusted,
+            $warmStartFraction,
+            $fixedScalars['relevanceWeight'],
+            $fixedScalars['specificityCurveExponent'],
+            $fixedScalars['specificityWeightExponent'],
+            $fixedScalars['specificityWeightShiftMagnitude'],
+            $fixedScalars['specificityBlendWeight'],
+            $this->parseFixedMetricWeightsFromRequest($request),
+        );
 
         $this->addSuccessMessage(
             'Optimization run queued — the next "search-ranking-optimizer:optimize" cron tick will process it.',
@@ -137,6 +164,91 @@ class AutomatedWeightOptimizationController extends AbstractController
             AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME,
             $localeName,
         ));
+    }
+
+    /**
+     * Reads the run form's own parameter checklist for the 5 scalars (relevanceWeight + the 4 specificity
+     * knobs), populated by {@see parametersAction()}'s JS. Each one is submitted as a checkbox
+     * `optimizeScalar[<key>]` (present only when CHECKED -- unchecked HTML checkboxes submit nothing at
+     * all) alongside an always-present `fixedScalarValue[<key>]` number input. A key absent from
+     * `optimizeScalar` -- whether because a human unchecked it, or because the checklist was never loaded
+     * at all (JS disabled, or submitted before a store/locale was picked) -- falls back to its own
+     * `fixedScalarValue`; when THAT is also absent (the no-JS case), the result is null, preserving the
+     * original always-free behavior exactly.
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
+     * @return array<string, float|null>
+     */
+    protected function parseFixedScalarsFromRequest(Request $request): array
+    {
+        $optimizeScalar = (array)$request->request->all('optimizeScalar');
+        $fixedScalarValue = (array)$request->request->all('fixedScalarValue');
+
+        $fixedScalars = [];
+
+        foreach (static::FIXED_SCALAR_KEYS as $key) {
+            $fixedScalars[$key] = !isset($optimizeScalar[$key]) && isset($fixedScalarValue[$key])
+                ? (float)$fixedScalarValue[$key]
+                : null;
+        }
+
+        return $fixedScalars;
+    }
+
+    /**
+     * Same checked/unchecked contract as {@see parseFixedScalarsFromRequest()}, per metric instead of per
+     * scalar: `optimizeMetric[<idSearchRankingMetric>]` (checkbox, checked = optimize),
+     * `fixedMetricValue[<idSearchRankingMetric>]` (always-present number input), `metricName[<idSearchRankingMetric>]`
+     * (always-present hidden input, so this never needs a second lookup to resolve id -> name). A metric
+     * the checklist showed read-only (non-deterministic formula, nothing for a human to choose) submits
+     * none of these three -- {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}'s
+     * own determinism check holds it fixed regardless, exactly as it always has.
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer>
+     */
+    protected function parseFixedMetricWeightsFromRequest(Request $request): array
+    {
+        $optimizeMetric = (array)$request->request->all('optimizeMetric');
+        $fixedMetricValue = (array)$request->request->all('fixedMetricValue');
+        $metricName = (array)$request->request->all('metricName');
+
+        $fixedMetricWeightTransfers = [];
+
+        foreach ($metricName as $idSearchRankingMetric => $name) {
+            if (isset($optimizeMetric[$idSearchRankingMetric]) || !isset($fixedMetricValue[$idSearchRankingMetric])) {
+                continue;
+            }
+
+            $fixedMetricWeightTransfers[] = (new SearchRankingWeightCheckpointMetricWeightTransfer())
+                ->setIdSearchRankingMetric((int)$idSearchRankingMetric)
+                ->setName((string)$name)
+                ->setWeight((float)$fixedMetricValue[$idSearchRankingMetric]);
+        }
+
+        return $fixedMetricWeightTransfers;
+    }
+
+    /**
+     * Fetched by the run form's own JS whenever the store/locale ChoiceType fields change, to populate the
+     * parameter checklist (which scalar/metric to search vs. pin) without a full page reload — see
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacadeInterface::listOptimizableParameters()}
+     * for the payload shape.
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    public function parametersAction(Request $request): JsonResponse
+    {
+        $storeName = (string)$request->query->get(AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME, '');
+        $localeName = (string)$request->query->get(AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME, '');
+
+        if ($storeName === '' || $localeName === '') {
+            return $this->jsonResponse(['error' => 'storeName and localeName are both required.'], 400);
+        }
+
+        return $this->jsonResponse($this->getFacade()->listOptimizableParameters($storeName, $localeName));
     }
 
     /**

@@ -269,6 +269,11 @@ class SearchRankingOptimizerMapper
             ->setAlgorithm($optimizerRunEntity->getAlgorithm())
             ->setIsTerminationCriteriaTrusted($optimizerRunEntity->getIsTerminationCriteriaTrusted())
             ->setWarmStartFraction($optimizerRunEntity->getWarmStartFraction())
+            ->setFixedRelevanceWeight($optimizerRunEntity->getFixedRelevanceWeight())
+            ->setFixedSpecificityCurveExponent($optimizerRunEntity->getFixedSpecificityCurveExponent())
+            ->setFixedSpecificityWeightExponent($optimizerRunEntity->getFixedSpecificityWeightExponent())
+            ->setFixedSpecificityWeightShiftMagnitude($optimizerRunEntity->getFixedSpecificityWeightShiftMagnitude())
+            ->setFixedSpecificityBlendWeight($optimizerRunEntity->getFixedSpecificityBlendWeight())
             ->setStatus($optimizerRunEntity->getStatus())
             ->setTotalCount($optimizerRunEntity->getTotalCount())
             ->setProcessedCount($optimizerRunEntity->getProcessedCount())
@@ -291,6 +296,14 @@ class SearchRankingOptimizerMapper
         if ($bestMetricWeightsJson !== null) {
             foreach ($this->decodeMetricWeights($bestMetricWeightsJson) as $metricWeightTransfer) {
                 $optimizerRunTransfer->addBestMetricWeight($metricWeightTransfer);
+            }
+        }
+
+        $fixedMetricWeightsJson = $optimizerRunEntity->getFixedMetricWeights();
+
+        if ($fixedMetricWeightsJson !== null) {
+            foreach ($this->decodeMetricWeights($fixedMetricWeightsJson) as $metricWeightTransfer) {
+                $optimizerRunTransfer->addFixedMetricWeight($metricWeightTransfer);
             }
         }
 

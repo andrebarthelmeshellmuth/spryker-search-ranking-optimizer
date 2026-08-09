@@ -117,7 +117,14 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer, $storeName, $localeName);
+        $userFixedMetricWeights = $this->buildUserFixedMetricWeights($queuedRunTransfer, $liveConfigurationTransfer);
+        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism(
+            $activeMetrics,
+            $liveConfigurationTransfer,
+            $storeName,
+            $localeName,
+            $userFixedMetricWeights,
+        );
         $mapper = new ParameterVectorMapper(
             $optimizableMetrics,
             $fixedMetricWeights,
@@ -127,6 +134,11 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
             $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
             $this->searchRankingFacade->isSpecificityWeightingEnabled(),
+            $queuedRunTransfer->getFixedRelevanceWeight(),
+            $queuedRunTransfer->getFixedSpecificityCurveExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightShiftMagnitude(),
+            $queuedRunTransfer->getFixedSpecificityBlendWeight(),
         );
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
@@ -195,9 +207,36 @@ class OptimizationRunner implements OptimizationRunnerInterface
     }
 
     /**
-     * Splits the active metrics into the ones this run actually searches (a deterministic formula — the
-     * normal case) and the ones it holds fixed at their current live weight instead, because searching a
-     * weight against a non-deterministic formula (e.g. a placeholder/noise metric) is meaningless. A
+     * A human's own parameter-checklist choice at queue time (see `AutomatedWeightOptimizationController`),
+     * keyed by metric name -- entirely independent of (and checked BEFORE) the determinism-based exclusion
+     * {@see splitMetricsByDeterminism()} applies next. A metric can end up fixed for either reason, or both
+     * at once; either way it's held constant for the whole run.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
+     *
+     * @return array<string, float>
+     */
+    protected function buildUserFixedMetricWeights(
+        SearchRankingOptimizerRunTransfer $queuedRunTransfer,
+        SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
+    ): array {
+        $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
+        $userFixedMetricWeights = [];
+
+        foreach ($queuedRunTransfer->getFixedMetricWeights() as $fixedMetricWeightTransfer) {
+            $name = $fixedMetricWeightTransfer->getNameOrFail();
+            $userFixedMetricWeights[$name] = $fixedMetricWeightTransfer->getWeight() ?? (float)($liveMetricWeightsByName[$name] ?? 0.0);
+        }
+
+        return $userFixedMetricWeights;
+    }
+
+    /**
+     * Splits the active metrics into the ones this run actually searches (a deterministic formula the
+     * human did not choose to pin — the normal case) and the ones it holds fixed instead, because either
+     * searching a weight against a non-deterministic formula (e.g. a placeholder/noise metric) is
+     * meaningless, or a human explicitly chose to pin this metric on the run form's own checklist. A
      * metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
      * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run.
      * A store-wide metric (`isLocaleScoped=false`) is searched exactly like any other — its Apply write
@@ -209,6 +248,8 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
      * @param string $storeName
      * @param string $localeName
+     * @param array<string, float> $userFixedMetricWeights Name => the value a human chose to pin it at, see
+     *   {@see buildUserFixedMetricWeights()}.
      *
      * @return array{0: array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>, 1: array<string, float>}
      */
@@ -217,12 +258,19 @@ class OptimizationRunner implements OptimizationRunnerInterface
         SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
         string $storeName,
         string $localeName,
+        array $userFixedMetricWeights = [],
     ): array {
         $optimizableMetrics = [];
         $fixedMetricWeights = [];
         $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
 
         foreach ($activeMetrics as $metric) {
+            if (array_key_exists($metric['name'], $userFixedMetricWeights)) {
+                $fixedMetricWeights[$metric['name']] = $userFixedMetricWeights[$metric['name']];
+
+                continue;
+            }
+
             $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric'], $storeName, $localeName);
             $isDeterministic = $metricDetail === null || $this->formulaDeterminismChecker->isDeterministic($metricDetail['formula']);
 

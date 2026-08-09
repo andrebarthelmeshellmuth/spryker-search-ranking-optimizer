@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use RuntimeException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
@@ -492,6 +493,132 @@ class OptimizationRunnerTest extends Unit
         }
     }
 
+    public function testRunNextHoldsAUserFixedMetricConstantAtItsChosenValueEvenThoughItsFormulaIsDeterministic(): void
+    {
+        // Arrange -- top_seller's formula is deterministic (it would normally be searched, and its own
+        // current live weight is 0.6 -- see createBasicSearchRankingFacadeMock()), but a human pinned it at
+        // 0.55 on the run form's own checklist instead, a DIFFERENT value than the live one.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(fixedMetricWeights: ['top_seller' => 0.55]),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedBestMetricWeightTransfers = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 4 arguments; only the metric weight transfers are used below.
+        $captureCallback = function (int $idOptimizerRun, float $bestRelevanceWeight, array $bestMetricWeightTransfers) use (&$capturedBestMetricWeightTransfers): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedBestMetricWeightTransfers = $bestMetricWeightTransfers;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $weightsByName = [];
+
+        foreach ($capturedBestMetricWeightTransfers as $metricWeightTransfer) {
+            $weightsByName[$metricWeightTransfer->getName()] = $metricWeightTransfer->getWeight();
+        }
+
+        $this->assertSame(0.55, $weightsByName['top_seller'], "The human-chosen pin value, not top_seller's live weight of 0.6.");
+        $this->assertEqualsWithDelta(1.0, array_sum($weightsByName), 1e-9, 'The full set must still sum to 1.');
+    }
+
+    public function testRunNextUsesTheFixedRelevanceWeightRatherThanSearchingIt(): void
+    {
+        // Arrange -- a human pinned relevanceWeight at 0.42 on the run form's own checklist. The objective
+        // function below rewards relevanceWeight closer to 1.0, so if the fixed value were NOT actually
+        // honored, the search would drift the winning candidate's relevanceWeight away from 0.42.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(fixedRelevanceWeight: 0.42),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- see the DE test above.
+        $objectiveCallback = fn (string $storeName, string $localeName, SearchRankingConfigurationStorageTransfer $configurationTransfer): float => $configurationTransfer->getRelevanceWeightOrFail();
+        // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturnCallback($objectiveCallback);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedBestRelevanceWeight = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 2nd argument; the rest are unused below.
+        $captureCallback = function (int $idOptimizerRun, float $bestRelevanceWeight) use (&$capturedBestRelevanceWeight): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedBestRelevanceWeight = $bestRelevanceWeight;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertSame(0.42, $capturedBestRelevanceWeight, 'The fixed value -- an unconstrained search maximizing relevanceWeight would have pushed it toward 1.0 instead.');
+    }
+
+    public function testRunNextUsesAFixedSpecificityKnobRatherThanSearchingIt(): void
+    {
+        // Arrange -- a human pinned specificityBlendWeight at 0.33 on the run form's own checklist, a value
+        // outside its own live trust region ([0.5, 0.9], see createBasicSearchRankingFacadeMock()'s 0.7 +/-
+        // 0.2) -- proving the fixed value is used as-is, never clamped to a trust region meant for the free
+        // case.
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(fixedSpecificityBlendWeight: 0.33),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedBestSpecificityBlendWeight = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 5th argument; the rest are unused below.
+        $captureCallback = function (
+            int $idOptimizerRun,
+            float $bestRelevanceWeight,
+            array $bestMetricWeightTransfers,
+            float $bestScore,
+            float $bestSpecificityBlendWeight,
+        ) use (&$capturedBestSpecificityBlendWeight): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedBestSpecificityBlendWeight = $bestSpecificityBlendWeight;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertSame(0.33, $capturedBestSpecificityBlendWeight);
+    }
+
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
@@ -543,19 +670,51 @@ class OptimizationRunnerTest extends Unit
         return $searchRankingFacadeMock;
     }
 
+    /**
+     * @param string|null $algorithm
+     * @param bool $isTerminationCriteriaTrusted
+     * @param float $warmStartFraction
+     * @param float|null $fixedRelevanceWeight
+     * @param float|null $fixedSpecificityCurveExponent
+     * @param float|null $fixedSpecificityWeightExponent
+     * @param float|null $fixedSpecificityWeightShiftMagnitude
+     * @param float|null $fixedSpecificityBlendWeight
+     * @param array<string, float> $fixedMetricWeights Name => the value a human chose to pin it at.
+     */
     protected function createQueuedRunTransfer(
         ?string $algorithm = null,
         bool $isTerminationCriteriaTrusted = false,
         float $warmStartFraction = 0.0,
+        ?float $fixedRelevanceWeight = null,
+        ?float $fixedSpecificityCurveExponent = null,
+        ?float $fixedSpecificityWeightExponent = null,
+        ?float $fixedSpecificityWeightShiftMagnitude = null,
+        ?float $fixedSpecificityBlendWeight = null,
+        array $fixedMetricWeights = [],
     ): SearchRankingOptimizerRunTransfer {
-        return (new SearchRankingOptimizerRunTransfer())
+        $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
             ->setStoreName('DE')
             ->setLocaleName('en_US')
             ->setAlgorithm($algorithm ?? SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED)
             ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
-            ->setWarmStartFraction($warmStartFraction);
+            ->setWarmStartFraction($warmStartFraction)
+            ->setFixedRelevanceWeight($fixedRelevanceWeight)
+            ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)
+            ->setFixedSpecificityWeightExponent($fixedSpecificityWeightExponent)
+            ->setFixedSpecificityWeightShiftMagnitude($fixedSpecificityWeightShiftMagnitude)
+            ->setFixedSpecificityBlendWeight($fixedSpecificityBlendWeight);
+
+        foreach ($fixedMetricWeights as $name => $weight) {
+            $optimizerRunTransfer->addFixedMetricWeight(
+                (new SearchRankingWeightCheckpointMetricWeightTransfer())
+                    ->setName($name)
+                    ->setWeight($weight),
+            );
+        }
+
+        return $optimizerRunTransfer;
     }
 
     protected function createDoneRunTransfer(): SearchRankingOptimizerRunTransfer

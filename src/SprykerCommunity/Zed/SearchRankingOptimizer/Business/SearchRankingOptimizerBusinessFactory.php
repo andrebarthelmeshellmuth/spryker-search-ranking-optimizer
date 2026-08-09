@@ -28,6 +28,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDetermini
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterLister;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterListerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
@@ -231,6 +233,14 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
     public function createAlgorithmFactory(): AlgorithmFactoryInterface
     {
         return new AlgorithmFactory();
+    }
+
+    public function createOptimizableParameterLister(): OptimizableParameterListerInterface
+    {
+        return new OptimizableParameterLister(
+            $this->getSearchRankingFacade(),
+            $this->createFormulaDeterminismChecker(),
+        );
     }
 
     public function createOptimizationApplier(): OptimizationApplierInterface
