@@ -703,6 +703,23 @@ either, so both need their own `vcs` repository entries too (skip whichever you 
 composer require spryker-community/search-ranking-optimizer:@dev
 ```
 
+**If your project's `search-ranking` is installed from a dev branch rather than a tagged release**,
+Composer can fail this step with `require spryker-community/search-ranking ^1.3.0 -> found
+spryker-community/search-ranking[dev-your-branch] but it does not match the constraint` — a dev-branch
+version doesn't satisfy a normal semver constraint on its own, regardless of what commits it actually
+contains. Fix it in `search-ranking`'s own `composer.json`, not this package's:
+
+```json
+"extra": {
+    "branch-alias": {
+        "dev-your-branch-name": "1.3.x-dev"
+    }
+}
+```
+
+telling Composer to treat that branch as the `1.3.x` version line for constraint-matching purposes. Pick
+the alias version to match whichever tagged release your branch is actually built on top of.
+
 ### 2. Register the core namespace
 
 In `config/Shared/config_default.php`, ensure `SprykerCommunity` is in `KernelConstants::CORE_NAMESPACES`
@@ -743,6 +760,17 @@ customer's company role is actually given `RateSearchRelevancePermissionPlugin` 
 company-role/permission fixture data, e.g. `company_role_permission.csv` if you use the standard
 `CompanyRoleDataImport`). A customer already logged in when the grant is added needs to log out and back
 in for the permission to take effect in their session.
+
+**A freshly-registered permission plugin also needs a one-time DB sync before it's usable anywhere** —
+`spryker/permission`'s own `spy_permission` table is the source of truth the Company Role edit GUI's
+checkbox list (and step 8's `check-installation` command) both read against, and nothing populates a new
+row for it automatically. Until that sync runs, granting or even *checking* the permission throws
+`Undefined array key "RateSearchRelevancePermissionPlugin"` deep inside
+`PermissionFacade::findMergedRegisteredNonInfrastructuralPermissions()` — not a message that points back
+to this step. The sync itself (`PermissionFacade::syncPermissionPlugins()`) runs automatically the moment
+anyone loads `spryker/permission`'s own Zed landing page (`Spryker\Zed\Permission\Communication\Controller\IndexController`)
+— visit it once in Zed (wire up its route/navigation entry if your project doesn't have one already) and
+every registered-but-unsynced permission plugin, this one included, gets its row.
 
 ### 3b. Register the Yves widget plugins
 
@@ -821,6 +849,18 @@ extra step. Otherwise add it once:
 $coreTranslationFilePathPatterns[] = APPLICATION_VENDOR_DIR . '/spryker-community/*/data/translation/Zed/[a-z][a-z]_[A-Z][A-Z].csv';
 ```
 
+Adding the glob is not enough on its own — Zed's translation catalog is cached. Rebuild it once after
+wiring the glob (or after this package is installed at all, if the glob was already present):
+
+```bash
+vendor/bin/console translator:clean-cache
+vendor/bin/console translator:generate-cache
+```
+
+Skipping this makes any of this package's Zed GUI strings — e.g. the "Search Ranking Saturation Point
+Calibration" page title — resolve to their raw translation key instead of real text, with no error either
+in the console or in the browser.
+
 **Yves widget** (the three button titles): the opposite mechanism — a plain
 [`data/glossary.csv`](data/glossary.csv), imported the normal Spryker way (this is the same
 Redis-backed Glossary module every Yves-facing string in a Spryker shop already uses):
@@ -828,6 +868,14 @@ Redis-backed Glossary module every Yves-facing string in a Spryker shop already 
 ```bash
 vendor/bin/console data:import glossary
 ```
+
+**If your project's glossary import source is a single merged CSV** (the common demo-data-starter
+pattern — one `data/import/common/common/glossary.csv` covering the whole project, rather than a
+per-bundle glob), running the command above alone does nothing for this package: it re-imports whatever
+your project's own file already contains, and this package's rows in its own `data/glossary.csv` were
+never part of that. Copy this package's rows into your project's file first, then import. The three
+`search_ranking_optimizer.rate.*` glossary keys and the `permission.name.RateSearchRelevancePermissionPlugin`
+row are both shipped in [`data/glossary.csv`](data/glossary.csv) for exactly this copy-paste.
 
 ### 6. Build (transfers, Propel tables, caches)
 
