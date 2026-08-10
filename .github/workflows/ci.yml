@@ -76,10 +76,10 @@ jobs:
       - run: composer check-floors
 
   complexity:
-    # Two SEPARATE phpmd runs, not one combined ruleset: PHPMD merges every loaded ruleset's
-    # exclude-pattern into one global file-ignore list for a single invocation, so keeping
-    # TooManyPublicMethods' Facade/Factory exemption in its own ruleset (run on its own) is the only
-    # way to exempt just that one rule without also hiding Facades/Factories from the rules below.
+    # Three SEPARATE phpmd runs, not one combined ruleset: PHPMD merges every loaded ruleset's
+    # exclude-pattern into one global file-ignore list for a single invocation, so keeping each rule's
+    # own Facade/Factory/Mapper exemption in its own ruleset (run on its own) is the only way to exempt
+    # just that one rule without also hiding those files from the rules in the other rulesets.
     name: phpmd (codesize)
     runs-on: ubuntu-latest
     steps:
@@ -92,3 +92,5 @@ jobs:
       - run: vendor/bin/phpmd src github phpmd.xml
       - name: Public method count (Facades/Factories exempt)
         run: vendor/bin/phpmd src github phpmd-public-methods.xml
+      - name: Parameter count (Facades/Mappers exempt)
+        run: vendor/bin/phpmd src github phpmd-parameter-list.xml
