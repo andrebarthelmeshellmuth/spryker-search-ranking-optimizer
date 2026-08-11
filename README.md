@@ -839,6 +839,31 @@ a working reference.
 directory also has an `index.ts` (`import './your-template';`) — webpack's entry-point discovery keys off
 `templates/*/index.ts`, SCSS discovery only piggybacks on that entry point already existing.
 
+#### 3c. Optional but recommended: the Yves installation-check page
+
+Everything in 3b fails **silently**. A missing `activeRatingType`, an unimported glossary and an unbuilt
+frontend all leave a storefront that renders perfectly and simply never reflects a stored judgment — there
+is no error anywhere to notice, and the symptom (a rating that "didn't save") points at the wrong layer.
+
+Set the flag in a development-tier config (e.g. `config/Shared/config_default-development.php`):
+
+```php
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConstants;
+
+$config[SearchRankingOptimizerConstants::IS_CHECK_INSTALLATION_PAGE_ENABLED] = true;
+```
+
+Then visit `/search-ranking-optimizer-widget/check-installation` as a customer holding
+`RateSearchRelevancePermissionPlugin`. It reports on the Twig helper functions, the submit/clear routes,
+whether the stored-judgment lookup actually completes against Zed, whether the glossary was imported, and
+whether the frontend build picked this package's components up — each with the exact remedy.
+
+The flag defaults to `false`, so the route does not exist at all until a project opts in; the URL 404s
+rather than existing-but-denied. It complements `vendor/bin/console
+search-ranking-optimizer:check-installation` (Propel tables, console-command registration, the permission
+plugin, Zed translations) — Zed never bootstraps the
+Yves DI container, so neither can see the other's half.
+
 ### 4. Register the Zed navigation entry
 
 Zed navigation has no glob auto-discovery for `vendor/spryker-community/*` (standard Spryker behavior).
@@ -851,6 +876,13 @@ cache first, since `navigation:build-cache` re-serializes whatever is already ca
 rm -f src/Generated/Zed/Navigation/codeBucket/navigation*.cache
 vendor/bin/console navigation:build-cache
 ```
+
+Because a missing entry never errors — the page simply cannot be reached from the sidebar, and a stale
+cache hides a correct copy just as completely — `vendor/bin/console search-ranking-optimizer:check-installation` verifies every one of
+this package's page keys against the built navigation cache, reading the expected list from the package's
+own `navigation.xml` so it also catches a page added by a later version that your project never copied. It
+tells the two failures apart: "not in your navigation.xml" and "in your navigation.xml but not in the
+cache" get different remedies.
 
 ### 5. Translations
 
@@ -942,6 +974,13 @@ finer granularity. `search-ranking-optimizer:optimize` processes at most one que
 oldest queued run, FIFO); the [Zed page](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
 already processes a run in-request when you click "Run now", so the cron only matters for runs queued some
 other way.
+
+Nothing registers a cron job for you: `SymfonySchedulerConfig::getCronJobs()` returns `[]` in Spryker core
+and has no plugin stack, so a package cannot contribute an entry even in principle — this is project config
+by design, for every package, not just this one. Because skipping it produces no error (just a queued run
+that sits in `queued` forever), the [next step](#8-verify-the-installation) verifies these registrations for
+you. If your project schedules jobs some other way than `spryker/symfony-scheduler`, that check degrades to
+a warning listing what to confirm by hand rather than failing.
 
 ### 8. Verify the installation
 
@@ -1114,8 +1153,8 @@ composer check-floors
 
 ### Test suite
 
-**311 tests, 1065 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
-`Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
+**322 tests, 1100 assertions** across three Codeception suites (`Zed/SearchRankingOptimizer`,
+`Client/SearchRankingOptimizer`, `Yves/SearchRankingOptimizerWidget`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
 own test suite. From a shop that has the package installed:
@@ -1209,7 +1248,7 @@ Two suites, split by layer:
   for `relevanceSaturationPoint`, which checkpoints deliberately exclude — see [Weight
   Checkpoints](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)) —
   so test order never matters and the suite leaves the environment exactly as it found it.
-- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` (6 tests) — the SRP
+- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` (9 tests) — the SRP
   heart/check/X rating widget: renders, colorizes, persists across reload (which only holds once the SRP
   template feeds `activeRatingType` back in — see [3b](#3b-register-the-yves-widget-plugins)), only one
   button active per product, un-rating

@@ -1,0 +1,22 @@
+namespace: SprykerCommunityTest\Yves\SearchRankingOptimizerWidget
+
+paths:
+    tests: .
+    data: _data
+    support: _support
+    output: _output
+
+coverage:
+    enabled: true
+    remote: false
+    include:
+        - 'packages/spryker-community/search-ranking-optimizer/src/*'
+
+suites:
+    Unit:
+        path: .
+        actor: SearchRankingOptimizerWidgetTester
+        modules:
+            enabled:
+                - \PyzTest\Shared\Testify\Helper\Environment
+                - \SprykerTest\Shared\Testify\Helper\ConfigHelper

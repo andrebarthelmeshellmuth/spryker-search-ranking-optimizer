@@ -7,3 +7,19 @@ search_ranking_optimizer.rate.x,Rate this product as not relevant,en_US
 search_ranking_optimizer.rate.x,Als nicht relevant bewerten,de_DE
 permission.name.RateSearchRelevancePermissionPlugin,Rate search relevance,en_US
 permission.name.RateSearchRelevancePermissionPlugin,Suchrelevanz bewerten,de_DE
+search_ranking_optimizer.check_installation.heading,Search Ranking Optimizer: installation check,en_US
+search_ranking_optimizer.check_installation.heading,Search Ranking Optimizer: Installationsprüfung,de_DE
+search_ranking_optimizer.check_installation.scope_hint,"Checks the parts of the installation only visible from the storefront (Yves) DI container.",en_US
+search_ranking_optimizer.check_installation.scope_hint,"Prüft die Teile der Installation, die nur aus dem Storefront-(Yves)-Container sichtbar sind.",de_DE
+search_ranking_optimizer.check_installation.not_verifiable_heading,Not verifiable from this page:,en_US
+search_ranking_optimizer.check_installation.not_verifiable_heading,Von dieser Seite aus nicht prüfbar:,de_DE
+search_ranking_optimizer.check_installation.not_verifiable_active_rating_type,"Whether your SRP template passes activeRatingType into the rating widget. Without it every button renders unpressed on every load, however many judgments are stored — rate a product, reload the search results page, and confirm the button stays colorized.",en_US
+search_ranking_optimizer.check_installation.not_verifiable_active_rating_type,"Ob dein SRP-Template activeRatingType an das Bewertungs-Widget übergibt. Ohne das wird bei jedem Laden jeder Button ungedrückt gerendert, egal wie viele Bewertungen gespeichert sind — bewerte ein Produkt, lade die Suchergebnisseite neu und prüfe, ob der Button eingefärbt bleibt.",de_DE
+search_ranking_optimizer.check_installation.not_verifiable_permission_grant,"Whether other admins hold RateSearchRelevancePermissionPlugin — you reaching this page only proves your own account does.",en_US
+search_ranking_optimizer.check_installation.not_verifiable_permission_grant,"Ob andere Admins RateSearchRelevancePermissionPlugin besitzen — dass du diese Seite siehst, belegt das nur für dein eigenes Konto.",de_DE
+search_ranking_optimizer.check_installation.cross_reference_zed,"For Propel tables, console-command registration, the permission plugin and the Zed translations, run vendor/bin/console search-ranking-optimizer:check-installation in Zed.",en_US
+search_ranking_optimizer.check_installation.cross_reference_zed,"Für Propel-Tabellen, Konsolenbefehl-Registrierung, das Permission-Plugin und die Zed-Übersetzungen führe vendor/bin/console search-ranking-optimizer:check-installation in Zed aus.",de_DE
+search_ranking_optimizer.check_installation.permission_denied_heading,Search Ranking Optimizer: permission required,en_US
+search_ranking_optimizer.check_installation.permission_denied_heading,Search Ranking Optimizer: Berechtigung erforderlich,de_DE
+search_ranking_optimizer.check_installation.permission_denied_body,"This installation-check page is only shown to a customer holding the RateSearchRelevancePermissionPlugin permission. Grant it to a Company Role in Zed → Customer → Company Roles, assign that role to your account, log out and back in, then reload this page.",en_US
+search_ranking_optimizer.check_installation.permission_denied_body,"Diese Installationsprüfung wird nur einem Kunden mit der Berechtigung RateSearchRelevancePermissionPlugin angezeigt. Vergib sie in Zed → Kunde → Unternehmensrollen an eine Rolle, weise sie deinem Konto zu, melde dich ab und wieder an und lade die Seite neu.",de_DE

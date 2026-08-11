@@ -18,8 +18,10 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
+use SimpleXMLElement;
 use Spryker\Shared\Config\Config;
 use Spryker\Shared\Kernel\KernelConstants;
+use Spryker\Zed\Kernel\ClassResolver\Config\BundleConfigResolver;
 use Spryker\Zed\Kernel\Communication\Console\Console;
 use SprykerCommunity\Shared\SearchRankingOptimizer\Plugin\RateSearchRelevancePermissionPlugin;
 use Symfony\Component\Console\Input\InputInterface;
@@ -112,6 +114,33 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
     ];
 
     /**
+     * The commands this package expects a project to have put on a cron schedule.
+     *
+     * @var array<string>
+     */
+    protected const CRON_COMMANDS = [
+        'search-ranking-optimizer:calibrate',
+        'search-ranking-optimizer:auto-tune',
+        'search-ranking-optimizer:optimize',
+    ];
+
+    /**
+     * Referenced as a string, never imported: spryker/symfony-scheduler is a `suggest`, not a
+     * requirement, so this package must stay loadable without it.
+     *
+     * @var string
+     */
+    protected const SCHEDULER_CONFIG_CLASS = 'Spryker\\Zed\\SymfonyScheduler\\SymfonySchedulerConfig';
+
+    /**
+     * This package's own navigation.xml, relative to this console's directory — the source of truth for
+     * which page keys a project is expected to have copied.
+     *
+     * @var string
+     */
+    protected const OWN_NAVIGATION_XML_RELATIVE_PATH = '/../navigation.xml';
+
+    /**
      * @var array<string>
      */
     protected array $failures = [];
@@ -143,6 +172,8 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         $this->checkGlossaryKeyRegistered($output);
         $this->checkZedTranslationRegistered($output);
         $this->checkPropelTablesExist($output);
+        $this->checkCronJobsRegistered($output);
+        $this->checkNavigationRegistered($output);
 
         $output->writeln('');
 
@@ -353,5 +384,227 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
             'The following tables are missing or unreachable: %s. Run `vendor/bin/console propel:install` (or propel:migrate) after installing this package (README step 6).',
             implode(', ', $missingTables),
         );
+    }
+
+    /**
+     * Cron jobs are the one integration step no package can perform for a project and nothing else
+     * verifies: `SymfonySchedulerConfig::getCronJobs()` returns `[]` in Spryker core and has no plugin
+     * stack at all, so a vendor package cannot contribute an entry — it is project config, copied by hand
+     * from the README. Skipping it produces no error either, just a queued calibration or optimization run that sits in "queued" forever.
+     *
+     * Resolved through {@see BundleConfigResolver} rather than by naming `Pyz\Zed\...` directly: the
+     * resolver is what picks a project's own override over core's empty default, and hardcoding the
+     * project namespace would break the moment a project uses a different one.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkCronJobsRegistered(OutputInterface $output): void
+    {
+        $cronJobs = $this->findRegisteredCronJobs();
+
+        if ($cronJobs === null) {
+            $this->warnings[] = sprintf(
+                'Could not read this project\'s cron registrations (spryker/symfony-scheduler is optional and may not be installed, or this project schedules jobs another way). Confirm by hand that these run periodically: %s.',
+                implode(', ', static::CRON_COMMANDS),
+            );
+
+            return;
+        }
+
+        $registeredCommands = implode(' ', array_column($cronJobs, 'command'));
+        $missingCommands = [];
+
+        foreach (static::CRON_COMMANDS as $commandName) {
+            if (str_contains($registeredCommands, $commandName)) {
+                continue;
+            }
+
+            $missingCommands[] = $commandName;
+        }
+
+        if ($missingCommands === []) {
+            $output->writeln('<info>✓</info> every cron job this package needs is registered');
+
+            return;
+        }
+
+        $this->failures[] = sprintf(
+            'These commands are NOT scheduled: %s. Add them to Pyz\Zed\SymfonyScheduler\SymfonySchedulerConfig::getCronJobs() (README step 7) — nothing registers them automatically, and leaving them unscheduled fails silently.',
+            implode(', ', $missingCommands),
+        );
+    }
+
+    /**
+     * Null means "cannot tell" (module absent, or the resolved config does not expose cron jobs), which
+     * is deliberately different from an empty array — the former is a warning, the latter a real failure.
+     *
+     * @return array<string, array<string, string>>|null
+     */
+    protected function findRegisteredCronJobs(): ?array
+    {
+        if (!class_exists(static::SCHEDULER_CONFIG_CLASS)) {
+            return null;
+        }
+
+        try {
+            $schedulerConfig = (new BundleConfigResolver())->resolve(static::SCHEDULER_CONFIG_CLASS);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (!method_exists($schedulerConfig, 'getCronJobs')) {
+            return null;
+        }
+
+        return $schedulerConfig->getCronJobs();
+    }
+
+    /**
+     * Zed navigation has no glob auto-discovery for `vendor/spryker-community/*`, so a project copies this
+     * package's own `<search-ranking-optimizer-gui>` block into `config/Zed/navigation.xml` by hand — and a page added by a
+     * later version of this package is easy to miss on upgrade. Neither omission errors: the entry is
+     * simply absent from the sidebar, and a stale navigation cache hides a correct copy just as
+     * completely as never copying it at all.
+     *
+     * The expected page keys are read from this package's OWN navigation.xml rather than hardcoded here,
+     * so this check cannot drift from what the package actually ships.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkNavigationRegistered(OutputInterface $output): void
+    {
+        $expectedPageKeys = $this->readOwnNavigationPageKeys();
+        $effectiveNavigation = $this->readEffectiveNavigation();
+
+        if ($expectedPageKeys === [] || $effectiveNavigation === null) {
+            $this->warnings[] = 'Could not compare this package\'s navigation entries against the project\'s own (neither the built navigation cache nor config/Zed/navigation.xml was readable). Confirm by hand that this package\'s pages appear in the Zed sidebar.';
+
+            return;
+        }
+
+        [$sourceLabel, $registeredPageKeys] = $effectiveNavigation;
+        $missingPageKeys = array_values(array_diff($expectedPageKeys, $registeredPageKeys));
+
+        if ($missingPageKeys === []) {
+            $output->writeln(sprintf('<info>✓</info> all %d navigation entries are registered (checked against %s)', count($expectedPageKeys), $sourceLabel));
+
+            return;
+        }
+
+        $this->failures[] = sprintf(
+            'These navigation entries are missing from %s: %s. First run "vendor/bin/console navigation:cache:remove && vendor/bin/console navigation:build-cache" — a stale cache hides a correct configuration just as completely, and is the cheaper cause to rule out. If they are still missing after that, copy the <search-ranking-optimizer-gui> block from this package\'s own src/SprykerCommunity/Zed/SearchRankingOptimizer/Communication/navigation.xml into config/Zed/navigation.xml (README step 4). A missing entry never errors — the page simply cannot be reached from the sidebar.',
+            $sourceLabel,
+            implode(', ', $missingPageKeys),
+        );
+    }
+
+    /**
+     * Every page key this package's own navigation.xml declares — the root entry plus each `<pages>`
+     * child, including the ones marked `<visible>0</visible>` (invisible still means routable, and a
+     * project that skipped them gets a dead link from the visible pages that point at them).
+     *
+     * @return array<string>
+     */
+    protected function readOwnNavigationPageKeys(): array
+    {
+        $ownNavigationXml = $this->loadXml(__DIR__ . static::OWN_NAVIGATION_XML_RELATIVE_PATH);
+
+        if ($ownNavigationXml === null) {
+            return [];
+        }
+
+        $pageKeys = [];
+
+        foreach ($ownNavigationXml->children() as $rootEntry) {
+            $pageKeys[] = $rootEntry->getName();
+
+            foreach ($rootEntry->pages->children() as $page) {
+                $pageKeys[] = $page->getName();
+            }
+        }
+
+        return $pageKeys;
+    }
+
+    /**
+     * Prefers the BUILT navigation cache over the project's raw XML, because the cache is what Zed
+     * actually renders from — a correct copy that was never followed by a cache rebuild is a real, and
+     * easy to miss, failure mode. Falls back to the raw XML when no cache has been built.
+     *
+     * @return array{0: string, 1: array<string>}|null
+     */
+    protected function readEffectiveNavigation(): ?array
+    {
+        $cacheFilePath = APPLICATION_ROOT_DIR . '/src/Generated/Zed/Navigation/codeBucket/navigation.cache';
+
+        if (is_readable($cacheFilePath)) {
+            $cachedNavigation = json_decode((string)file_get_contents($cacheFilePath), true);
+
+            if (is_array($cachedNavigation)) {
+                return ['the built navigation cache', $this->collectCachedPageKeys($cachedNavigation)];
+            }
+        }
+
+        $projectPageKeys = $this->readProjectNavigationPageKeys();
+
+        return $projectPageKeys === null ? null : ['config/Zed/navigation.xml', $projectPageKeys];
+    }
+
+    /**
+     * @return array<string>|null
+     */
+    protected function readProjectNavigationPageKeys(): ?array
+    {
+        $projectNavigationXml = $this->loadXml(APPLICATION_ROOT_DIR . '/config/Zed/navigation.xml');
+
+        if ($projectNavigationXml === null) {
+            return null;
+        }
+
+        $pageKeys = [];
+
+        foreach ($projectNavigationXml->xpath('//*') ?: [] as $element) {
+            $pageKeys[] = $element->getName();
+        }
+
+        return $pageKeys;
+    }
+
+    /**
+     * @param array<string, mixed> $cachedNavigation
+     *
+     * @return array<string>
+     */
+    protected function collectCachedPageKeys(array $cachedNavigation): array
+    {
+        $pageKeys = [];
+
+        foreach ($cachedNavigation as $pageKey => $page) {
+            $pageKeys[] = (string)$pageKey;
+
+            if (!is_array($page) || !is_array($page['pages'] ?? null)) {
+                continue;
+            }
+
+            $pageKeys = array_merge($pageKeys, $this->collectCachedPageKeys($page['pages']));
+        }
+
+        return $pageKeys;
+    }
+
+    /**
+     * @param string $filePath
+     */
+    protected function loadXml(string $filePath): ?SimpleXMLElement
+    {
+        if (!is_readable($filePath)) {
+            return null;
+        }
+
+        $previousUseInternalErrors = libxml_use_internal_errors(true);
+        $xml = simplexml_load_string((string)file_get_contents($filePath));
+        libxml_use_internal_errors($previousUseInternalErrors);
+
+        return $xml === false ? null : $xml;
     }
 }
