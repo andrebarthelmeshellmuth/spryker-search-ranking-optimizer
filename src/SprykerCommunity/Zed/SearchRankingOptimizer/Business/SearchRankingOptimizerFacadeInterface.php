@@ -212,7 +212,7 @@ interface SearchRankingOptimizerFacadeInterface
     /**
      * Specification:
      * - Reads the CURRENT state directly from `search-ranking`'s own facade — relevanceWeight, every
-     *   metric's own weight, the 3 specificity-weighting knobs, and whether specificity weighting is currently
+     *   metric's own weight, the 4 specificity-weighting knobs, and whether specificity weighting is currently
      *   enabled at the code level — and persists it as one new weight checkpoint.
      *
      * @api
@@ -225,7 +225,7 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 specificity knobs back through
+     * - Writes a past checkpoint's relevanceWeight, metric weights, and 4 specificity knobs back through
      *   `search-ranking`'s own facade, for the given (store, locale) — independent of whichever scope the
      *   checkpoint was originally recorded for, skipping any metric that no longer exists.
      * - Never writes back `isSpecificityWeightingEnabled` — it's a pure code-level project flag with no

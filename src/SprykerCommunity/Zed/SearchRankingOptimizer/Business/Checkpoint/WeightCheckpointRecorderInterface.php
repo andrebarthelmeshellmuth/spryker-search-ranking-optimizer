@@ -16,7 +16,7 @@ interface WeightCheckpointRecorderInterface
     /**
      * Specification:
      * - Reads the CURRENT state directly from `search-ranking`'s own facade for the given store+locale —
-     *   relevanceWeight, every metric's own weight, the 3 specificity-weighting knobs, and whether
+     *   relevanceWeight, every metric's own weight, the 4 specificity-weighting knobs, and whether
      *   specificity weighting is currently enabled at the code level — and persists it as one new weight
      *   checkpoint.
      * - Each metric weight row also captures that metric's `isLocaleScoped` flag AT RECORD TIME — a

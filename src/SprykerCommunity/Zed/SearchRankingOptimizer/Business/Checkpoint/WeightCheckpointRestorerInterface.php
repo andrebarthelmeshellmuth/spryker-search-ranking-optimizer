@@ -15,7 +15,7 @@ interface WeightCheckpointRestorerInterface
 {
     /**
      * Specification:
-     * - Writes a past checkpoint's relevanceWeight, metric weights, and 3 specificity knobs back through
+     * - Writes a past checkpoint's relevanceWeight, metric weights, and 4 specificity knobs back through
      *   `search-ranking`'s own facade — the SAME operation Calibration's own "Apply" already is (write
      *   current values + record the result as a new checkpoint), not a special "undo" mechanism.
      * - A metric referenced by the checkpoint that no longer exists is skipped silently — a safe,

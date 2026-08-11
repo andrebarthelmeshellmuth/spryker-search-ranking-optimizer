@@ -106,7 +106,7 @@ interface SearchRankingOptimizerToSearchRankingFacadeInterface
 
     /**
      * Whether specificity-aware relevance weighting is active right now — a pure code-level project flag,
-     * not Zed-editable. A checkpoint captures the 3 specificity knobs above regardless of this value
+     * not Zed-editable. A checkpoint captures the 4 specificity knobs above regardless of this value
      * (cheap, and keeps a checkpoint a complete snapshot even if the feature gets enabled later), but
      * records this flag alongside them so history honestly shows whether those numbers were actually live
      * at the time, rather than silently implying they always were.
