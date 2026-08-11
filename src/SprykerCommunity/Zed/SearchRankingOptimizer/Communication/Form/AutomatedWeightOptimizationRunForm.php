@@ -95,10 +95,13 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
 
         $builder->add(static::FIELD_IS_TERMINATION_CRITERIA_TRUSTED, ChoiceType::class, [
             'label' => 'Trust termination criteria',
-            'help' => 'Off (default): run the full generation budget, the same fixed-length exploration '
-                . 'run as always. On: stop as soon as the algorithm\'s own convergence/divergence/plateau '
-                . 'detection fires instead of exhausting the budget — faster when the search already '
-                . 'converges well before the budget runs out, no different otherwise.',
+            'help' => 'The algorithm\'s own convergence/divergence/plateau detection runs every generation '
+                . 'either way — this only changes the generation-count ceiling it\'s allowed to stop early '
+                . 'against. Off (default): capped at the normal ~150-generation budget, so most runs never '
+                . 'get close enough to reach that detection at all. On: the ceiling jumps to a 10,000-'
+                . 'generation safety limit instead, for a search that needs real room to keep converging '
+                . 'past the normal budget — slower per run, not faster, since it can now run far longer '
+                . 'before that detection (or the higher ceiling itself) finally stops it.',
             'choices' => ['Off' => false, 'On' => true],
             'data' => false,
         ]);

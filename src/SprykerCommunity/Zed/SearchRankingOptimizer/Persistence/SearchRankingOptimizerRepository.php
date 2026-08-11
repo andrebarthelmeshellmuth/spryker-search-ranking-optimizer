@@ -312,17 +312,28 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
-     * @param string $storeName
-     * @param string $localeName
+     * Null $storeName/$localeName means "no filter" — this history is a cross-scope audit trail, like
+     * {@see findWeightCheckpointHistory()}, so an unset filter means "show every store/locale", not "fall
+     * back to a default scope".
+     *
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
-    public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array
+    public function findEvaluationHistory(?string $storeName = null, ?string $localeName = null): array
     {
-        $evaluationEntities = $this->getFactory()
-            ->createSearchRankingEvaluationQuery()
-            ->filterByStoreName($storeName)
-            ->filterByLocaleName($localeName)
+        $evaluationQuery = $this->getFactory()->createSearchRankingEvaluationQuery();
+
+        if ($storeName !== null) {
+            $evaluationQuery->filterByStoreName($storeName);
+        }
+
+        if ($localeName !== null) {
+            $evaluationQuery->filterByLocaleName($localeName);
+        }
+
+        $evaluationEntities = $evaluationQuery
             ->orderByCreatedAt(Criteria::DESC)
             ->find();
 
@@ -337,12 +348,27 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
+     * Null $storeName/$localeName means "no filter" — same cross-scope-audit-trail convention as
+     * {@see findEvaluationHistory()}.
+     *
+     * @param string|null $storeName
+     * @param string|null $localeName
+     *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
-    public function findWeightCheckpointHistory(): array
+    public function findWeightCheckpointHistory(?string $storeName = null, ?string $localeName = null): array
     {
-        $weightCheckpointEntities = $this->getFactory()
-            ->createSearchRankingWeightCheckpointQuery()
+        $weightCheckpointQuery = $this->getFactory()->createSearchRankingWeightCheckpointQuery();
+
+        if ($storeName !== null) {
+            $weightCheckpointQuery->filterByStoreName($storeName);
+        }
+
+        if ($localeName !== null) {
+            $weightCheckpointQuery->filterByLocaleName($localeName);
+        }
+
+        $weightCheckpointEntities = $weightCheckpointQuery
             ->orderByCreatedAt(Criteria::DESC)
             ->find();
 

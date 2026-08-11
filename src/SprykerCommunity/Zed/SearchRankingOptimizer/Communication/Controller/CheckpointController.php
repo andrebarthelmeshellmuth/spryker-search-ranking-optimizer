@@ -38,6 +38,16 @@ class CheckpointController extends AbstractController
     protected const PARAM_LOCALE_NAME = 'localeName';
 
     /**
+     * @var string
+     */
+    protected const PARAM_HISTORY_STORE_NAME = 'historyStoreName';
+
+    /**
+     * @var string
+     */
+    protected const PARAM_HISTORY_LOCALE_NAME = 'historyLocaleName';
+
+    /**
      * @param \Symfony\Component\HttpFoundation\Request $request
      *
      * @return array<string, mixed>
@@ -46,8 +56,12 @@ class CheckpointController extends AbstractController
     {
         $storeName = $this->resolveStoreName($request);
         $localeName = $this->resolveLocaleName($request);
+        $historyStoreName = $this->resolveHistoryStoreName($request);
+        $historyLocaleName = $this->resolveHistoryLocaleName($request);
         $searchRankingFacade = $this->getFactory()->getSearchRankingFacade();
-        $weightCheckpointHistory = $this->getFacade()->findWeightCheckpointHistory();
+        // Independent of $storeName/$localeName above -- History is a cross-scope audit trail (unfiltered
+        // by default), not tied to whichever scope "Current State" and "Restore" currently target.
+        $weightCheckpointHistory = $this->getFacade()->findWeightCheckpointHistory($historyStoreName, $historyLocaleName);
 
         $restoreForms = [];
         $metricNameSet = [];
@@ -119,6 +133,8 @@ class CheckpointController extends AbstractController
             'locales' => $this->getFactory()->getAllLocaleNames(),
             'selectedStoreName' => $storeName,
             'selectedLocaleName' => $localeName,
+            'selectedHistoryStoreName' => $historyStoreName,
+            'selectedHistoryLocaleName' => $historyLocaleName,
         ]);
     }
 
@@ -205,6 +221,30 @@ class CheckpointController extends AbstractController
     protected function resolveLocaleName(Request $request): string
     {
         return (string)$request->query->get(static::PARAM_LOCALE_NAME, '') ?: SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME;
+    }
+
+    /**
+     * Null (not a default scope) means "no filter" — unlike {@see resolveStoreName()} above (which picks
+     * the "Current State"/Restore-target scope and always falls back to a default), the History table is
+     * a cross-scope audit trail, so an unset/blank query param means "show every store".
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveHistoryStoreName(Request $request): ?string
+    {
+        $historyStoreName = (string)$request->query->get(static::PARAM_HISTORY_STORE_NAME, '');
+
+        return $historyStoreName === '' ? null : $historyStoreName;
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveHistoryLocaleName(Request $request): ?string
+    {
+        $historyLocaleName = (string)$request->query->get(static::PARAM_HISTORY_LOCALE_NAME, '');
+
+        return $historyLocaleName === '' ? null : $historyLocaleName;
     }
 
     /**

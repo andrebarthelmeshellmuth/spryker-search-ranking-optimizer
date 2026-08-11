@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -62,6 +63,13 @@ class AutomatedWeightOptimizationController extends AbstractController
             'currentSpecificityBlendWeight' => $this->getFactory()->getSearchRankingFacade()->getSpecificityBlendWeight($currentConfigurationStoreName, $currentConfigurationLocaleName),
             'inProgressOptimizerRun' => $this->getFacade()->findOptimizerRunInProgress(),
             'latestOptimizerRun' => $latestOptimizerRunTransfer,
+            // The current LIVE ceiling, not necessarily what actually governed $latestOptimizerRunTransfer --
+            // generationsUsed is the only generation-budget figure persisted per run, so a project that
+            // changes this config after an old run finishes would see that run's own display drift from
+            // its real historical ceiling. Not tracked as a real gap: the config is a fixed constant almost
+            // nobody overrides, and persisting it per-run purely to guard against that is not worth the
+            // schema churn.
+            'optimizationMaxGenerations' => SearchRankingOptimizerConfig::getOptimizationMaxGenerations(),
             'applySiblingLocalesByMetric' => $applySiblingLocalesByMetric,
             'applyForm' => $latestOptimizerRunTransfer !== null
                 ? $this->getFactory()->createOptimizationApplyForm($latestOptimizerRunTransfer->getIdSearchRankingOptimizerRunOrFail())->createView()

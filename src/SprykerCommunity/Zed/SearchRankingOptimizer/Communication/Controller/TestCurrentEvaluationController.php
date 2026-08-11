@@ -28,6 +28,16 @@ class TestCurrentEvaluationController extends AbstractController
     protected const URL_EVALUATION = '/search-ranking-optimizer/test-current-evaluation';
 
     /**
+     * @var string
+     */
+    protected const PARAM_HISTORY_STORE_NAME = 'historyStoreName';
+
+    /**
+     * @var string
+     */
+    protected const PARAM_HISTORY_LOCALE_NAME = 'historyLocaleName';
+
+    /**
      * `_rank_eval` is a single batched HTTP call (unlike Saturation Point Calibration's per-term loop), so — unlike
      * Saturation Point Calibration's upload-then-cron-then-poll flow — this page runs the evaluation synchronously on
      * submit and redirects straight back with the result: no progress counter/polling machinery needed.
@@ -54,6 +64,8 @@ class TestCurrentEvaluationController extends AbstractController
 
         $storeName = (string)$request->query->get(TestCurrentEvaluationForm::FIELD_STORE_NAME, '');
         $localeName = (string)$request->query->get(TestCurrentEvaluationForm::FIELD_LOCALE_NAME, '');
+        $historyStoreName = $this->resolveHistoryStoreName($request);
+        $historyLocaleName = $this->resolveHistoryLocaleName($request);
 
         return $this->viewResponse([
             'evaluationForm' => $evaluationForm->createView(),
@@ -62,9 +74,14 @@ class TestCurrentEvaluationController extends AbstractController
             'latestEvaluation' => $storeName !== '' && $localeName !== ''
                 ? $this->getFacade()->findLatestEvaluation($storeName, $localeName)
                 : null,
-            'evaluationHistory' => $storeName !== '' && $localeName !== ''
-                ? $this->getFacade()->findEvaluationHistory($storeName, $localeName)
-                : [],
+            // Independent of the run form's own storeName/localeName above -- History is a cross-scope
+            // audit trail (unfiltered by default), not tied to whichever scope is currently selected to
+            // evaluate/re-evaluate.
+            'evaluationHistory' => $this->getFacade()->findEvaluationHistory($historyStoreName, $historyLocaleName),
+            'stores' => $this->getFactory()->getAllStoreNames(),
+            'locales' => $this->getFactory()->getAllLocaleNames(),
+            'selectedHistoryStoreName' => $historyStoreName,
+            'selectedHistoryLocaleName' => $historyLocaleName,
         ]);
     }
 
@@ -129,5 +146,29 @@ class TestCurrentEvaluationController extends AbstractController
         }
 
         return $data;
+    }
+
+    /**
+     * Null (not a default scope) means "no filter" — the History table below is a cross-scope audit
+     * trail, unlike the run form above it, so an unset/blank query param means "show every store", not
+     * "fall back to whatever the run form has selected".
+     *
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveHistoryStoreName(Request $request): ?string
+    {
+        $historyStoreName = (string)$request->query->get(static::PARAM_HISTORY_STORE_NAME, '');
+
+        return $historyStoreName === '' ? null : $historyStoreName;
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function resolveHistoryLocaleName(Request $request): ?string
+    {
+        $historyLocaleName = (string)$request->query->get(static::PARAM_HISTORY_LOCALE_NAME, '');
+
+        return $historyLocaleName === '' ? null : $historyLocaleName;
     }
 }

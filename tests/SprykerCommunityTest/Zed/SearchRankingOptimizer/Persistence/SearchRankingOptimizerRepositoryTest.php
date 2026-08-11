@@ -371,7 +371,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    public function testFindEvaluationHistoryByStoreLocaleReturnsNewestFirst(): void
+    public function testFindEvaluationHistoryFilteredByStoreLocaleReturnsNewestFirst(): void
     {
         // Arrange
         $storeName = 'DE-TEST-EVAL-HISTORY';
@@ -384,12 +384,28 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $newer->save();
 
         // Act
-        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistoryByStoreLocale($storeName, 'en_US');
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistory($storeName, 'en_US');
 
         // Assert
         $this->assertCount(2, $historyTransfers);
         $this->assertSame($newer->getIdSearchRankingEvaluation(), $historyTransfers[0]->getIdSearchRankingEvaluation());
         $this->assertSame($older->getIdSearchRankingEvaluation(), $historyTransfers[1]->getIdSearchRankingEvaluation());
+    }
+
+    public function testFindEvaluationHistoryWithNullStoreOrLocaleIgnoresThatFilter(): void
+    {
+        // Arrange
+        $matchingStore = $this->createTestEvaluation('DE-TEST-EVAL-HISTORY-NULL', 'en_US', 0.5, 3);
+        $otherLocale = $this->createTestEvaluation('DE-TEST-EVAL-HISTORY-NULL', 'de_DE', 0.6, 4);
+
+        // Act -- storeName filtered, localeName left null (unfiltered): both rows for this store come back
+        // regardless of locale.
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistory('DE-TEST-EVAL-HISTORY-NULL');
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingEvaluation(), $historyTransfers);
+
+        // Assert
+        $this->assertContains($matchingStore->getIdSearchRankingEvaluation(), $returnedIds);
+        $this->assertContains($otherLocale->getIdSearchRankingEvaluation(), $returnedIds);
     }
 
     public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
@@ -839,6 +855,31 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
+    public function testFindWeightCheckpointHistoryFilteredByStoreLocaleExcludesOtherScopes(): void
+    {
+        // Arrange
+        $matching = $this->createTestWeightCheckpoint(
+            SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL,
+            0.7,
+            'DE-TEST-CHECKPOINT-FILTER',
+            'en_US',
+        );
+        $otherLocale = $this->createTestWeightCheckpoint(
+            SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL,
+            0.8,
+            'DE-TEST-CHECKPOINT-FILTER',
+            'de_DE',
+        );
+
+        // Act
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findWeightCheckpointHistory('DE-TEST-CHECKPOINT-FILTER', 'en_US');
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingWeightCheckpoint(), $historyTransfers);
+
+        // Assert
+        $this->assertContains($matching->getIdSearchRankingWeightCheckpoint(), $returnedIds);
+        $this->assertNotContains($otherLocale->getIdSearchRankingWeightCheckpoint(), $returnedIds);
+    }
+
     public function testFindWeightCheckpointByIdReturnsTheMatchingCheckpoint(): void
     {
         // Arrange
@@ -867,12 +908,16 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $source
      * @param float $relevanceWeight
      */
-    protected function createTestWeightCheckpoint(string $source, float $relevanceWeight): SpySearchRankingWeightCheckpoint
-    {
+    protected function createTestWeightCheckpoint(
+        string $source,
+        float $relevanceWeight,
+        ?string $storeName = null,
+        ?string $localeName = null,
+    ): SpySearchRankingWeightCheckpoint {
         $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
         $weightCheckpointEntity->setSource($source);
-        $weightCheckpointEntity->setStoreName(SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME);
-        $weightCheckpointEntity->setLocaleName(SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
+        $weightCheckpointEntity->setStoreName($storeName ?? SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME);
+        $weightCheckpointEntity->setLocaleName($localeName ?? SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
         $weightCheckpointEntity->setRelevanceWeight($relevanceWeight);
         $weightCheckpointEntity->setSpecificityBlendWeight(0.7);
         $weightCheckpointEntity->setSpecificityWeightExponent(1.5);

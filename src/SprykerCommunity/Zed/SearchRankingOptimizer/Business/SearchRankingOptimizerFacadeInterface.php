@@ -196,16 +196,18 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Returns every persisted evaluation run for (storeName, localeName), newest first.
+     * - Returns every persisted evaluation run, newest first.
+     * - Null $storeName/$localeName means "no filter" (every store/locale); a non-null value narrows to
+     *   that scope only.
      *
      * @api
      *
-     * @param string $storeName
-     * @param string $localeName
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
-    public function findEvaluationHistory(string $storeName, string $localeName): array;
+    public function findEvaluationHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
      * Specification:
@@ -248,12 +250,17 @@ interface SearchRankingOptimizerFacadeInterface
     /**
      * Specification:
      * - Returns every persisted weight checkpoint, newest first.
+     * - Null $storeName/$localeName means "no filter" (every store/locale); a non-null value narrows to
+     *   that scope only.
      *
      * @api
      *
+     * @param string|null $storeName
+     * @param string|null $localeName
+     *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
-    public function findWeightCheckpointHistory(): array;
+    public function findWeightCheckpointHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
      * Specification:

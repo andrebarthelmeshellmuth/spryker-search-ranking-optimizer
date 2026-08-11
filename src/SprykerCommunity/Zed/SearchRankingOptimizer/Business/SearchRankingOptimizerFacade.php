@@ -196,14 +196,14 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
-     * @param string $storeName
-     * @param string $localeName
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
-    public function findEvaluationHistory(string $storeName, string $localeName): array
+    public function findEvaluationHistory(?string $storeName = null, ?string $localeName = null): array
     {
-        return $this->getRepository()->findEvaluationHistoryByStoreLocale($storeName, $localeName);
+        return $this->getRepository()->findEvaluationHistory($storeName, $localeName);
     }
 
     /**
@@ -239,11 +239,14 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      *
      * @api
      *
+     * @param string|null $storeName
+     * @param string|null $localeName
+     *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
-    public function findWeightCheckpointHistory(): array
+    public function findWeightCheckpointHistory(?string $storeName = null, ?string $localeName = null): array
     {
-        return $this->getRepository()->findWeightCheckpointHistory();
+        return $this->getRepository()->findWeightCheckpointHistory($storeName, $localeName);
     }
 
     /**

@@ -64,7 +64,11 @@
                             <tr>
                                 <th>Generations used</th>
                                 <td>
-                                    {{ latestOptimizerRun.generationsUsed }}
+                                    {# The "/budget" denominator is deliberately omitted for a trusted-termination
+                                       run: that run was never capped at optimizationMaxGenerations at all, but
+                                       at the algorithm's own far higher safety ceiling, so printing this budget
+                                       next to it would read as a nonsensical over-100% figure. #}
+                                    {{ latestOptimizerRun.generationsUsed }}{% if not latestOptimizerRun.isTerminationCriteriaTrusted %}/{{ optimizationMaxGenerations }}{% endif %}
                                     {% if latestOptimizerRun.isTerminationCriteriaTrusted %}
                                         <span class="text-muted" style="font-size: 11px;">(trusted termination criteria — stopped on convergence/divergence/plateau, not a fixed budget)</span>
                                     {% endif %}
@@ -122,6 +126,11 @@
                                 <tr>
                                     <td>
                                         {{ metricWeight.name }}
+                                        {% if metricWeight.name == 'random' %}
+                                            <div class="text-muted" style="font-size: 11px;">
+                                                Shown only so the weights below visibly sum to 1 — random's own formula is non-deterministic, so this run never searched it; it's held fixed at its live weight.
+                                            </div>
+                                        {% endif %}
                                         {% if applySiblingLocalesByMetric[metricWeight.name] is defined %}
                                             <div class="text-warning" style="font-size: 11px;">
                                                 Store-wide — also applies to {{ applySiblingLocalesByMetric[metricWeight.name] | join(', ') }}

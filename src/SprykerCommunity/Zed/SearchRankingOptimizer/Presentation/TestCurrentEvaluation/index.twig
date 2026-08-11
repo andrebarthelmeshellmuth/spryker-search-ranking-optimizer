@@ -46,32 +46,59 @@
                 {% endif %}
             {% endblock %}
         {% endembed %}
-
-        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
-            {% block widget_content %}
-                {% if evaluationHistory %}
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Evaluated at</th>
-                                <th>Weighted nDCG aggregate</th>
-                                <th>Rated queries</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for evaluation in evaluationHistory %}
-                                <tr>
-                                    <td>{{ evaluation.createdAt }}</td>
-                                    <td>{{ evaluation.metricScore }}</td>
-                                    <td>{{ evaluation.queryCount }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p>No evaluation history yet.</p>
-                {% endif %}
-            {% endblock %}
-        {% endembed %}
     {% endif %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
+        {% block widget_content %}
+            <p>Every past evaluation run, independent of the store/locale selected above — a cross-scope audit trail.</p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="historyStoreName">{{ 'Store' | trans }}</label>
+                <select name="historyStoreName" id="historyStoreName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if not selectedHistoryStoreName %}selected="selected"{% endif %}>{{ 'All stores' | trans }}</option>
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedHistoryStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="historyLocaleName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="historyLocaleName" id="historyLocaleName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if not selectedHistoryLocaleName %}selected="selected"{% endif %}>{{ 'All locales' | trans }}</option>
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedHistoryLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% if storeName %}<input type="hidden" name="storeName" value="{{ storeName }}">{% endif %}
+                {% if localeName %}<input type="hidden" name="localeName" value="{{ localeName }}">{% endif %}
+            </form>
+            {% if evaluationHistory %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Evaluated at</th>
+                            <th>Store</th>
+                            <th>Locale</th>
+                            <th>Weighted nDCG aggregate</th>
+                            <th>Rated queries</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evaluation in evaluationHistory %}
+                            <tr>
+                                <td>{{ evaluation.createdAt }}</td>
+                                <td>{{ evaluation.storeName }}</td>
+                                <td>{{ evaluation.localeName }}</td>
+                                <td>{{ evaluation.metricScore }}</td>
+                                <td>{{ evaluation.queryCount }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No evaluation history yet.</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
 {% endblock %}

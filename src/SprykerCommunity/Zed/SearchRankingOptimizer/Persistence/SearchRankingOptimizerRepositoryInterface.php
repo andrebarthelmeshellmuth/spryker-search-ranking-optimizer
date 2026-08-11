@@ -133,22 +133,28 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 
     /**
-     * Every persisted evaluation run for a given store/locale, newest first — backs a simple score-over-
-     * time history list on the Zed Evaluation page.
+     * Every persisted evaluation run, newest first — backs the Zed Evaluation page's history list. Null
+     * $storeName/$localeName means "no filter" (show every store/locale); a non-null value narrows to
+     * that scope only.
      *
-     * @param string $storeName
-     * @param string $localeName
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
-    public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array;
+    public function findEvaluationHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
-     * Every persisted weight checkpoint, newest first — backs the Zed Checkpoint page's history list.
+     * Every persisted weight checkpoint, newest first — backs the Zed Checkpoint page's history list. Null
+     * $storeName/$localeName means "no filter" (show every store/locale); a non-null value narrows to
+     * that scope only.
+     *
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
-    public function findWeightCheckpointHistory(): array;
+    public function findWeightCheckpointHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
      * @param int $idSearchRankingWeightCheckpoint
