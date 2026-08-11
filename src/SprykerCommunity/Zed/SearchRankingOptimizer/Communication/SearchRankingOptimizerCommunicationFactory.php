@@ -28,6 +28,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\AssessRatedQ
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\RatingTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToPermissionClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCustomerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToGlossaryFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeInterface;
@@ -143,6 +144,11 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_COMPANY_USER);
     }
 
+    public function getCustomerFacade(): SearchRankingOptimizerToCustomerFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_CUSTOMER);
+    }
+
     public function getPermissionFacade(): SearchRankingOptimizerToPermissionFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_PERMISSION);
@@ -178,7 +184,7 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
 
     public function createRatingTable(): RatingTable
     {
-        return new RatingTable(SpySearchRankingQueryRatingQuery::create());
+        return new RatingTable(SpySearchRankingQueryRatingQuery::create(), $this->getCustomerFacade());
     }
 
     /**

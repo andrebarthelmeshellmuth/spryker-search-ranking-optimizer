@@ -16,6 +16,7 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Spryker\Zed\Gui\Communication\Table\AbstractTable;
 use Spryker\Zed\Gui\Communication\Table\TableConfiguration;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCustomerFacadeInterface;
 
 /**
  * Every individual admin rating input (one row per heart/check/X click from the storefront widget),
@@ -46,9 +47,12 @@ class RatingTable extends AbstractTable
 
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery $ratingQuery
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCustomerFacadeInterface $customerFacade
      */
-    public function __construct(SpySearchRankingQueryRatingQuery $ratingQuery)
-    {
+    public function __construct(
+        SpySearchRankingQueryRatingQuery $ratingQuery,
+        protected SearchRankingOptimizerToCustomerFacadeInterface $customerFacade,
+    ) {
         $this->ratingQuery = $ratingQuery;
     }
 
@@ -107,6 +111,7 @@ class RatingTable extends AbstractTable
 
         $ratingEntities = $this->runQuery($this->ratingQuery, $config, true);
         $rows = [];
+        $customerEmailsByReference = [];
 
         /** @var \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating $ratingEntity */
         foreach ($ratingEntities as $ratingEntity) {
@@ -114,13 +119,34 @@ class RatingTable extends AbstractTable
                 SpySearchRankingQueryRatingTableMap::COL_ID_SEARCH_RANKING_QUERY_RATING => $ratingEntity->getIdSearchRankingQueryRating(),
                 static::COL_SEARCH_TERM => $ratingEntity->getSearchRankingQuery()->getSearchTerm(),
                 static::COL_SKU => $ratingEntity->getSpyProductAbstract()->getSku(),
-                SpySearchRankingQueryRatingTableMap::COL_CUSTOMER_REFERENCE => $ratingEntity->getCustomerReference(),
+                SpySearchRankingQueryRatingTableMap::COL_CUSTOMER_REFERENCE => $this->resolveCustomerEmail($ratingEntity->getCustomerReference(), $customerEmailsByReference),
                 static::COL_RATING_TYPE => $this->formatRatingType($ratingEntity),
                 SpySearchRankingQueryRatingTableMap::COL_UPDATED_AT => $ratingEntity->getUpdatedAt('Y-m-d H:i:s'),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * `spryker/customer` exposes no batch/collection lookup by multiple references, so this caches by
+     * reference across the page's own rows instead of calling out per row — same posture
+     * spryker-community/search-feedback's own TicketTable already takes for the identical problem.
+     *
+     * @param string $customerReference
+     * @param array<string, string> $customerEmailsByReference
+     */
+    protected function resolveCustomerEmail(string $customerReference, array &$customerEmailsByReference): string
+    {
+        if (!isset($customerEmailsByReference[$customerReference])) {
+            $customerResponseTransfer = $this->customerFacade->findCustomerByReference($customerReference);
+
+            $customerEmailsByReference[$customerReference] = $customerResponseTransfer->getIsSuccess() && $customerResponseTransfer->getCustomerTransfer() !== null
+                ? ($customerResponseTransfer->getCustomerTransfer()->getEmail() ?? $customerReference)
+                : $customerReference;
+        }
+
+        return $customerEmailsByReference[$customerReference];
     }
 
     /**

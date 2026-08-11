@@ -15,6 +15,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingO
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeBridge;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCustomerFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToGlossaryFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToLocaleFacadeBridge;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToPermissionFacadeBridge;
@@ -61,6 +62,15 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
      * @var string
      */
     public const FACADE_COMPANY_USER = 'FACADE_COMPANY_USER';
+
+    /**
+     * Resolves a rating row's raw customer reference to a real email for display on the Ratings table —
+     * same "no stored link, resolve at render time" posture as spryker-community/search-feedback's own
+     * ticket list uses for the identical problem.
+     *
+     * @var string
+     */
+    public const FACADE_CUSTOMER = 'FACADE_CUSTOMER';
 
     /**
      * Re-checks RateSearchRelevancePermissionPlugin server-side in the Gateway Controller, independently
@@ -160,6 +170,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = $this->addStoreFacade($container);
         $container = $this->addLocaleFacade($container);
         $container = $this->addCompanyUserFacade($container);
+        $container = $this->addCustomerFacade($container);
         $container = $this->addPermissionFacade($container);
         $container = $this->addPermissionClient($container);
         $container = $this->addGlossaryFacade($container);
@@ -223,6 +234,18 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
     {
         $container->set(static::FACADE_COMPANY_USER, fn (Container $container) => new SearchRankingOptimizerToCompanyUserFacadeBridge(
             $container->getLocator()->companyUser()->facade(),
+        ));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     */
+    protected function addCustomerFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_CUSTOMER, fn (Container $container) => new SearchRankingOptimizerToCustomerFacadeBridge(
+            $container->getLocator()->customer()->facade(),
         ));
 
         return $container;
