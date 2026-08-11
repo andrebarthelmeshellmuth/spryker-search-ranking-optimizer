@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\SaturationPoi
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\NoSearchTermsAvailableException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\CsvSearchTermParserInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\SaturationPointCalibrationUploadHandler;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
@@ -62,24 +63,46 @@ class SaturationPointCalibrationUploadHandlerTest extends Unit
         $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', 'chair,desk');
     }
 
-    public function testCreateCalibrationPersistsAnEmptySearchTermListWhenParsingYieldsNoTerms(): void
+    public function testCreateCalibrationRejectsTheUploadWhenParsingYieldsNoTerms(): void
     {
-        // Arrange
+        // Arrange -- a calibration with zero attached terms can only fail later on the calibrate cron
+        // tick, so it is rejected up front rather than persisted.
         $csvSearchTermParserMock = $this->createMock(CsvSearchTermParserInterface::class);
         $csvSearchTermParserMock->method('parse')->willReturn([]);
 
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
 
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
-        $entityManagerMock->expects($this->once())
-            ->method('createCalibration')
-            ->with($this->callback(fn (SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): bool => iterator_to_array($calibrationTransfer->getSearchTerms()) === []))
-            ->willReturnArgument(0);
+        $entityManagerMock->expects($this->never())->method('createCalibration');
 
         $handler = new SaturationPointCalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
 
+        // Assert
+        $this->expectException(NoSearchTermsAvailableException::class);
+
         // Act
         $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US', '');
+    }
+
+    public function testCreateCalibrationRejectsTheUploadWhenTheRepositoryHasNoRatedTermsYet(): void
+    {
+        // Arrange
+        $csvSearchTermParserMock = $this->createMock(CsvSearchTermParserInterface::class);
+        $csvSearchTermParserMock->expects($this->never())->method('parse');
+
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findDistinctSearchTermsByStoreLocale')->with('DE', 'en_US')->willReturn([]);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('createCalibration');
+
+        $handler = new SaturationPointCalibrationUploadHandler($csvSearchTermParserMock, $repositoryMock, $entityManagerMock);
+
+        // Assert
+        $this->expectException(NoSearchTermsAvailableException::class);
+
+        // Act
+        $handler->createCalibration(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE, 6, 'DE', 'en_US');
     }
 
     public function testCreateCalibrationSourcesTermsFromTheRepositoryWhenNoCsvContentIsGiven(): void
@@ -117,7 +140,7 @@ class SaturationPointCalibrationUploadHandlerTest extends Unit
     {
         // Arrange
         $csvSearchTermParserMock = $this->createMock(CsvSearchTermParserInterface::class);
-        $csvSearchTermParserMock->method('parse')->willReturn([]);
+        $csvSearchTermParserMock->method('parse')->willReturn(['chair']);
 
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
 

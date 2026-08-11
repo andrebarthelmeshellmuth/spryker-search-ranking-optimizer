@@ -49,14 +49,24 @@ class CalibrationCest
      */
     public function startingARunQueuesItWithoutTouchingLiveConfig(SearchRankingOptimizerGuiPresentationTester $i): void
     {
+        $ratedScope = $i->grabFirstRatedScope();
+
+        if ($ratedScope === null) {
+            $i->comment('No rated query exists yet anywhere, so every scope\'s calibration would be rejected up front; skipping. Run the sibling Yves suite\'s rating-widget tests first for full coverage.');
+
+            return;
+        }
+
+        [$storeName, $localeName] = $ratedScope;
+
         $i->amOnPage(SearchRankingSettingsPage::URL);
         $relevanceSaturationPointBefore = $i->grabValueFrom('#' . SearchRankingSettingsPage::FIELD_RELEVANCE_SATURATION_POINT);
 
         $i->amOnPage(CalibrationPage::URL);
         $i->selectOption('#' . CalibrationPage::FIELD_CALIBRATION_TYPE, 'Relevance score');
         $i->fillField('#' . CalibrationPage::FIELD_RELEVANT_PRODUCT_COUNT, '6');
-        $i->selectOption('#' . CalibrationPage::FIELD_STORE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_STORE_NAME);
-        $i->selectOption('#' . CalibrationPage::FIELD_LOCALE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME);
+        $i->selectOption('#' . CalibrationPage::FIELD_STORE_NAME, $storeName);
+        $i->selectOption('#' . CalibrationPage::FIELD_LOCALE_NAME, $localeName);
         // The new "Viewing" scope picker above pushes this button further down the page than the fixed
         // Symfony debug toolbar's dead zone at this viewport size — same fix AutoTuneCest/CheckpointCest
         // already use for their own Save/Apply buttons.
@@ -74,14 +84,28 @@ class CalibrationCest
      */
     public function calculatingAndApplyingWritesKIntoSearchRanking(SearchRankingOptimizerGuiPresentationTester $i): void
     {
+        $ratedScope = $i->grabFirstRatedScope();
+
+        if ($ratedScope === null) {
+            $i->comment('No rated query exists yet anywhere, so every scope\'s calibration would be rejected up front; skipping. Run the sibling Yves suite\'s rating-widget tests first for full coverage.');
+
+            return;
+        }
+
+        [$storeName, $localeName] = $ratedScope;
+        // Any other locale of the same store — this one must NOT show the run produced below.
+        $otherLocaleName = $localeName === SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME
+            ? 'en_US'
+            : SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME;
+
         $i->amOnPage(SearchRankingSettingsPage::URL);
         $originalRelevanceSaturationPoint = $i->grabValueFrom('#' . SearchRankingSettingsPage::FIELD_RELEVANCE_SATURATION_POINT);
 
         $i->amOnPage(CalibrationPage::URL);
         $i->selectOption('#' . CalibrationPage::FIELD_CALIBRATION_TYPE, 'Relevance score');
         $i->fillField('#' . CalibrationPage::FIELD_RELEVANT_PRODUCT_COUNT, '6');
-        $i->selectOption('#' . CalibrationPage::FIELD_STORE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_STORE_NAME);
-        $i->selectOption('#' . CalibrationPage::FIELD_LOCALE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME);
+        $i->selectOption('#' . CalibrationPage::FIELD_STORE_NAME, $storeName);
+        $i->selectOption('#' . CalibrationPage::FIELD_LOCALE_NAME, $localeName);
         // The new "Viewing" scope picker above pushes this button further down the page than the fixed
         // Symfony debug toolbar's dead zone at this viewport size — same fix AutoTuneCest/CheckpointCest
         // already use for their own Save/Apply buttons.
@@ -91,12 +115,13 @@ class CalibrationCest
 
         $consoleOutput = $i->runConsoleCommand(CalibrationPage::CONSOLE_COMMAND_CALIBRATE);
 
-        $i->amOnPage(CalibrationPage::URL);
+        // Explicit scope in the URL: the upload form's own store/locale pickers are independent of the
+        // page's VIEW scope, so landing on the default view would show a different scope's (missing) run.
+        $i->amOnPage(CalibrationPage::URL . '?storeName=' . $storeName . '&localeName=' . $localeName);
 
         if (!$i->tryToSeeElement("//button[contains(., '" . CalibrationPage::APPLY_BUTTON_TEXT . "')]")) {
-            // No organically-rated search term existed yet for the console command to sample (this run
-            // sources terms from real ratings, same precondition QueryCest/EvaluationCest document) -
-            // a legitimate outcome in a freshly-seeded environment, not a failure of this test.
+            // The console command found no scorable result for any of the sourced terms — a legitimate
+            // outcome on a shop whose catalog doesn't match them, not a failure of this test.
             $i->comment('Calibration did not produce a calculated run (console output: ' . trim($consoleOutput) . '); skipping the Apply assertion.');
 
             return;
@@ -104,19 +129,19 @@ class CalibrationCest
 
         $i->see('Computed k (mean)');
 
-        // Scope isolation: this real calculated run is for DE/de_DE specifically — switching the page's
-        // own VIEW picker to a different locale of the same store must show the "Latest Calibration Run"
-        // box as empty for THAT scope, not the DE/de_DE run just produced. Proves the store/locale
+        // Scope isolation: this real calculated run belongs to one store/locale specifically — switching
+        // the page's own VIEW picker to a different locale of the same store must show the "Latest
+        // Calibration Run" box as empty for THAT scope, not the run just produced. Proves the store/locale
         // scoping added to findLatestCalculatedCalibration()/the picker actually reaches the real page,
         // not just the unit-tested repository layer.
-        $i->selectOption('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, 'en_US');
+        $i->selectOption('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, $otherLocaleName);
         $i->waitForElementVisible('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, 10);
         $i->see(CalibrationPage::NO_CALIBRATION_YET_TEXT);
         $i->dontSee('Computed k (mean)');
 
-        // Back to DE/de_DE — the actual Apply click below must act on the real calculated run, not
-        // whatever (nothing) is showing for en_US.
-        $i->selectOption('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME);
+        // Back to the calibrated scope — the actual Apply click below must act on the real calculated run,
+        // not whatever (nothing) is showing for the other locale.
+        $i->selectOption('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, $localeName);
         $i->waitForElementVisible('#' . CalibrationPage::VIEW_LOCALE_SELECT_ID, 10);
         $i->see('Computed k (mean)');
 

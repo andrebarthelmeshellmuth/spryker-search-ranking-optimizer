@@ -46,8 +46,7 @@ class RatingWidgetCest
         $i->amOnPage(SearchResultsPage::URL_CHAIR);
         $i->waitForElementVisible(SearchResultsPage::SELECTOR_HEART_BUTTON, 10);
 
-        $i->click(SearchResultsPage::SELECTOR_HEART_BUTTON);
-        $i->wait(1);
+        $i->clickAndWaitForRatingRoundTrip(SearchResultsPage::SELECTOR_HEART_BUTTON);
         $i->seeElement(SearchResultsPage::SELECTOR_HEART_BUTTON . '[aria-pressed="true"]');
 
         $i->amOnPage(SearchResultsPage::URL_CHAIR);
@@ -55,8 +54,7 @@ class RatingWidgetCest
         $i->seeElement(SearchResultsPage::SELECTOR_HEART_BUTTON . '[aria-pressed="true"]');
 
         // Clean up: clicking the already-active button again removes the rating (checklist card o2-2).
-        $i->click(SearchResultsPage::SELECTOR_HEART_BUTTON);
-        $i->wait(1);
+        $i->clickAndWaitForRatingRoundTrip(SearchResultsPage::SELECTOR_HEART_BUTTON);
         $i->seeElement(SearchResultsPage::SELECTOR_HEART_BUTTON . '[aria-pressed="false"]');
 
         $i->amOnPage(SearchResultsPage::URL_CHAIR);
@@ -72,20 +70,17 @@ class RatingWidgetCest
         $i->amOnPage(SearchResultsPage::URL_CHAIR);
         $i->waitForElementVisible(SearchResultsPage::SELECTOR_CHECK_BUTTON, 10);
 
-        $i->click(SearchResultsPage::SELECTOR_CHECK_BUTTON);
-        $i->wait(1);
+        $i->clickAndWaitForRatingRoundTrip(SearchResultsPage::SELECTOR_CHECK_BUTTON);
         $i->seeElement(SearchResultsPage::SELECTOR_CHECK_BUTTON . '[aria-pressed="true"]');
         $i->seeElement(SearchResultsPage::SELECTOR_HEART_BUTTON . '[aria-pressed="false"]');
         $i->seeElement(SearchResultsPage::SELECTOR_X_BUTTON . '[aria-pressed="false"]');
 
-        $i->click(SearchResultsPage::SELECTOR_X_BUTTON);
-        $i->wait(1);
+        $i->clickAndWaitForRatingRoundTrip(SearchResultsPage::SELECTOR_X_BUTTON);
         $i->seeElement(SearchResultsPage::SELECTOR_X_BUTTON . '[aria-pressed="true"]');
         $i->seeElement(SearchResultsPage::SELECTOR_CHECK_BUTTON . '[aria-pressed="false"]');
 
         // Clean up.
-        $i->click(SearchResultsPage::SELECTOR_X_BUTTON);
-        $i->wait(1);
+        $i->clickAndWaitForRatingRoundTrip(SearchResultsPage::SELECTOR_X_BUTTON);
         $i->seeElement(SearchResultsPage::SELECTOR_X_BUTTON . '[aria-pressed="false"]');
     }
 

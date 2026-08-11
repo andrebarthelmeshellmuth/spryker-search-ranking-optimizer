@@ -74,14 +74,17 @@ class PreFlightCest
      */
     public function sidebarListsAllSevenPages(SearchRankingOptimizerGuiPresentationTester $i): void
     {
+        // The sidebar renders the labels from the package's own Communication/navigation.xml verbatim, so
+        // these assert those labels exactly rather than the page headings, which word some of them
+        // differently (the Auto-tune page's own heading reads "Auto-Tune Settings").
         $i->amOnPage(CalibrationPage::URL);
         $i->see('Search Ranking Optimizer');
         $i->see('Calibration');
-        $i->see('Queries');
+        $i->see('Assess Rated Queries');
         $i->see('Ratings');
-        $i->see('Evaluation');
+        $i->see('Test Current Evaluation');
         $i->see('Weight Checkpoints');
-        $i->see('Auto-Tune Settings');
-        $i->see('Automated Optimization');
+        $i->see('Auto-tune metrics settings');
+        $i->see('Automated Weight Optimization');
     }
 }

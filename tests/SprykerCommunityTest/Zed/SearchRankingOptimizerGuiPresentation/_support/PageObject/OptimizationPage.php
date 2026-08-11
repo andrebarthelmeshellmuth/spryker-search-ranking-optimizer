@@ -37,6 +37,14 @@ class OptimizationPage
     public const RUN_NOW_BUTTON_TEXT = 'Run now';
 
     /**
+     * Same button as RUN_NOW_BUTTON_TEXT, addressed by selector rather than text so it can be scrolled
+     * clear of the fixed Symfony debug toolbar before being clicked.
+     *
+     * @var string
+     */
+    public const SELECTOR_RUN_NOW_BUTTON = '[data-role="run-now-button"]';
+
+    /**
      * @var string
      */
     public const APPLY_BUTTON_TEXT = 'Apply';

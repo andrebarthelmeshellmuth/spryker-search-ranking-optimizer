@@ -795,12 +795,20 @@ Then render the widget below each product tile in your SRP template (this packag
 `page-layout-catalog.twig` itself — that stays project-owned):
 
 ```twig
+{# Once per page, BEFORE the product loop. #}
+{% set canRateSearchRelevanceValue = canRateSearchRelevance() %}
+{% set searchRelevanceRatings = canRateSearchRelevanceValue
+    ? getSearchRelevanceRatings(data.searchString, data.products | default([]) | map((product) => product.id_product_abstract))
+    : {} %}
+
+{# Once per product, INSIDE the loop. #}
 {% include molecule('search-ranking-optimizer-product-rating', 'SearchRankingOptimizerWidget') with {
     data: {
-        canRate: canRateSearchRelevance(),
+        canRate: canRateSearchRelevanceValue,
         searchTerm: data.searchString,
         idProductAbstract: product.id_product_abstract,
         csrfToken: searchRankingOptimizerRatingCsrfToken(),
+        activeRatingType: searchRelevanceRatings[product.id_product_abstract] | default(null),
     }
 } only %}
 ```
@@ -809,8 +817,16 @@ Then render the widget below each product tile in your SRP template (this packag
 submit/clear actions are plain POST controllers, not bound to a Symfony Form, so without this field they'd
 carry none of the CSRF protection every Form-backed POST in this project gets automatically.
 
-Compute `canRateSearchRelevance()` **once per page**, not once per product, and pass the same value into
-every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
+`getSearchRelevanceRatings(searchTerm, idProductAbstracts)` comes from that same plugin and is **not
+optional if you want prior judgments to show up**: it returns this customer's already-persisted rating type
+per product abstract, and the widget's `activeRatingType` is what turns the corresponding button's
+`aria-pressed` on at render time. Omit it and every button renders unpressed on every page load — ratings
+are still submitted and stored correctly, they just silently never appear again after a reload, which reads
+as "the rating didn't save". Call it **once per page** with the whole result page's product ids (one
+batched Zed round trip), never once per product.
+
+Compute `canRateSearchRelevance()` **once per page** too, not once per product, and pass the same value
+into every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
 `.search-debug-product-wrapper` (or any other wrapper that stretches to a fixed row height via CSS Grid/
 flex `align-items: stretch`), make sure that wrapper's first child does not have a hard `height: 100%` —
 combined with `flex-shrink: 0` that silently eats all the wrapper's height and pushes this widget outside
@@ -1098,7 +1114,7 @@ composer check-floors
 
 ### Test suite
 
-**291 tests, 1015 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
+**311 tests, 1065 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
@@ -1183,16 +1199,20 @@ caught by a manual click-through. The Browser (Presentation) suite below closes 
 
 Two suites, split by layer:
 
-- `tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation/` — all 7 Zed pages (Calibration,
-  Queries, Ratings, Evaluation, Weight Checkpoints, Auto-Tune Settings, Automated Optimization). Every
+- `tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation/` (15 tests) — all 7 Zed pages
+  (Calibration, Assess Rated Queries, Ratings, Test Current Evaluation, Weight Checkpoints, Auto-tune
+  metrics settings, Automated Weight Optimization — the labels this package's own `navigation.xml`
+  ships, which the sidebar assertions match verbatim). Every
   test that mutates live `search-ranking` config (relevanceWeight, metric weights, relevanceSaturationPoint)
   is fully self-contained — it captures the real value first, mutates, verifies, and restores it again
   before finishing (via a checkpoint restore where checkpoints cover the field, or a direct Settings edit
   for `relevanceSaturationPoint`, which checkpoints deliberately exclude — see [Weight
   Checkpoints](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)) —
   so test order never matters and the suite leaves the environment exactly as it found it.
-- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` — the SRP heart/check/X
-  rating widget: renders, colorizes, persists across reload, only one button active per product, un-rating
+- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` (6 tests) — the SRP
+  heart/check/X rating widget: renders, colorizes, persists across reload (which only holds once the SRP
+  template feeds `activeRatingType` back in — see [3b](#3b-register-the-yves-widget-plugins)), only one
+  button active per product, un-rating
   removes the row rather than just deselecting it, coexists with search-debug's own overlay on the same
   tile, and the permission gate (two negative-test accounts).
 
@@ -1268,7 +1288,7 @@ the one further exemption, same class as those two: it is a thin pass-through to
 needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
 verification in [Status](#status) instead of a unit test.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 80
+Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 151
 files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
 generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
 `transfer:generate`. **Invoke it via the real `packages/` path, not the `vendor/` symlink** — running it

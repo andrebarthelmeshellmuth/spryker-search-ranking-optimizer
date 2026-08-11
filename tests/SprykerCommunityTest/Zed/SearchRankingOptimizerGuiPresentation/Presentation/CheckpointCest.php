@@ -85,6 +85,10 @@ class CheckpointCest
         $i->amOnPage(CheckpointPage::URL);
         $rowCountBeforeRestore = count($i->grabMultiple(CheckpointPage::SELECTOR_ANY_HISTORY_ROW));
         $i->waitForElementVisible(CheckpointPage::SELECTOR_FIRST_HISTORY_ROW_RESTORE_BUTTON, 10);
+        // Clear of the fixed Symfony debug toolbar's dead zone at this viewport size — the history table
+        // grows by one row per run of this suite, so the first row's own Restore button drifts down the
+        // page over time.
+        $i->scrollTo(CheckpointPage::SELECTOR_FIRST_HISTORY_ROW_RESTORE_BUTTON, 0, -150);
         $i->click(CheckpointPage::SELECTOR_FIRST_HISTORY_ROW_RESTORE_BUTTON);
         // The restore button's onclick fires a native confirm() warning about the store-wide fan-out
         // (see index.twig) — must be accepted before any further command, or WebDriver throws

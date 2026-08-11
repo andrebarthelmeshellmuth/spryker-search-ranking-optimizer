@@ -69,6 +69,35 @@ class SearchRankingOptimizerWidgetPresentationTester extends Actor
     }
 
     /**
+     * Counts the widget's own submit/clear round trips the browser has actually COMPLETED — a resource
+     * timing entry only appears once the response has been fully received.
+     *
+     * @var string
+     */
+    protected const JS_COMPLETED_ROUND_TRIP_COUNT = 'return window.performance.getEntriesByType("resource")'
+        . '.filter(function (entry) { return entry.name.indexOf("relevance-judgment") !== -1; }).length;';
+
+    /**
+     * The rating widget persists via `fetch()` and colorizes optimistically, BEFORE that request resolves —
+     * so a plain wait-then-navigate races the POST and can abandon it in flight, which looks exactly like a
+     * rating that silently failed to save. Waiting on the resource timing entry instead is a real
+     * completion signal rather than a guessed sleep duration.
+     *
+     * @param string $selector
+     */
+    public function clickAndWaitForRatingRoundTrip(string $selector): void
+    {
+        $completedBefore = (int)$this->executeJS(static::JS_COMPLETED_ROUND_TRIP_COUNT);
+
+        $this->click($selector);
+
+        $this->waitForJS(
+            sprintf('%s > %d;', rtrim(static::JS_COMPLETED_ROUND_TRIP_COUNT, ';'), $completedBefore),
+            10,
+        );
+    }
+
+    /**
      * @param string $selector
      */
     public function tryToSeeElement(string $selector): bool

@@ -54,6 +54,9 @@ class OptimizationCest
         $i->amOnPage(OptimizationPage::URL);
         $i->selectOption('#' . OptimizationPage::FIELD_STORE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_STORE_NAME);
         $i->selectOption('#' . OptimizationPage::FIELD_LOCALE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME);
+        // Clear of the fixed Symfony debug toolbar's dead zone at this viewport size — same fix
+        // AutoTuneCest/CheckpointCest/CalibrationCest already use for their own submit buttons.
+        $i->scrollTo(OptimizationPage::SELECTOR_RUN_NOW_BUTTON, 0, -150);
         $i->click(OptimizationPage::RUN_NOW_BUTTON_TEXT);
         $i->see(OptimizationPage::FLASH_MESSAGE_QUEUED);
 
@@ -86,6 +89,9 @@ class OptimizationCest
         $i->selectOption('#' . OptimizationPage::FIELD_STORE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_STORE_NAME);
         $i->selectOption('#' . OptimizationPage::FIELD_LOCALE_NAME, SearchRankingOptimizerGuiPresentationTester::DEFAULT_LOCALE_NAME);
         $i->selectOption('#' . OptimizationPage::FIELD_ALGORITHM, 'CMA-ES');
+        // Clear of the fixed Symfony debug toolbar's dead zone at this viewport size — same fix
+        // AutoTuneCest/CheckpointCest/CalibrationCest already use for their own submit buttons.
+        $i->scrollTo(OptimizationPage::SELECTOR_RUN_NOW_BUTTON, 0, -150);
         $i->click(OptimizationPage::RUN_NOW_BUTTON_TEXT);
         $i->see(OptimizationPage::FLASH_MESSAGE_QUEUED);
 

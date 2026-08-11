@@ -70,11 +70,17 @@ class RatingTable extends AbstractTable
             SpySearchRankingQueryRatingTableMap::COL_UPDATED_AT => 'Recorded At',
         ]);
 
+        // The Admin column deliberately appears in neither list: it *stores* a customer reference but
+        // *renders* the resolved email (see resolveCustomerEmail()), and both sorting and searching happen
+        // in SQL against the stored column. Leaving it enabled would sort visible emails into reference
+        // order and make a search for the email a rendered value actually shows return nothing. Sorting or
+        // searching on the email itself would mean joining `spy_customer` directly, which this package
+        // deliberately does not do — `spryker/customer` is reached through a facade bridge only, so the
+        // package stays installable without a hard Propel-level coupling to it.
         $config->setSortable([
             SpySearchRankingQueryRatingTableMap::COL_ID_SEARCH_RANKING_QUERY_RATING,
             SpySearchRankingQueryTableMap::COL_SEARCH_TERM,
             SpyProductAbstractTableMap::COL_SKU,
-            SpySearchRankingQueryRatingTableMap::COL_CUSTOMER_REFERENCE,
             SpySearchRankingQueryRatingTableMap::COL_RATING_TYPE,
             SpySearchRankingQueryRatingTableMap::COL_UPDATED_AT,
         ]);
@@ -82,7 +88,6 @@ class RatingTable extends AbstractTable
         $config->setSearchable([
             SpySearchRankingQueryTableMap::COL_SEARCH_TERM,
             SpyProductAbstractTableMap::COL_SKU,
-            SpySearchRankingQueryRatingTableMap::COL_CUSTOMER_REFERENCE,
         ]);
 
         $config->setRawColumns([

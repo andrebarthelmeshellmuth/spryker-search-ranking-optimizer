@@ -56,12 +56,14 @@
            (the filter/sort form) — without an explicit type a <button> defaults to type="submit", and
            an accidental click would submit the filter form (same reasoning as search-debug's own
            trigger/pin buttons). #}
-        {# aria-pressed starts already true/false per button from data.activeRatingType (set once per SRP
-           render via the batched getSearchRelevanceRatings() call, see the demoshop's catalog template) so
-           an admin revisiting a search term they already rated sees their prior judgment reflected
-           immediately — the same attribute the .ts click handler reads/writes at runtime, so no separate
-           JS-side init state is needed; the scss's own [aria-pressed='true'] rules apply identically
-           whether that state came from a click or from this initial render. #}
+        {# aria-pressed starts already true/false per button from data.activeRatingType, which the SRP
+           template supplies from one batched getSearchRelevanceRatings() call per page (see the README's
+           integration snippet) so an admin revisiting a search term they already rated sees their prior
+           judgment reflected immediately. Leave activeRatingType unset and every button renders unpressed
+           on every load, however many judgments are actually stored. It is the same attribute the .ts
+           click handler reads/writes at runtime, so no separate JS-side init state is needed; the scss's
+           own [aria-pressed='true'] rules apply identically whether that state came from a click or from
+           this initial render. #}
         <button type="button" class="{{ config.name }}__button {{ config.name }}__button--heart {{ config.jsName }}__button" data-rating-type="heart" aria-pressed="{{ data.activeRatingType == 'heart' ? 'true' : 'false' }}" title="{{ 'search_ranking_optimizer.rate.heart' | trans }}">
             {# Inlined rather than referenced via `atom('icon')`, same reasoning search-debug's own pin
                icon documents: a shop's icon sprite has no guaranteed heart/check/x symbols, so relying

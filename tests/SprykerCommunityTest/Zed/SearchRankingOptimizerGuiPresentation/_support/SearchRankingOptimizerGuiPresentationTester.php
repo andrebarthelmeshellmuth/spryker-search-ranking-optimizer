@@ -11,6 +11,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation;
 
 use Codeception\Actor;
 use Exception;
+use SprykerCommunityTest\Zed\SearchRankingOptimizerGuiPresentation\PageObject\QueryPage;
 
 /**
  * Inherited Methods
@@ -54,6 +55,32 @@ class SearchRankingOptimizerGuiPresentationTester extends Actor
         } catch (Exception) {
             return false;
         }
+    }
+
+    /**
+     * The store/locale of the first row of the Rated Queries table, or null when no query has been rated
+     * anywhere yet.
+     *
+     * Calibration sources its search terms from organically rated queries and is rejected outright when a
+     * scope has none (NoSearchTermsAvailableException), so a calibration test can't just assume
+     * DEFAULT_STORE_NAME/DEFAULT_LOCALE_NAME the way the weight-oriented Cests do — it has to run against
+     * whichever scope the shop under test actually has ratings in.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function grabFirstRatedScope(): ?array
+    {
+        $this->amOnPage(QueryPage::URL_LIST);
+        $this->waitForElementVisible(QueryPage::SELECTOR_TABLE, 10);
+
+        if (!$this->tryToSeeElement(QueryPage::SELECTOR_EDIT_BUTTON)) {
+            return null;
+        }
+
+        return [
+            trim($this->grabTextFrom(QueryPage::SELECTOR_FIRST_ROW_STORE_CELL)),
+            trim($this->grabTextFrom(QueryPage::SELECTOR_FIRST_ROW_LOCALE_CELL)),
+        ];
     }
 
     /**
