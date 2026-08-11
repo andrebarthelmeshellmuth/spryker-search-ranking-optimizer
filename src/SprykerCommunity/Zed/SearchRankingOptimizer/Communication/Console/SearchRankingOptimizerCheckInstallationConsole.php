@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console;
 
+use FilesystemIterator;
 use Generated\Shared\Transfer\PermissionCollectionTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
@@ -18,6 +19,8 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use SimpleXMLElement;
 use Spryker\Shared\Config\Config;
 use Spryker\Shared\Kernel\KernelConstants;
@@ -141,6 +144,30 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
     protected const OWN_NAVIGATION_XML_RELATIVE_PATH = '/../navigation.xml';
 
     /**
+     * This package's root, relative to this console's directory.
+     *
+     * @var string
+     */
+    protected const PACKAGE_ROOT_RELATIVE_PATH = '/../../../../../..';
+
+    /**
+     * The locale whose catalog defines the expected key set; the others are kept at parity with it.
+     *
+     * @var string
+     */
+    protected const TRANSLATION_REFERENCE_LOCALE = 'en_US';
+
+    /**
+     * @var string
+     */
+    protected const PATTERN_TWIG_TRANS = '/(?<![\\w\\\\])([\'"])((?:\\\\.|(?!\\1).)*)\\1\\s*\\|\\s*trans/';
+
+    /**
+     * @var string
+     */
+    protected const PATTERN_PHP_TRANS = '/->(?:trans|translate)\\(\\s*([\'"])((?:\\\\.|(?!\\1).)*)\\1/';
+
+    /**
      * @var array<string>
      */
     protected array $failures = [];
@@ -174,6 +201,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         $this->checkPropelTablesExist($output);
         $this->checkCronJobsRegistered($output);
         $this->checkNavigationRegistered($output);
+        $this->checkZedTranslationCatalogComplete($output);
 
         $output->writeln('');
 
@@ -606,5 +634,135 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         libxml_use_internal_errors($previousUseInternalErrors);
 
         return $xml === false ? null : $xml;
+    }
+
+    /**
+     * The Zed catalog and the strings the GUI actually renders drift apart silently, in both directions,
+     * because the keys ARE the English text: a key missing from the catalog still renders correct English
+     * and only shows up as untranslated in a non-English Zed. Nothing else notices, which is how this
+     * package's own catalog fell behind its GUI once already.
+     *
+     * Scans this package's own Zed sources for `|trans` keys and asserts each one is in the shipped
+     * catalog. Deliberately one-directional: a key that looks unused to this scan may still be reached
+     * through addSuccessMessage(), a widget_title, a table header or a form label, all of which are
+     * translated at render time, so an unused-looking entry is never reported as a problem.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkZedTranslationCatalogComplete(OutputInterface $output): void
+    {
+        $usedKeys = $this->collectUsedZedTranslationKeys();
+        $catalogKeys = $this->readZedTranslationCatalogKeys(static::TRANSLATION_REFERENCE_LOCALE);
+
+        if ($usedKeys === [] || $catalogKeys === null) {
+            $this->warnings[] = 'Could not compare this package\'s Zed translation catalog against the strings its GUI uses (sources or catalog unreadable). Nothing to act on unless you are working on the package itself.';
+
+            return;
+        }
+
+        $missingKeys = array_values(array_diff($usedKeys, $catalogKeys));
+
+        if ($missingKeys === []) {
+            $output->writeln(sprintf('<info>✓</info> all %d Zed GUI strings are present in the translation catalog', count($usedKeys)));
+
+            return;
+        }
+
+        $this->failures[] = sprintf(
+            '%d Zed GUI string(s) are missing from data/translation/Zed/%s.csv and will render untranslated in any non-English Zed: "%s". This is a defect in the package itself, not in your project setup.',
+            count($missingKeys),
+            static::TRANSLATION_REFERENCE_LOCALE,
+            implode('", "', array_slice($missingKeys, 0, 8)) . (count($missingKeys) > 8 ? '", ...' : ''),
+        );
+    }
+
+    /**
+     * @return array<string>
+     */
+    protected function collectUsedZedTranslationKeys(): array
+    {
+        $zedSourcePath = __DIR__ . static::PACKAGE_ROOT_RELATIVE_PATH . '/src/SprykerCommunity/Zed';
+
+        if (!is_dir($zedSourcePath)) {
+            return [];
+        }
+
+        $keys = [];
+        $directoryIterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($zedSourcePath, FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($directoryIterator as $fileInfo) {
+            if (!$fileInfo->isFile() || !in_array(strtolower($fileInfo->getExtension()), ['twig', 'php'], true)) {
+                continue;
+            }
+
+            $keys = array_merge($keys, $this->extractTranslationKeys((string)file_get_contents($fileInfo->getPathname())));
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * Skips anything interpolated (`~`, `{{ }}`) — those are built at runtime and cannot be matched
+     * against a static catalog.
+     *
+     * @param string $source
+     *
+     * @return array<string>
+     */
+    protected function extractTranslationKeys(string $source): array
+    {
+        $keys = [];
+
+        foreach ([static::PATTERN_TWIG_TRANS, static::PATTERN_PHP_TRANS] as $pattern) {
+            preg_match_all($pattern, $source, $matches, PREG_SET_ORDER);
+
+            foreach ($matches as $match) {
+                $key = str_replace(['\\\'', '\\"'], ['\'', '"'], $match[2]);
+
+                if (str_contains($key, '{') || str_contains($key, '~') || str_starts_with($key, '/')) {
+                    continue;
+                }
+
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param string $locale
+     *
+     * @return array<string>|null
+     */
+    protected function readZedTranslationCatalogKeys(string $locale): ?array
+    {
+        $catalogPath = sprintf('%s%s/data/translation/Zed/%s.csv', __DIR__, static::PACKAGE_ROOT_RELATIVE_PATH, $locale);
+
+        if (!is_readable($catalogPath)) {
+            return null;
+        }
+
+        $handle = fopen($catalogPath, 'r');
+
+        if ($handle === false) {
+            return null;
+        }
+
+        $keys = [];
+
+        while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+            if (!isset($row[0]) || trim((string)$row[0]) === '') {
+                continue;
+            }
+
+            $keys[] = (string)$row[0];
+        }
+
+        fclose($handle);
+
+        return $keys;
     }
 }
