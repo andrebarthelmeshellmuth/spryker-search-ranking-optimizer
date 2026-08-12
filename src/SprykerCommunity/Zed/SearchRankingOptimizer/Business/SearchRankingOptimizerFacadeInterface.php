@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use Generated\Shared\Transfer\SearchRankingAutoTuneNotificationDiagnosisTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -325,6 +326,19 @@ interface SearchRankingOptimizerFacadeInterface
      * @api
      */
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer;
+
+    /**
+     * Specification:
+     * - Reports whether the auto-tune summary email can actually reach anybody, and if not, why — see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationDiagnoserInterface::diagnose()}
+     *   for the full specification.
+     * - A read-only diagnostic, not part of the auto-tune run itself: {@see runAutoTune()} never consults
+     *   it and its own behavior is unchanged by anything here. Exists because every way the notification
+     *   can reach nobody is silent — the run still succeeds — so something has to be able to ask.
+     *
+     * @api
+     */
+    public function getAutoTuneNotificationDiagnosis(): SearchRankingAutoTuneNotificationDiagnosisTransfer;
 
     /**
      * Specification:

@@ -526,6 +526,40 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * A config with notify enabled but NO threshold still counts: this answers "could this shop ever need
+     * to email an admin", not "will it tonight" — see the method's own docblock.
+     */
+    public function testHasAutoTuneMetricConfigWithNotifyEnabledIsTrueForANotifyEnabledConfigWithoutAThreshold(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90109, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE', 'de_DE');
+
+        // Act
+        $result = (new SearchRankingOptimizerRepository())->hasAutoTuneMetricConfigWithNotifyEnabled();
+
+        // Assert
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Asserted against a baseline rather than a flat `assertFalse`: this query is deliberately unscoped, so
+     * whatever notify-enabled configs the surrounding installation already has would otherwise decide the
+     * outcome. What matters is that adding a notify-DISABLED row never flips it on by itself.
+     */
+    public function testHasAutoTuneMetricConfigWithNotifyEnabledIsUnaffectedByANotifyDisabledConfig(): void
+    {
+        // Arrange
+        $repository = new SearchRankingOptimizerRepository();
+        $baseline = $repository->hasAutoTuneMetricConfigWithNotifyEnabled();
+
+        // Act
+        $this->createTestAutoTuneMetricConfig(90110, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+
+        // Assert
+        $this->assertSame($baseline, $repository->hasAutoTuneMetricConfigWithNotifyEnabled());
+    }
+
+    /**
      * @param int $idSearchRankingMetric
      * @param float|null $autoTuneThreshold
      * @param bool $isAutoUpdateEnabled

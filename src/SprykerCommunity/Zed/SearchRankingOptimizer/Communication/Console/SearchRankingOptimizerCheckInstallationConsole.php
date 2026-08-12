@@ -60,7 +60,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Diagnoses a search-ranking-optimizer installation: core namespace, sibling console command registration, the SRP-rating permission plugin (Zed and Client), Yves glossary key, Zed translations, and the 8 Propel tables this package ships.';
+    public const COMMAND_DESCRIPTION = 'Diagnoses a search-ranking-optimizer installation: core namespace, sibling console command registration, the SRP-rating permission plugin (Zed and Client), Yves glossary key, Zed translations, the 8 Propel tables this package ships, and whether the auto-tune notification ACL role is staffed.';
 
     /**
      * @var string
@@ -200,6 +200,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         $this->checkZedTranslationRegistered($output);
         $this->checkPropelTablesExist($output);
         $this->checkCronJobsRegistered($output);
+        $this->checkAutoTuneNotificationRoleStaffed($output);
         $this->checkNavigationRegistered($output);
         $this->checkZedTranslationCatalogComplete($output);
 
@@ -485,6 +486,65 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         }
 
         return $schedulerConfig->getCronJobs();
+    }
+
+    /**
+     * The auto-tune summary email resolves its recipients from an ACL role
+     * ({@see \SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::AUTO_TUNE_NOTIFICATION_ROLE_NAME}),
+     * which no package can create for a project — it is set up by hand in the Zed ACL Gui, exactly like the
+     * cron registrations above. Every way it can end up resolving to nobody is silent: `AutoTuneRunner`
+     * sends to zero recipients and the run still reports success. The only surface is the auto-tune
+     * console's own "Notified 0 admin(s) by email." line, which nobody reads — that job runs under cron.
+     *
+     * A WARNING, never a failure, and only raised when some metric actually has "notify by email" enabled:
+     * the role is genuinely optional for a shop that never turned notifications on, and failing there would
+     * cry wolf on the majority of installs. Everything it needs comes from one facade call, which resolves
+     * recipients through the same
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface::resolve()}
+     * the real send path uses — a check that re-traversed the ACL tables itself could pass while the
+     * actual email still reached nobody.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkAutoTuneNotificationRoleStaffed(OutputInterface $output): void
+    {
+        $diagnosisTransfer = $this->getFacade()->getAutoTuneNotificationDiagnosis();
+        $roleName = $diagnosisTransfer->getRoleNameOrFail();
+
+        if (!$diagnosisTransfer->getIsNotifyEnabledAnywhere()) {
+            $output->writeln(sprintf(
+                '<info>✓</info> no metric has auto-tune email notification enabled, so the "%s" ACL role is not needed yet',
+                $roleName,
+            ));
+
+            return;
+        }
+
+        $recipientEmails = $diagnosisTransfer->getRecipientEmails();
+
+        if (count($recipientEmails) > 0) {
+            $output->writeln(sprintf(
+                '<info>✓</info> the auto-tune summary email resolves to %d recipient(s) via the "%s" ACL role',
+                count($recipientEmails),
+                $roleName,
+            ));
+
+            return;
+        }
+
+        if (!$diagnosisTransfer->getDoesRoleExist()) {
+            $this->warnings[] = sprintf(
+                'At least one metric has auto-tune email notification enabled, but the ACL role "%s" does not exist — the summary email will be sent to nobody, and the auto-tune run will still report success. Create the role in the Zed ACL Gui (Maintenance > Users & Rights > Roles), assign it to a group, and put the admins who should be notified in that group.',
+                $roleName,
+            );
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'At least one metric has auto-tune email notification enabled and the ACL role "%s" exists, but nobody holds it — either no ACL group has been assigned the role, or the groups that have it contain no users. The summary email will be sent to nobody, and the auto-tune run will still report success. Fix it in the Zed ACL Gui (Maintenance > Users & Rights).',
+            $roleName,
+        );
     }
 
     /**

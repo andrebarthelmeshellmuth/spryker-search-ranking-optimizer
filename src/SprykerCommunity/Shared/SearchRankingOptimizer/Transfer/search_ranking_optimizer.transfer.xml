@@ -208,7 +208,7 @@
          behavior the same way relevanceWeight/metric weights do, so a checkpoint that omitted them
          wouldn't actually reproduce a past ranking behavior, only part of it. isSpecificityWeightingEnabled
          is captured alongside them — specificity weighting is a code-level, project-wide flag
-         (search-ranking's SearchRankingConfig::isSpecificityWeightingEnabled()) independent of the 3 knob
+         (search-ranking's SearchRankingConfig::isSpecificityWeightingEnabled()) independent of the 4 knob
          VALUES, so a checkpoint honestly records whether those numbers were actually live at the time,
          rather than silently implying they always were. source is 'manual' for now (a Query
          Curator-triggered "take checkpoint now" or a restore); a later automated-weight-search phase will
@@ -302,6 +302,29 @@
     <transfer name="SearchRankingAutoTuneResult" strict="true">
         <property name="metricResults" type="SearchRankingAutoTuneMetricResult[]" singular="metricResult"/>
         <property name="notifiedEmailCount" type="int"/>
+    </transfer>
+
+    <!-- Why the auto-tune summary email would reach nobody, in enough detail for a diagnostic to name the
+         actual remedy. Every one of the three states below makes AutoTuneRunner send to zero recipients
+         WITHOUT failing the run — the reason this shape exists at all: the run reports success either way,
+         and under cron nobody reads the console line that would have said so.
+
+         isNotifyEnabledAnywhere=false means no metric has "notify by email" turned on, so none of the rest
+         matters yet — the role is genuinely optional for a shop that never enabled notifications, and
+         reporting a missing role as a problem there would be crying wolf. doesRoleExist=false means the
+         host shop never created AUTO_TUNE_NOTIFICATION_ROLE_NAME at all. doesRoleExist=true with empty
+         recipientEmails means it exists but is unstaffed — no ACL group holds it, or the groups that do
+         have no users; deliberately NOT split further, since both have the same remedy (assign the role to
+         a group and put users in it) and separating them would only add a state nobody acts on differently.
+
+         recipientEmails comes from AutoTuneNotificationRecipientResolver::resolve(), the same call the real
+         send path makes, never a second traversal of the ACL tables — a diagnosis that reimplemented the
+         lookup could pass while the real send still reached nobody. -->
+    <transfer name="SearchRankingAutoTuneNotificationDiagnosis" strict="true">
+        <property name="isNotifyEnabledAnywhere" type="bool"/>
+        <property name="roleName" type="string"/>
+        <property name="doesRoleExist" type="bool"/>
+        <property name="recipientEmails" type="string[]" singular="recipientEmail"/>
     </transfer>
 
     <!-- Extends spryker/mail's own core `Mail` transfer (standard Spryker transfer-merge-by-name

@@ -188,6 +188,15 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findAutoTuneMetricConfigsWithThresholdSet(string $storeName): array;
 
     /**
+     * Whether ANY metric, in any store/locale, has "notify by email" turned on — the one thing that makes
+     * the auto-tune notification ACL role actually required. Deliberately unscoped and threshold-agnostic:
+     * this answers "could this shop ever need to email an admin", not "will it email one tonight", so a
+     * config that has notify enabled but no threshold yet still counts (a threshold is one form save away,
+     * and a diagnostic that stayed quiet until then would go quiet exactly when it was about to matter).
+     */
+    public function hasAutoTuneMetricConfigWithNotifyEnabled(): bool;
+
+    /**
      * @param int $idSearchRankingOptimizerRun
      */
     public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;

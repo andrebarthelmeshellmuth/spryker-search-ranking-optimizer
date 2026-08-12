@@ -667,7 +667,10 @@ That's the whole loop: tune once for real, replicate everywhere else. It's not f
   metric's "notify by email" auto-tune toggle; everything else in this package works without it.
 - **An ACL role named `search-score-admin`** — only needed for the same reason, to resolve who receives
   the auto-tune notification email (every member of every ACL group holding that role). Create it via the
-  Zed ACL Gui or your own `data:import acl-role`-style fixture; nothing here creates it for you.
+  Zed ACL Gui or your own `data:import acl-role`-style fixture; nothing here creates it for you. Creating
+  the role is not enough on its own — it also has to be assigned to a group that has users in it, or the
+  email still resolves to nobody. `search-ranking-optimizer:check-installation`
+  ([step 8](#8-verify-the-installation)) warns about both cases once any metric has notification enabled.
 
 ## Installation
 
@@ -996,6 +999,15 @@ on BOTH Zed and Client — either half missing independently makes the rating wi
 invisible — that the Yves glossary key and Zed GUI translation catalog (step 5) both resolve, and that all
 8 Propel tables this package ships (step 6) exist and are queryable. It exits non-zero and names the exact
 remedy for whatever is wrong.
+
+It also checks something no step above can create for you: whether the `search-score-admin` ACL role
+([Requirements](#requirements)) actually resolves to anybody. Every way it can fail to is silent — a role
+that was never created, a role no ACL group holds, or groups with no users in them all make the auto-tune
+summary email go to zero recipients while the run still reports success, and the only surface is a console
+line nobody reads, since that job runs under cron. This is reported as a **warning, not a failure**, and
+only when at least one metric actually has "notify by email" enabled — the role is genuinely optional for a
+shop that never turned notifications on, and the two unstaffed cases are distinguished from the
+missing-role case because the remedy differs (staff the role vs. create it).
 
 It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
 and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below

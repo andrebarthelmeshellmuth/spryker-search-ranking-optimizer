@@ -460,6 +460,20 @@ class SearchRankingOptimizerRepository extends AbstractRepository implements Sea
     }
 
     /**
+     * Whether ANY metric, in any store/locale, has "notify by email" turned on. Unscoped and
+     * threshold-agnostic on purpose — see this method on
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface}
+     * for why. `exists()` rather than `count()`: nothing here needs the number, only whether there is one.
+     */
+    public function hasAutoTuneMetricConfigWithNotifyEnabled(): bool
+    {
+        return $this->getFactory()
+            ->createSearchRankingAutoTuneMetricConfigQuery()
+            ->filterByIsNotifyEnabled(true)
+            ->exists();
+    }
+
+    /**
      * @param int $idSearchRankingOptimizerRun
      */
     public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer

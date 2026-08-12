@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
+use Generated\Shared\Transfer\SearchRankingAutoTuneNotificationDiagnosisTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -303,6 +304,16 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function runAutoTune(): SearchRankingAutoTuneResultTransfer
     {
         return $this->getFactory()->createAutoTuneRunner()->run();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function getAutoTuneNotificationDiagnosis(): SearchRankingAutoTuneNotificationDiagnosisTransfer
+    {
+        return $this->getFactory()->createAutoTuneNotificationDiagnoser()->diagnose();
     }
 
     /**

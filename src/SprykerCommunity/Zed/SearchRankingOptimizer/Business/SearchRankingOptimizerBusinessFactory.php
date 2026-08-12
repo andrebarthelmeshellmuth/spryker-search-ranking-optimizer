@@ -12,6 +12,8 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationDiagnoser;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationDiagnoserInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolver;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
@@ -190,6 +192,15 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         return new AutoTuneNotificationRecipientResolver(
             $this->getAclFacade(),
             $this->getAclQueryContainer(),
+        );
+    }
+
+    public function createAutoTuneNotificationDiagnoser(): AutoTuneNotificationDiagnoserInterface
+    {
+        return new AutoTuneNotificationDiagnoser(
+            $this->createAutoTuneNotificationRecipientResolver(),
+            $this->getAclFacade(),
+            $this->getRepository(),
         );
     }
 
