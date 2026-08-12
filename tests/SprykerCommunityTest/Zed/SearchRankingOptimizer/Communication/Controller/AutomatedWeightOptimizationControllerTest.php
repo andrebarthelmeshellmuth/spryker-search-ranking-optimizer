@@ -32,7 +32,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Communication
  * @group Controller
  * @group AutomatedWeightOptimizationControllerTest
- * @group Portable
+ * @group NeedsDatabase
  */
 class AutomatedWeightOptimizationControllerTest extends Unit
 {

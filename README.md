@@ -1162,6 +1162,7 @@ to maintain.
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
 | `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | complexity / method- and class-length limits, run as two separate invocations (PHPMD merges every ruleset's `exclude-pattern` into one global list per run, and only the public-method-count rule should skip Facades/Factories) |
+| `portable tests` (PHP 8.3, 8.4) | this package's own `@group Portable` test subset actually passes — see "Test suite" below |
 
 `check-floors` resolves every declared constraint to its **oldest** allowed version
 (`composer update --prefer-lowest --prefer-stable --no-dev`) and then asserts every vendor symbol used in
@@ -1173,6 +1174,31 @@ composer check-floors
 ```
 
 ### Test suite
+
+Every test class carries a portability `@group`, so `codecept run -g <tag>` tells you what a given test
+actually needs:
+
+| tag | needs | where it runs |
+|---|---|---|
+| `Portable` | nothing beyond `Generated\Shared\Transfer\*` | standalone — CI runs exactly this, see below |
+| `NeedsDatabase` | a real Propel connection | host shop only |
+| `NeedsSearch` | a real Elasticsearch/OpenSearch | host shop only |
+| `NeedsProject` | this package's own installation diagnostics, deliberately coupled — see their own docblocks | host shop only |
+
+`Portable` tests run standalone in CI on every push, via `tests/codeception.portable.yml` +
+`tests/_ci-standalone/` — no host shop, no live database, no search engine. The recipe: a direct
+`TransferBusinessFactory` call generates `Generated\Shared\Transfer\*` into `src/Generated/` (gitignored,
+exactly like a real project already gitignores its own — regenerated every run), and
+`tests/_ci-standalone/Generated/Shared/Search/PageIndexMap.php` is a checked-in, point-in-time snapshot of
+the one generated artifact this package cannot produce alone (its content is a project-wide aggregate
+across every installed sibling package — see that file's own docblock for the full reasoning and how to
+regenerate it). Run it yourself the same way CI does:
+
+```bash
+composer install
+php tests/_ci-standalone/generate-transfers.php
+vendor/bin/codecept run -c tests/codeception.portable.yml -g Portable
+```
 
 **322 tests, 1100 assertions** across three Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`, `Yves/SearchRankingOptimizerWidget`) — down from a prior count that included `CmaEsAlgorithm`/

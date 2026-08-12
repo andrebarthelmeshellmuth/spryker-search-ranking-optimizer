@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Request;
  * @group Communication
  * @group Controller
  * @group SaturationPointCalibrationControllerTest
- * @group Portable
+ * @group NeedsDatabase
  */
 class SaturationPointCalibrationControllerTest extends Unit
 {

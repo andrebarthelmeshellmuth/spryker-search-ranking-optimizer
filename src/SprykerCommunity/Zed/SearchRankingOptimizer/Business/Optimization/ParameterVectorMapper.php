@@ -373,7 +373,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         }
 
         foreach ($this->getFreeSpecificityKeys() as $key) {
-            $vector[] = (float)match ($key) {
+            $vector[] = match ($key) {
                 'specificityCurveExponent' => $configurationTransfer->getSpecificityCurveExponent() ?? 1.0,
                 'specificityWeightExponent' => $configurationTransfer->getSpecificityWeightExponent() ?? 1.0,
                 'specificityWeightShiftMagnitude' => $configurationTransfer->getSpecificityWeightShiftMagnitude() ?? 0.0,
