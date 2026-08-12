@@ -3,43 +3,48 @@
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="spryker:transfer-01 http://static.spryker.com/transfer-01.xsd">
 
-    <!-- One calibration run: an admin-uploaded list of "relevant" search terms, sampled against the
-         live raw text-relevance score (BEFORE any function_score wrapper) to suggest a
-         relevanceSaturationPoint (k) value — the pooled mean of the top relevantProductCount (X) hits'
-         scores across every search term. status is one of the SearchRankingOptimizerConfig::CALIBRATION_STATUS_*
-         constants; the score*/sampleCount/computedK/calculatedAt fields are null until status=calculated,
-         errorMessage is set only on status=failed. -->
-    <transfer name="SearchRankingCalibration" strict="true">
-        <property name="idSearchRankingCalibration" type="int"/>
+    <!-- One calibration run: an admin-uploaded list of "relevant" search terms, sampled to suggest either
+         relevanceSaturationPoint or specificitySaturationPoint (k), depending on calibrationType
+         (SearchRankingOptimizerConfig::CALIBRATION_TYPE_*) — the pooled mean of the top relevantProductCount
+         (X) hits' raw values across every search term for CALIBRATION_TYPE_RELEVANCE_SCORE (BEFORE any
+         function_score wrapper), or the pooled mean of one raw specificity value per search term (no real
+         catalog query at all) for CALIBRATION_TYPE_SPECIFICITY. status is one of the
+         SearchRankingOptimizerConfig::CALIBRATION_STATUS_* constants; the value*/sampleCount/computedK/
+         calculatedAt fields are null until status=calculated, errorMessage is set only on status=failed. -->
+    <transfer name="SearchRankingSaturationPointCalibration" strict="true">
+        <property name="idSearchRankingSaturationPointCalibration" type="int"/>
+        <property name="calibrationType" type="string"/>
         <property name="relevantProductCount" type="int"/>
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="status" type="string"/>
         <property name="computedK" type="float"/>
-        <property name="scoreMin" type="float"/>
-        <property name="scoreMax" type="float"/>
-        <property name="scoreMean" type="float"/>
-        <property name="scoreMedian" type="float"/>
-        <property name="scoreP25" type="float"/>
-        <property name="scoreP75" type="float"/>
+        <property name="valueMin" type="float"/>
+        <property name="valueMax" type="float"/>
+        <property name="valueMean" type="float"/>
+        <property name="valueMedian" type="float"/>
+        <property name="valueP25" type="float"/>
+        <property name="valueP75" type="float"/>
         <property name="sampleCount" type="int"/>
         <property name="calculatedAt" type="string"/>
         <property name="errorMessage" type="string"/>
         <property name="createdAt" type="string"/>
         <property name="totalCount" type="int"/>
         <property name="processedCount" type="int"/>
-        <property name="searchTerms" type="SearchRankingCalibrationSearchTerm[]" singular="searchTerm"/>
+        <property name="searchTerms" type="SearchRankingSaturationPointCalibrationSearchTerm[]" singular="searchTerm"/>
     </transfer>
 
-    <!-- One uploaded search term of a calibration run. scores is populated by the calibration cron: the
-         raw text-relevance scores of the top-ranked products found for this term, up to the run's
-         relevantProductCount — fewer when the term matched fewer products. Null until calculated. -->
-    <transfer name="SearchRankingCalibrationSearchTerm" strict="true">
-        <property name="idSearchRankingCalibrationSearchTerm" type="int"/>
-        <property name="fkSearchRankingCalibration" type="int"/>
+    <!-- One uploaded search term of a calibration run. values is populated by the calibration cron: for
+         CALIBRATION_TYPE_RELEVANCE_SCORE, the raw text-relevance scores of the top-ranked products found
+         for this term (up to the run's relevantProductCount, fewer when the term matched fewer products);
+         for CALIBRATION_TYPE_SPECIFICITY, exactly one raw specificity value for the term itself (no
+         per-product query at all). Null until calculated. -->
+    <transfer name="SearchRankingSaturationPointCalibrationSearchTerm" strict="true">
+        <property name="idSearchRankingSaturationPointCalibrationSearchTerm" type="int"/>
+        <property name="fkSearchRankingSaturationPointCalibration" type="int"/>
         <property name="searchTerm" type="string"/>
         <property name="productsFound" type="int"/>
-        <property name="scores" type="float[]" singular="score"/>
+        <property name="values" type="float[]" singular="value"/>
     </transfer>
 
     <!-- A canonical search query (trim/lowercase/collapse-whitespace, NOT tokenized) that has accumulated
@@ -92,6 +97,29 @@
         <property name="errorMessage" type="string"/>
     </transfer>
 
+    <!-- Yves -> Zed gateway request: the SRP widget's own batched "what did I already rate on this page"
+         read, fired once per page render (not once per product tile) covering every product currently on
+         the page. searchTerm arrives UN-canonicalized, same reasoning as SearchRankingProductRelevanceJudgmentRequest.
+         customerReference is set server-side by the Yves controller from the authenticated session, never
+         trusted from client input. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentBatchRequest" strict="true">
+        <property name="searchTerm" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="idProductAbstracts" type="int[]" singular="idProductAbstract"/>
+        <property name="customerReference" type="string"/>
+    </transfer>
+
+    <!-- Zed -> Yves gateway response. isSuccess=false covers only an unauthorized caller here - unlike
+         SearchRankingProductRelevanceJudgmentResponse there is no rejected-write case to report, this is a
+         read. An empty ratings array on isSuccess=true is the ordinary/expected result for a query nobody
+         (or not this customer) has rated yet, never an error. -->
+    <transfer name="SearchRankingProductRelevanceJudgmentBatchResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="ratings" type="SearchRankingQueryRating[]" singular="rating"/>
+        <property name="errorMessage" type="string"/>
+    </transfer>
+
     <!-- One rated (query, product) judgment feeding a rank_eval evaluation: the query's own id/searchTerm
          plus the per-product mean gain across every admin who rated that (query, product) pair (see
          SearchRankingEvaluationRequest for how "mean" is computed and why). -->
@@ -110,7 +138,7 @@
     </transfer>
 
     <!-- Zed business layer -> Client bridge request: fire one _rank_eval call covering every rated query
-         for a single (storeName, localeName) — mirrors Calibration's own store/locale scoping. cutoff is
+         for a single (storeName, localeName) — mirrors Saturation Point Calibration's own store/locale scoping. cutoff is
          the nDCG @k cutoff (SearchRankingOptimizerConfig::getRankEvalCutoff()). rankingConfiguration is
          OPTIONAL: when null, RankEvalRunner fetches the LIVE synced search-ranking configuration (the
          normal Evaluation-page path — "how good is our currently-configured ranking formula, really?").
@@ -157,37 +185,49 @@
     <!-- One metric's weight at the moment a checkpoint was taken. idSearchRankingMetric is
          search-ranking's own metric id, kept only as a best-effort restore key, since that metric could
          be deleted before a restore attempt (see WeightCheckpointRestorer, a safe no-op in that case). -->
+    <!-- isLocaleScoped mirrors search-ranking's own per-metric flag AT RECORD TIME: a store-wide metric
+         (isLocaleScoped=false) is the one whose weight search-ranking's own saveMetricWeight() fans out
+         to every real locale of the store on write. Recorded here so a checkpoint restore can warn which
+         other locales it's about to touch, not just this one (see WeightCheckpointRestorer). Left unset
+         (null) on the SearchRankingOptimizerRun::bestMetricWeights reuse of this same shape: a run
+         proposes a value for a store-wide metric like any other, but the blast-radius disclosure there is
+         resolved on demand via resolveEffectiveWeightLocales() instead of carried on this field (see
+         AutomatedWeightOptimizationController). -->
     <transfer name="SearchRankingWeightCheckpointMetricWeight" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
         <property name="name" type="string"/>
         <property name="weight" type="float"/>
+        <property name="isLocaleScoped" type="bool"/>
     </transfer>
 
-    <!-- A full point-in-time snapshot of what Phase 5/6's propose/review/apply workflow needs to
-         reproduce: the relevanceWeight blend, every metric's own weight, and the 3 entropy-weighting
-         knobs (probe size/exponent/shift magnitude) — NOT relevanceSaturationPoint, which already has its
-         own versioning story via Calibration and stays out of checkpoint scope deliberately. The entropy
-         knobs ARE included: they directly shape the live ranking formula's behavior the same way
-         relevanceWeight/metric weights do, so a checkpoint that omitted them wouldn't actually reproduce
-         a past ranking behavior, only part of it. isEntropyWeightingEnabled is captured alongside them —
-         entropy weighting is a code-level, project-wide flag (search-ranking's
-         SearchRankingConfig::isEntropyWeightingEnabled()) independent of the 3 knob VALUES, so a
-         checkpoint honestly records whether those numbers were actually live at the time, rather than
-         silently implying they always were. source is 'manual' for now (a Query Curator-triggered "take
-         checkpoint now" or a restore); a later automated-weight-search phase will add an 'algorithm' value
-         as that producer gets built, per the "one harness, N producers" design. The monthly auto-tune job
-         (see SearchRankingAutoTuneResult below) is NOT a producer here — it refits a metric's FORMULA
-         (curve shape/parameter), never relevanceWeight/metric weight/entropy knobs, so it has no reason
-         to write a weight checkpoint at all; its own before/after audit trail lives entirely in
-         spryker-community/search-ranking's own metric-history table instead. -->
+    <!-- A full point-in-time snapshot of what the propose/review/apply workflow needs to
+         reproduce: the relevanceWeight blend, every metric's own weight, and the 4 specificity-weighting
+         knobs (blend weight/curve exponent/exponent/shift magnitude) — NOT relevanceSaturationPoint/specificitySaturationPoint,
+         which already have their own versioning story via Saturation Point Calibration and stay out of checkpoint scope
+         deliberately. The specificity knobs ARE included: they directly shape the live ranking formula's
+         behavior the same way relevanceWeight/metric weights do, so a checkpoint that omitted them
+         wouldn't actually reproduce a past ranking behavior, only part of it. isSpecificityWeightingEnabled
+         is captured alongside them — specificity weighting is a code-level, project-wide flag
+         (search-ranking's SearchRankingConfig::isSpecificityWeightingEnabled()) independent of the 4 knob
+         VALUES, so a checkpoint honestly records whether those numbers were actually live at the time,
+         rather than silently implying they always were. source is 'manual' for now (a Query
+         Curator-triggered "take checkpoint now" or a restore); a later automated-weight-search phase will
+         add an 'algorithm' value as that producer gets built, per the "one harness, N producers" design.
+         The monthly auto-tune job (see SearchRankingAutoTuneResult below) is NOT a producer here — it
+         refits a metric's FORMULA (curve shape/parameter), never relevanceWeight/metric weight/specificity
+         knobs, so it has no reason to write a weight checkpoint at all; its own before/after audit trail
+         lives entirely in spryker-community/search-ranking's own metric-history table instead. -->
     <transfer name="SearchRankingWeightCheckpoint" strict="true">
         <property name="idSearchRankingWeightCheckpoint" type="int"/>
         <property name="source" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="relevanceWeight" type="float"/>
-        <property name="entropyProbeResultSize" type="int"/>
-        <property name="entropyWeightExponent" type="float"/>
-        <property name="entropyWeightShiftMagnitude" type="float"/>
-        <property name="isEntropyWeightingEnabled" type="bool"/>
+        <property name="specificityBlendWeight" type="float"/>
+        <property name="specificityCurveExponent" type="float"/>
+        <property name="specificityWeightExponent" type="float"/>
+        <property name="specificityWeightShiftMagnitude" type="float"/>
+        <property name="isSpecificityWeightingEnabled" type="bool"/>
         <property name="metricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="metricWeight"/>
         <property name="createdAt" type="string"/>
     </transfer>
@@ -207,33 +247,45 @@
     <transfer name="SearchRankingAutoTuneMetricConfig" strict="true">
         <property name="idSearchRankingAutoTuneMetricConfig" type="int"/>
         <property name="idSearchRankingMetric" type="int"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="autoTuneThreshold" type="float"/>
         <property name="isAutoUpdateEnabled" type="bool"/>
         <property name="autoUpdateScope" type="string"/>
         <property name="isNotifyEnabled" type="bool"/>
     </transfer>
 
-    <!-- One metric processed by a single auto-tune run. wasThresholdMet=true means the live formula's fit
-         was already at or above autoTuneThreshold - nothing else on this transfer is meaningful (no refit
-         was computed, since none was needed). wasThresholdMet=false + wasSkippedNonDeterministic=true
-         means the fit dropped below threshold but the metric's own formula calls a non-deterministic
-         function (e.g. random()) - still checked and visible, but no refit was ever computed, since
-         fitting a "better" curve to noise would just overfit to whatever randomness happened to be in
-         that digest snapshot. wasThresholdMet=false + wasSkippedNonDeterministic=false means a refit WAS
-         computed (afterFormula/afterFitRSquared/afterShape always set in that case, regardless of whether
-         it was actually applied); wasApplied reflects whether isAutoUpdateEnabled caused it to be
-         persisted through search-ranking's own facade, or it was only proposed (logged/emailed, formula
-         left untouched). errorMessage is set instead of everything above when processing this ONE metric
-         raised an unexpected exception (e.g. search-ranking's facade/ES call failed) — AutoTuneRunner
-         catches per-metric so one broken metric can never abort the whole run; every other metric with a
+    <!-- One metric processed by a single auto-tune run, at one (storeName, localeName). For a store-wide
+         metric (search-ranking's own isLocaleScoped=false, the common case) there is exactly one of these
+         per (metric, store), always at that store's own default locale - a refit/apply fans out to every
+         real locale of the store on search-ranking's own side regardless. For a genuinely locale-scoped
+         metric (isLocaleScoped=true) there is one of these per (metric, store, REAL locale) instead - each
+         checked/refit/applied fully independently, since a save for one locale never touches another.
+
+         wasThresholdMet=true means the live formula's fit was already at or above autoTuneThreshold -
+         nothing else on this transfer is meaningful (no refit was computed, since none was needed).
+         wasThresholdMet=false + wasSkippedNonDeterministic=true means the fit dropped below threshold but
+         the metric's own formula calls a non-deterministic function (e.g. random()) - still checked and
+         visible, but no refit was ever computed, since fitting a "better" curve to noise would just
+         overfit to whatever randomness happened to be in that digest snapshot. wasThresholdMet=false +
+         wasSkippedNonDeterministic=false means a refit WAS computed (afterFormula/afterFitRSquared/
+         afterShape always set in that case, regardless of whether it was actually applied); wasApplied
+         reflects whether isAutoUpdateEnabled caused it to be persisted through search-ranking's own
+         facade, or it was only proposed (logged/emailed, formula left untouched). errorMessage is set
+         instead of everything above when processing this ONE (metric, locale) raised an unexpected
+         exception (e.g. search-ranking's facade/ES call failed) — AutoTuneRunner catches per-(metric,
+         locale) so one broken one can never abort the whole run; every other metric/locale with a
          threshold set still gets checked, and this entry surfaces the failure rather than swallowing it. -->
     <transfer name="SearchRankingAutoTuneMetricResult" strict="true">
         <property name="idSearchRankingMetric" type="int"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
         <property name="metricName" type="string"/>
         <property name="wasThresholdMet" type="bool"/>
         <property name="wasSkippedNonDeterministic" type="bool"/>
         <property name="beforeFormula" type="string"/>
         <property name="beforeFitRSquared" type="float"/>
+        <property name="fitRSquaredByLocale" type="array" singular="fitRSquared" associative="true"/>
         <property name="afterFormula" type="string"/>
         <property name="afterShape" type="string"/>
         <property name="afterFitRSquared" type="float"/>
@@ -252,6 +304,29 @@
         <property name="notifiedEmailCount" type="int"/>
     </transfer>
 
+    <!-- Why the auto-tune summary email would reach nobody, in enough detail for a diagnostic to name the
+         actual remedy. Every one of the three states below makes AutoTuneRunner send to zero recipients
+         WITHOUT failing the run — the reason this shape exists at all: the run reports success either way,
+         and under cron nobody reads the console line that would have said so.
+
+         isNotifyEnabledAnywhere=false means no metric has "notify by email" turned on, so none of the rest
+         matters yet — the role is genuinely optional for a shop that never enabled notifications, and
+         reporting a missing role as a problem there would be crying wolf. doesRoleExist=false means the
+         host shop never created AUTO_TUNE_NOTIFICATION_ROLE_NAME at all. doesRoleExist=true with empty
+         recipientEmails means it exists but is unstaffed — no ACL group holds it, or the groups that do
+         have no users; deliberately NOT split further, since both have the same remedy (assign the role to
+         a group and put users in it) and separating them would only add a state nobody acts on differently.
+
+         recipientEmails comes from AutoTuneNotificationRecipientResolver::resolve(), the same call the real
+         send path makes, never a second traversal of the ACL tables — a diagnosis that reimplemented the
+         lookup could pass while the real send still reached nobody. -->
+    <transfer name="SearchRankingAutoTuneNotificationDiagnosis" strict="true">
+        <property name="isNotifyEnabledAnywhere" type="bool"/>
+        <property name="roleName" type="string"/>
+        <property name="doesRoleExist" type="bool"/>
+        <property name="recipientEmails" type="string[]" singular="recipientEmail"/>
+    </transfer>
+
     <!-- Extends spryker/mail's own core `Mail` transfer (standard Spryker transfer-merge-by-name
          mechanism) purely to carry the auto-tune summary email's own data through to its Twig template
          (Presentation/Mail/auto-tune-summary.html.twig) — the ONLY context a rendered mail template
@@ -262,7 +337,7 @@
         <property name="autoTuneAnyApplied" type="bool"/>
     </transfer>
 
-    <!-- Phase O6: one automated weight-optimization run, mirroring Calibration's own queue-then-process
+    <!-- Phase O6: one automated weight-optimization run, mirroring Saturation Point Calibration's own queue-then-process
          lifecycle (status starts at 'queued', a console command picks up the oldest queued run and moves
          it through 'running' to 'done'/'failed') and its progress-counter shape (totalCount/processedCount).
          Reuses SearchRankingWeightCheckpointMetricWeight for bestMetricWeights, identical shape, no need
@@ -270,26 +345,71 @@
          applied automatically, regardless of algorithm or score improvement — a human reviews it on the
          Zed page and explicitly clicks Apply, which goes through the SAME write-through-facade +
          checkpoint pipeline as any other weight change (see WeightCheckpointRestorer). -->
+    <!-- fixedRelevanceWeight/fixedSpecificity*/fixedMetricWeights: a human's own parameter-selection choice
+         at queue time (the Automated Weight Optimization run form's checklist) — null means that scalar was
+         left free for the search, same as every run before this field existed; a non-null value means the
+         human pinned it at exactly that value instead (not necessarily the value it happened to have live
+         at queue time — a human can search-and-fix at a hypothetical number just as easily as the current
+         one). fixedMetricWeights carries the same choice for individual metrics, reusing
+         SearchRankingWeightCheckpointMetricWeight's shape/JSON encoding identically to bestMetricWeights
+         (isLocaleScoped is left unset, same as bestMetricWeights already does). A metric a human did NOT
+         fix can still end up held constant anyway if its own formula turns out non-deterministic (see
+         FormulaDeterminismCheckerInterface) — that's OptimizationRunner's own orthogonal decision, not
+         recorded here. -->
     <transfer name="SearchRankingOptimizerRun" strict="true">
         <property name="idSearchRankingOptimizerRun" type="int"/>
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="algorithm" type="string"/>
+        <property name="isTerminationCriteriaTrusted" type="bool"/>
+        <property name="warmStartFraction" type="float"/>
+        <property name="fixedRelevanceWeight" type="float"/>
+        <property name="fixedSpecificityCurveExponent" type="float"/>
+        <property name="fixedSpecificityWeightExponent" type="float"/>
+        <property name="fixedSpecificityWeightShiftMagnitude" type="float"/>
+        <property name="fixedSpecificityBlendWeight" type="float"/>
+        <property name="fixedMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="fixedMetricWeight"/>
         <property name="status" type="string"/>
         <property name="totalCount" type="int"/>
         <property name="processedCount" type="int"/>
+        <property name="generationsUsed" type="int"/>
         <property name="baselineScore" type="float"/>
         <property name="bestRelevanceWeight" type="float"/>
         <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>
         <property name="bestScore" type="float"/>
-        <property name="bestEntropyWeightExponent" type="float"/>
-        <property name="bestEntropyWeightShiftMagnitude" type="float"/>
-        <property name="bestEntropyProbeResultSize" type="int"/>
+        <property name="bestSpecificityBlendWeight" type="float"/>
+        <property name="bestSpecificityCurveExponent" type="float"/>
+        <property name="bestSpecificityWeightExponent" type="float"/>
+        <property name="bestSpecificityWeightShiftMagnitude" type="float"/>
         <property name="completedAt" type="string"/>
         <property name="errorMessage" type="string"/>
         <property name="appliedAt" type="string"/>
         <property name="createdAt" type="string"/>
         <property name="updatedAt" type="string"/>
+    </transfer>
+
+    <!-- How much of the back office can actually reach this package's Zed pages, for
+         `search-ranking-optimizer:check-installation` to report on. Zed access is deny-by-default outside a matching
+         ACL rule, and a nav entry the current user has no rule for is filtered out of the sidebar entirely
+         (see Spryker's own AclNavigationItemFilterPlugin) rather than 403ing — so "the adopter never
+         adjusted ACL" looks exactly like "the package was never installed".
+
+         The split that matters is unrestrictedRoleCount vs restrictedRoleCount. A default Spryker install
+         gives root_role a total wildcard and puts every installer user in root_group, so these pages are
+         reachable out of the box and nothing needs doing — that is the unrestricted count. Roles carrying
+         explicit per-module rules instead are the restricted count, and they reach nothing here until
+         somebody adds a rule. restrictedRoleWithAccessCount separates "the adopter pointed a restricted
+         role at this feature" from "no restricted role can see it", which is the only state worth
+         mentioning — and even then only as something to confirm, never as a failure: restricting these
+         pages to root-style admins is a perfectly ordinary choice.
+
+         Counts rather than names deliberately: this is a yes/no/how-many signal about the shape of an
+         installation, and printing an adopter's internal role names into console output buys nothing. -->
+    <transfer name="SearchRankingOptimizerBackOfficeAccessDiagnosis" strict="true">
+        <property name="moduleNames" type="string[]" singular="moduleName"/>
+        <property name="unrestrictedRoleCount" type="int"/>
+        <property name="restrictedRoleCount" type="int"/>
+        <property name="restrictedRoleWithAccessCount" type="int"/>
     </transfer>
 
 </transfers>

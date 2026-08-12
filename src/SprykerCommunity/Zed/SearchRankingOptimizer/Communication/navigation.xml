@@ -5,44 +5,58 @@
         <title>Search Ranking Optimizer</title>
         <icon>tune</icon>
         <bundle>search-ranking-optimizer</bundle>
-        <controller>calibration</controller>
+        <controller>saturation-point-calibration</controller>
         <action>index</action>
         <pages>
             <search-ranking-optimizer-calibration>
                 <label>Calibration</label>
                 <title>Calibration</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>calibration</controller>
+                <controller>saturation-point-calibration</controller>
                 <action>index</action>
             </search-ranking-optimizer-calibration>
             <search-ranking-optimizer-calibration-apply>
                 <label>Apply Calibration</label>
                 <title>Apply Calibration</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>calibration-apply</controller>
+                <controller>saturation-point-calibration-apply</controller>
                 <action>index</action>
                 <visible>0</visible>
             </search-ranking-optimizer-calibration-apply>
-            <search-ranking-optimizer-query>
-                <label>Queries</label>
-                <title>Rated Search Queries</title>
+            <search-ranking-optimizer-auto-tune>
+                <label>Auto-tune metrics settings</label>
+                <title>Auto-tune metrics settings</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>query</controller>
+                <controller>auto-tune</controller>
+                <action>index</action>
+            </search-ranking-optimizer-auto-tune>
+            <search-ranking-optimizer-rating>
+                <label>Ratings</label>
+                <title>Ratings</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>rating</controller>
+                <action>index</action>
+            </search-ranking-optimizer-rating>
+            <search-ranking-optimizer-query>
+                <label>Assess Rated Queries</label>
+                <title>Assess Rated Search Queries</title>
+                <bundle>search-ranking-optimizer</bundle>
+                <controller>assess-rated-query</controller>
                 <action>index</action>
             </search-ranking-optimizer-query>
             <search-ranking-optimizer-query-edit>
                 <label>Edit Query Importance</label>
                 <title>Edit Query Importance</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>query</controller>
+                <controller>assess-rated-query</controller>
                 <action>edit</action>
                 <visible>0</visible>
             </search-ranking-optimizer-query-edit>
             <search-ranking-optimizer-evaluation>
-                <label>Evaluation</label>
-                <title>Rank Evaluation</title>
+                <label>Test Current Evaluation</label>
+                <title>Test Current Evaluation</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>evaluation</controller>
+                <controller>test-current-evaluation</controller>
                 <action>index</action>
             </search-ranking-optimizer-evaluation>
             <search-ranking-optimizer-checkpoint>
@@ -52,25 +66,18 @@
                 <controller>checkpoint</controller>
                 <action>index</action>
             </search-ranking-optimizer-checkpoint>
-            <search-ranking-optimizer-auto-tune>
-                <label>Auto-Tune Settings</label>
-                <title>Auto-Tune Settings</title>
-                <bundle>search-ranking-optimizer</bundle>
-                <controller>auto-tune</controller>
-                <action>index</action>
-            </search-ranking-optimizer-auto-tune>
             <search-ranking-optimizer-optimization>
-                <label>Automated Optimization</label>
+                <label>Automated Weight Optimization</label>
                 <title>Automated Weight Optimization</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>optimization</controller>
+                <controller>automated-weight-optimization</controller>
                 <action>index</action>
             </search-ranking-optimizer-optimization>
             <search-ranking-optimizer-optimization-apply>
                 <label>Apply Optimization</label>
                 <title>Apply Optimization</title>
                 <bundle>search-ranking-optimizer</bundle>
-                <controller>optimization-apply</controller>
+                <controller>automated-weight-optimization-apply</controller>
                 <action>index</action>
                 <visible>0</visible>
             </search-ranking-optimizer-optimization-apply>

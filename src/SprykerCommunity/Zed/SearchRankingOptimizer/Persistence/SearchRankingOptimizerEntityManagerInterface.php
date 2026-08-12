@@ -10,11 +10,11 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 
@@ -25,8 +25,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * this entity manager and a cross-package facade (e.g. {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier})
      * can be wrapped in one atomic transaction — both ultimately share the same underlying Propel
      * connection, so a transaction opened here also covers facade calls made inside the same callback.
-     *
-     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
      */
     public function getTransactionHandler(): TransactionHandlerInterface;
 
@@ -34,59 +32,50 @@ interface SearchRankingOptimizerEntityManagerInterface
      * Creates a calibration run in status=uploaded together with one child row per
      * `$calibrationTransfer->getSearchTerms()` entry (search term text only, no scores yet).
      *
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
-    public function createCalibration(SearchRankingCalibrationTransfer $calibrationTransfer): SearchRankingCalibrationTransfer;
+    public function createCalibration(SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $status
-     *
-     * @return void
      */
-    public function updateCalibrationStatus(int $idSearchRankingCalibration, string $status): void;
+    public function updateCalibrationStatus(int $idSearchRankingSaturationPointCalibration, string $status): void;
 
     /**
-     * @param int $idSearchRankingCalibrationSearchTerm
+     * @param int $idSearchRankingSaturationPointCalibrationSearchTerm
      * @param int $productsFound
      * @param array<float> $scores
-     *
-     * @return void
      */
-    public function saveCalibrationSearchTermResult(int $idSearchRankingCalibrationSearchTerm, int $productsFound, array $scores): void;
+    public function saveCalibrationSearchTermResult(int $idSearchRankingSaturationPointCalibrationSearchTerm, int $productsFound, array $scores): void;
 
     /**
      * Adds 1 to the calibration's `processedCount` — called once per search term as the calculation loop
      * works through them, the numerator half of the live progress counter. A safe no-op if the id no
      * longer exists.
      *
-     * @param int $idSearchRankingCalibration
-     *
-     * @return void
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    public function incrementCalibrationProcessedCount(int $idSearchRankingCalibration): void;
+    public function incrementCalibrationProcessedCount(int $idSearchRankingSaturationPointCalibration): void;
 
     /**
      * Persists the pooled statistics onto the calibration row and sets status=calculated.
      *
-     * @param int $idSearchRankingCalibration
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $statisticsTransfer
-     *
-     * @return void
+     * @param int $idSearchRankingSaturationPointCalibration
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer
      */
-    public function saveCalibrationStatistics(int $idSearchRankingCalibration, SearchRankingCalibrationTransfer $statisticsTransfer): void;
+    public function saveCalibrationStatistics(
+        int $idSearchRankingSaturationPointCalibration,
+        SearchRankingSaturationPointCalibrationTransfer $statisticsTransfer,
+    ): void;
 
     /**
      * Sets status=failed with an explanatory error message.
      *
-     * @param int $idSearchRankingCalibration
+     * @param int $idSearchRankingSaturationPointCalibration
      * @param string $errorMessage
-     *
-     * @return void
      */
-    public function markCalibrationFailed(int $idSearchRankingCalibration, string $errorMessage): void;
+    public function markCalibrationFailed(int $idSearchRankingSaturationPointCalibration, string $errorMessage): void;
 
     /**
      * Creates a new query row. `$queryTransfer` must already carry a CANONICAL `searchTerm` — canonicalize
@@ -95,16 +84,12 @@ interface SearchRankingOptimizerEntityManagerInterface
      * schema default.
      *
      * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     public function createQuery(SearchRankingQueryTransfer $queryTransfer): SearchRankingQueryTransfer;
 
     /**
      * @param int $idSearchRankingQuery
      * @param float $importanceWeight
-     *
-     * @return void
      */
     public function updateQueryImportanceWeight(int $idSearchRankingQuery, float $importanceWeight): void;
 
@@ -114,8 +99,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * reflects real rating activity, not just importance-weight edits.
      *
      * @param int $idSearchRankingQuery
-     *
-     * @return void
      */
     public function touchQuery(int $idSearchRankingQuery): void;
 
@@ -126,8 +109,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * disagreement across raters is preserved, never overwritten). Also touches the parent query.
      *
      * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function upsertRating(SearchRankingQueryRatingTransfer $ratingTransfer): SearchRankingQueryRatingTransfer;
 
@@ -139,8 +120,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param int $fkSearchRankingQuery
      * @param string $customerReference
      * @param int $fkProductAbstract
-     *
-     * @return void
      */
     public function deleteRating(int $fkSearchRankingQuery, string $customerReference, int $fkProductAbstract): void;
 
@@ -148,8 +127,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * Persists one rank_eval evaluation run's query-importance-weighted aggregate score.
      *
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
      */
     public function createEvaluation(SearchRankingEvaluationTransfer $evaluationTransfer): SearchRankingEvaluationTransfer;
 
@@ -157,17 +134,15 @@ interface SearchRankingOptimizerEntityManagerInterface
      * Persists one weight checkpoint (a full point-in-time snapshot).
      *
      * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function createWeightCheckpoint(SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer): SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Upserts by `idSearchRankingMetric` — at most one config row per metric.
+     * Upserts by `(idSearchRankingMetric, storeName, localeName)` — at most one config row per
+     * metric+store+locale. Writes exactly the one row named on the transfer; fanning out to every real
+     * locale of a store-wide metric is the caller's job (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface}).
      *
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function saveAutoTuneMetricConfig(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
@@ -178,8 +153,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * column default until the console command actually picks this run up.
      *
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function createOptimizerRun(SearchRankingOptimizerRunTransfer $optimizerRunTransfer): SearchRankingOptimizerRunTransfer;
 
@@ -192,8 +165,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param int $idSearchRankingOptimizerRun
      * @param int $totalCount
      * @param float $baselineScore
-     *
-     * @return void
      */
     public function startOptimizerRun(int $idSearchRankingOptimizerRun, int $totalCount, float $baselineScore): void;
 
@@ -205,8 +176,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      *
      * @param int $idSearchRankingOptimizerRun
      * @param int $processedCount
-     *
-     * @return void
      */
     public function updateOptimizerRunProgress(int $idSearchRankingOptimizerRun, int $processedCount): void;
 
@@ -218,20 +187,24 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param float $bestRelevanceWeight
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $bestMetricWeightTransfers
      * @param float $bestScore
-     * @param float $bestEntropyWeightExponent
-     * @param float $bestEntropyWeightShiftMagnitude
-     * @param int $bestEntropyProbeResultSize
-     *
-     * @return void
+     * @param float $bestSpecificityBlendWeight
+     * @param float $bestSpecificityCurveExponent
+     * @param float $bestSpecificityWeightExponent
+     * @param float $bestSpecificityWeightShiftMagnitude
+     * @param int $generationsUsed The real number of generations the algorithm actually ran (count of
+     *   OptimizationResult::getBestValueHistory()) -- independent of totalCount/processedCount, which count
+     *   candidate evaluations, not generations.
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
         float $bestRelevanceWeight,
         array $bestMetricWeightTransfers,
         float $bestScore,
-        float $bestEntropyWeightExponent,
-        float $bestEntropyWeightShiftMagnitude,
-        int $bestEntropyProbeResultSize,
+        float $bestSpecificityBlendWeight,
+        float $bestSpecificityCurveExponent,
+        float $bestSpecificityWeightExponent,
+        float $bestSpecificityWeightShiftMagnitude,
+        int $generationsUsed,
     ): void;
 
     /**
@@ -239,8 +212,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      *
      * @param int $idSearchRankingOptimizerRun
      * @param string $errorMessage
-     *
-     * @return void
      */
     public function failOptimizerRun(int $idSearchRankingOptimizerRun, string $errorMessage): void;
 
@@ -250,8 +221,6 @@ interface SearchRankingOptimizerEntityManagerInterface
      * timestamp). A safe no-op if the id no longer exists.
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return void
      */
     public function markOptimizerRunApplied(int $idSearchRankingOptimizerRun): void;
 }

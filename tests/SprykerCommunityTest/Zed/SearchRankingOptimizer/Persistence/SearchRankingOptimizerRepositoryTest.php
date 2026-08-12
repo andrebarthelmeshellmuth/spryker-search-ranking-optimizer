@@ -11,13 +11,14 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence;
 
 use Codeception\Test\Unit;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository;
 
@@ -38,7 +39,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 class SearchRankingOptimizerRepositoryTest extends Unit
 {
     /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration>
+     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration>
      */
     protected array $calibrationEntities = [];
 
@@ -72,9 +73,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      */
     protected array $weightCheckpointEntities = [];
 
-    /**
-     * @return void
-     */
     protected function _after(): void
     {
         foreach ($this->calibrationEntities as $calibrationEntity) {
@@ -108,9 +106,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         parent::_after();
     }
 
-    /**
-     * @return void
-     */
     public function testGetUploadedCalibrationsReturnsOnlyUploadedStatusRowsNewestFirst(): void
     {
         // Arrange
@@ -120,38 +115,35 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
         // Act
         $calibrationTransfers = (new SearchRankingOptimizerRepository())->getUploadedCalibrations();
-        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingCalibration(), $calibrationTransfers);
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingSaturationPointCalibration(), $calibrationTransfers);
 
         // Assert — both uploaded rows present, newest first, calculated row excluded
-        $newerPosition = array_search($newer->getIdSearchRankingCalibration(), $returnedIds, true);
-        $olderPosition = array_search($older->getIdSearchRankingCalibration(), $returnedIds, true);
+        $newerPosition = array_search($newer->getIdSearchRankingSaturationPointCalibration(), $returnedIds, true);
+        $olderPosition = array_search($older->getIdSearchRankingSaturationPointCalibration(), $returnedIds, true);
 
         $this->assertNotFalse($newerPosition);
         $this->assertNotFalse($olderPosition);
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationWithSearchTermsReturnsTheCalibrationWithItsSearchTermsAttached(): void
     {
         // Arrange
         $calibrationEntity = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
 
-        $firstSearchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $firstSearchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+        $firstSearchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $firstSearchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         $firstSearchTermEntity->setSearchTerm('chair');
         $firstSearchTermEntity->save();
 
-        $secondSearchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $secondSearchTermEntity->setFkSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration());
+        $secondSearchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $secondSearchTermEntity->setFkSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration());
         $secondSearchTermEntity->setSearchTerm('desk');
         $secondSearchTermEntity->save();
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationWithSearchTerms(
-            $calibrationEntity->getIdSearchRankingCalibration(),
+            $calibrationEntity->getIdSearchRankingSaturationPointCalibration(),
         );
 
         // Assert
@@ -163,9 +155,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         );
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationWithSearchTermsReturnsNullForANonExistentId(): void
     {
         // Act
@@ -175,13 +164,11 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestCalculatedCalibrationReturnsTheMostRecentlyCalculatedRow(): void
     {
         // Arrange — "newer" uses a far-future date so it outranks any pre-existing real calibration row
-        // in this shared demo database, not just the "older" row created alongside it in this test.
+        // for this same (store, locale) in this shared demo database, not just the "older" row created
+        // alongside it in this test.
         $older = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
         $older->setCalculatedAt('2026-01-01 00:00:00');
         $older->save();
@@ -193,16 +180,35 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_UPLOADED);
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('DE', 'en_US');
 
         // Assert
         $this->assertNotNull($resultTransfer);
-        $this->assertSame($newer->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame($newer->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
     }
 
     /**
-     * @return void
+     * A calculated run for a DIFFERENT (store, locale) must never be returned as if it were the asked-about
+     * scope's own latest run — the real regression this whole store/locale-scoping extension is for.
+     * Isolated store names (not 'DE'/'AT') so this is self-contained regardless of real calibration rows
+     * already present in this shared demo database.
      */
+    public function testFindLatestCalculatedCalibrationIsScopedByStoreAndLocale(): void
+    {
+        // Arrange
+        $matching = $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, 'DE-TEST-CALIBRATION-SCOPE', 'de_DE');
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED, 'AT-TEST-CALIBRATION-SCOPE', 'de_AT');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('DE-TEST-CALIBRATION-SCOPE', 'de_DE');
+        $wrongStoreResultTransfer = (new SearchRankingOptimizerRepository())->findLatestCalculatedCalibration('AT-TEST-CALIBRATION-SCOPE', 'de_DE');
+
+        // Assert
+        $this->assertNotNull($resultTransfer);
+        $this->assertSame($matching->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
+        $this->assertNull($wrongStoreResultTransfer, 'Right locale, wrong store must not match.');
+    }
+
     public function testFindCalibrationInProgressReturnsTheCalculatingRowWithItsProgressCounts(): void
     {
         // Arrange
@@ -212,18 +218,15 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $inProgress->save();
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE', 'en_US');
 
         // Assert
         $this->assertNotNull($resultTransfer);
-        $this->assertSame($inProgress->getIdSearchRankingCalibration(), $resultTransfer->getIdSearchRankingCalibration());
+        $this->assertSame($inProgress->getIdSearchRankingSaturationPointCalibration(), $resultTransfer->getIdSearchRankingSaturationPointCalibration());
         $this->assertSame(8, $resultTransfer->getTotalCount());
         $this->assertSame(3, $resultTransfer->getProcessedCount());
     }
 
-    /**
-     * @return void
-     */
     public function testFindCalibrationInProgressReturnsNullWhenNothingIsCalculating(): void
     {
         // Arrange
@@ -231,15 +234,30 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATED);
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress();
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE', 'en_US');
 
         // Assert
         $this->assertNull($resultTransfer);
     }
 
     /**
-     * @return void
+     * A calculating run for a DIFFERENT (store, locale) must never be reported as the asked-about scope's
+     * own in-progress run — otherwise the Calibration page's progress widget could show another store's
+     * run as if it belonged to the one being viewed. Isolated store name for the same reason as
+     * {@see testFindLatestCalculatedCalibrationIsScopedByStoreAndLocale()}.
      */
+    public function testFindCalibrationInProgressIsScopedByStoreAndLocale(): void
+    {
+        // Arrange
+        $this->createTestCalibration(SearchRankingOptimizerConfig::CALIBRATION_STATUS_CALCULATING, 'AT-TEST-CALIBRATION-SCOPE', 'de_AT');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findCalibrationInProgress('DE-TEST-CALIBRATION-SCOPE', 'de_DE');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
     public function testFindDistinctSearchTermsByStoreLocaleReturnsEachTermOnceForTheGivenStoreLocale(): void
     {
         // Arrange — an isolated store name so this never collides with real organic ratings in the shared
@@ -258,9 +276,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertEqualsCanonicalizing(['chair', 'desk'], $searchTerms);
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueriesByStoreLocaleReturnsOnlyQueriesForThatStoreLocale(): void
     {
         // Arrange
@@ -277,9 +292,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matching->getIdSearchRankingQuery(), $queryTransfers[0]->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindRatingsByStoreLocaleReturnsRatingsJoinedThroughTheQuery(): void
     {
         // Arrange — id 9 is a real seeded product abstract (M1006811), needed to satisfy the rating
@@ -299,9 +311,37 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
     }
 
-    /**
-     * @return void
-     */
+    public function testFindRatingsByQueryCustomerAndProductsReturnsOnlyThatCustomersRatingsForTheGivenProducts(): void
+    {
+        // Arrange — ids 9/10 are real seeded product abstracts, needed to satisfy the rating table's real
+        // FK constraint to spy_product_abstract.
+        $queryEntity = $this->createTestQuery('chair', 'DE-TEST-FIND-BY-QUERY-CUSTOMER', 'en_US');
+
+        $matchingRating = $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-1', 9, 'heart');
+        // Same query, different customer — must not leak into CUST-1's own result.
+        $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-2', 9, 'check');
+        // Same query, same customer, but a product NOT in the requested id list — must be excluded.
+        $this->createTestRating($queryEntity->getIdSearchRankingQuery(), 'CUST-1', 10, 'x');
+
+        // Act
+        $ratingTransfers = (new SearchRankingOptimizerRepository())
+            ->findRatingsByQueryCustomerAndProducts($queryEntity->getIdSearchRankingQuery(), 'CUST-1', [9]);
+
+        // Assert
+        $this->assertCount(1, $ratingTransfers);
+        $this->assertSame($matchingRating->getIdSearchRankingQueryRating(), $ratingTransfers[0]->getIdSearchRankingQueryRating());
+    }
+
+    public function testFindRatingsByQueryCustomerAndProductsReturnsEmptyWithoutQueryingWhenNoProductIdsAreGiven(): void
+    {
+        // Act
+        $ratingTransfers = (new SearchRankingOptimizerRepository())
+            ->findRatingsByQueryCustomerAndProducts(999999, 'CUST-1', []);
+
+        // Assert
+        $this->assertSame([], $ratingTransfers);
+    }
+
     public function testFindLatestEvaluationReturnsTheMostRecentRow(): void
     {
         // Arrange
@@ -322,9 +362,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($newer->getIdSearchRankingEvaluation(), $resultTransfer->getIdSearchRankingEvaluation());
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestEvaluationReturnsNullWhenNoneExists(): void
     {
         // Act
@@ -334,10 +371,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
-    public function testFindEvaluationHistoryByStoreLocaleReturnsNewestFirst(): void
+    public function testFindEvaluationHistoryFilteredByStoreLocaleReturnsNewestFirst(): void
     {
         // Arrange
         $storeName = 'DE-TEST-EVAL-HISTORY';
@@ -350,7 +384,7 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $newer->save();
 
         // Act
-        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistoryByStoreLocale($storeName, 'en_US');
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistory($storeName, 'en_US');
 
         // Assert
         $this->assertCount(2, $historyTransfers);
@@ -358,49 +392,91 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($older->getIdSearchRankingEvaluation(), $historyTransfers[1]->getIdSearchRankingEvaluation());
     }
 
-    /**
-     * @return void
-     */
+    public function testFindEvaluationHistoryWithNullStoreOrLocaleIgnoresThatFilter(): void
+    {
+        // Arrange
+        $matchingStore = $this->createTestEvaluation('DE-TEST-EVAL-HISTORY-NULL', 'en_US', 0.5, 3);
+        $otherLocale = $this->createTestEvaluation('DE-TEST-EVAL-HISTORY-NULL', 'de_DE', 0.6, 4);
+
+        // Act -- storeName filtered, localeName left null (unfiltered): both rows for this store come back
+        // regardless of locale.
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findEvaluationHistory('DE-TEST-EVAL-HISTORY-NULL');
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingEvaluation(), $historyTransfers);
+
+        // Assert
+        $this->assertContains($matchingStore->getIdSearchRankingEvaluation(), $returnedIds);
+        $this->assertContains($otherLocale->getIdSearchRankingEvaluation(), $returnedIds);
+    }
+
     public function testFindAutoTuneMetricConfigByMetricIdReturnsTheConfigForThatMetric(): void
     {
         // Arrange
-        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true);
+        $this->createTestAutoTuneMetricConfig(90101, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE', 'de_DE');
 
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101);
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90101, 'DE', 'de_DE');
 
         // Assert
         $this->assertNotNull($resultTransfer);
         $this->assertSame(90101, $resultTransfer->getIdSearchRankingMetric());
+        $this->assertSame('DE', $resultTransfer->getStoreName());
+        $this->assertSame('de_DE', $resultTransfer->getLocaleName());
         $this->assertSame(0.8, $resultTransfer->getAutoTuneThreshold());
         $this->assertFalse($resultTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, $resultTransfer->getAutoUpdateScope());
         $this->assertTrue($resultTransfer->getIsNotifyEnabled());
     }
 
-    /**
-     * @return void
-     */
     public function testFindAutoTuneMetricConfigByMetricIdReturnsNullWhenTheMetricHasNoConfigYet(): void
     {
         // Act
-        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102);
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90102, 'DE', 'de_DE');
 
         // Assert
         $this->assertNull($resultTransfer);
     }
 
     /**
-     * @return void
+     * A config saved for one store must be invisible when looking up the SAME metric under a different
+     * store — proves lookups are genuinely scoped by (metric, store), not by metric alone.
      */
+    public function testFindAutoTuneMetricConfigByMetricIdIsScopedByStore(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90105, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90105, 'AT', 'de_DE');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
+    /**
+     * A config saved for one locale of a store must be invisible when looking up the SAME metric+store
+     * under a different locale — proves lookups are genuinely scoped by (metric, store, locale), the real
+     * point of this whole extension, not just (metric, store).
+     */
+    public function testFindAutoTuneMetricConfigByMetricIdIsScopedByLocale(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90107, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+
+        // Act
+        $resultTransfer = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigByMetricId(90107, 'DE', 'en_US');
+
+        // Assert
+        $this->assertNull($resultTransfer);
+    }
+
     public function testFindAutoTuneMetricConfigsWithThresholdSetExcludesConfigsWithNoThreshold(): void
     {
         // Arrange
-        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
-        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false);
+        $withThreshold = $this->createTestAutoTuneMetricConfig(90103, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $withoutThreshold = $this->createTestAutoTuneMetricConfig(90104, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
 
         // Act
-        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet();
+        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
         $returnedMetricIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingMetric(), $resultTransfers);
 
         // Assert
@@ -409,13 +485,88 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     }
 
     /**
+     * The same metric can have a threshold set for one store and none for another — each store's list
+     * must reflect only its own configs.
+     */
+    public function testFindAutoTuneMetricConfigsWithThresholdSetIsScopedByStore(): void
+    {
+        // Arrange
+        $deConfig = $this->createTestAutoTuneMetricConfig(90106, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $this->createTestAutoTuneMetricConfig(90106, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'AT', 'de_AT');
+
+        // Act
+        $deResultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
+        $atResultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('AT');
+
+        // Assert
+        $this->assertContains($deConfig->getFkSearchRankingMetric(), array_map(fn ($transfer) => $transfer->getIdSearchRankingMetric(), $deResultTransfers));
+        $this->assertSame([], array_filter($atResultTransfers, fn ($transfer) => $transfer->getIdSearchRankingMetric() === 90106));
+    }
+
+    /**
+     * Not locale-filtered: a metric with a threshold set at two different locales of the SAME store must
+     * come back as two separate rows — proves the list genuinely reflects (metric, locale) granularity now,
+     * not one row per metric.
+     */
+    public function testFindAutoTuneMetricConfigsWithThresholdSetReturnsOneRowPerConfiguredLocale(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90108, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+        $this->createTestAutoTuneMetricConfig(90108, 0.7, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'en_US');
+
+        // Act
+        $resultTransfers = (new SearchRankingOptimizerRepository())->findAutoTuneMetricConfigsWithThresholdSet('DE');
+        $localeNamesForMetric = array_map(
+            fn ($transfer) => $transfer->getLocaleName(),
+            array_filter($resultTransfers, fn ($transfer) => $transfer->getIdSearchRankingMetric() === 90108),
+        );
+
+        // Assert
+        $this->assertEqualsCanonicalizing(['de_DE', 'en_US'], array_values($localeNamesForMetric));
+    }
+
+    /**
+     * A config with notify enabled but NO threshold still counts: this answers "could this shop ever need
+     * to email an admin", not "will it tonight" — see the method's own docblock.
+     */
+    public function testHasAutoTuneMetricConfigWithNotifyEnabledIsTrueForANotifyEnabledConfigWithoutAThreshold(): void
+    {
+        // Arrange
+        $this->createTestAutoTuneMetricConfig(90109, null, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, true, 'DE', 'de_DE');
+
+        // Act
+        $result = (new SearchRankingOptimizerRepository())->hasAutoTuneMetricConfigWithNotifyEnabled();
+
+        // Assert
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Asserted against a baseline rather than a flat `assertFalse`: this query is deliberately unscoped, so
+     * whatever notify-enabled configs the surrounding installation already has would otherwise decide the
+     * outcome. What matters is that adding a notify-DISABLED row never flips it on by itself.
+     */
+    public function testHasAutoTuneMetricConfigWithNotifyEnabledIsUnaffectedByANotifyDisabledConfig(): void
+    {
+        // Arrange
+        $repository = new SearchRankingOptimizerRepository();
+        $baseline = $repository->hasAutoTuneMetricConfigWithNotifyEnabled();
+
+        // Act
+        $this->createTestAutoTuneMetricConfig(90110, 0.8, false, SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE, false, 'DE', 'de_DE');
+
+        // Assert
+        $this->assertSame($baseline, $repository->hasAutoTuneMetricConfigWithNotifyEnabled());
+    }
+
+    /**
      * @param int $idSearchRankingMetric
      * @param float|null $autoTuneThreshold
      * @param bool $isAutoUpdateEnabled
      * @param string $autoUpdateScope
      * @param bool $isNotifyEnabled
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
+     * @param string $storeName
+     * @param string $localeName
      */
     protected function createTestAutoTuneMetricConfig(
         int $idSearchRankingMetric,
@@ -423,9 +574,13 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         bool $isAutoUpdateEnabled,
         string $autoUpdateScope,
         bool $isNotifyEnabled,
+        string $storeName = 'DE',
+        string $localeName = 'de_DE',
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($idSearchRankingMetric);
+        $autoTuneMetricConfigEntity->setStoreName($storeName);
+        $autoTuneMetricConfigEntity->setLocaleName($localeName);
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneThreshold);
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($isAutoUpdateEnabled);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoUpdateScope);
@@ -441,8 +596,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery
      */
     protected function createTestQuery(string $searchTerm, string $storeName, string $localeName): SpySearchRankingQuery
     {
@@ -459,15 +612,13 @@ class SearchRankingOptimizerRepositoryTest extends Unit
 
     /**
      * @param string $status
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration
      */
-    protected function createTestCalibration(string $status): SpySearchRankingCalibration
+    protected function createTestCalibration(string $status, string $storeName = 'DE', string $localeName = 'en_US'): SpySearchRankingSaturationPointCalibration
     {
-        $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setRelevantProductCount(6);
-        $calibrationEntity->setStoreName('DE');
-        $calibrationEntity->setLocaleName('en_US');
+        $calibrationEntity->setStoreName($storeName);
+        $calibrationEntity->setLocaleName($localeName);
         $calibrationEntity->setStatus($status);
         $calibrationEntity->save();
 
@@ -481,8 +632,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $customerReference
      * @param int $fkProductAbstract
      * @param string $ratingType
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating
      */
     protected function createTestRating(
         int $fkSearchRankingQuery,
@@ -507,8 +656,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $localeName
      * @param float $metricScore
      * @param int $queryCount
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation
      */
     protected function createTestEvaluation(string $storeName, string $localeName, float $metricScore, int $queryCount): SpySearchRankingEvaluation
     {
@@ -524,9 +671,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         return $evaluationEntity;
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunByIdReturnsTheMatchingRow(): void
     {
         // Arrange
@@ -540,9 +684,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunByIdReturnsNullForANonExistentId(): void
     {
         $resultTransfer = (new SearchRankingOptimizerRepository())->findOptimizerRunById(999999999);
@@ -550,9 +691,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindOldestQueuedOptimizerRunReturnsTheOldestOneFirst(): void
     {
         // Arrange -- a done run must never be picked up, only queued ones, and the OLDEST of those.
@@ -568,9 +706,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($older->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunInProgressReturnsTheRunningRow(): void
     {
         // Arrange
@@ -584,9 +719,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($entity->getIdSearchRankingOptimizerRun(), $resultTransfer->getIdSearchRankingOptimizerRun());
     }
 
-    /**
-     * @return void
-     */
     public function testFindOldestQueuedOptimizerRunReturnsNullWhenNothingIsQueued(): void
     {
         // Arrange
@@ -600,9 +732,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindOptimizerRunInProgressReturnsNullWhenNothingIsRunning(): void
     {
         // Arrange
@@ -616,9 +745,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestOptimizerRunByStoreLocaleReturnsNullWhenNoneExistsForThatStoreLocale(): void
     {
         // Act
@@ -628,9 +754,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindLatestOptimizerRunByStoreLocaleReturnsTheMostRecentRegardlessOfStatus(): void
     {
         // Arrange
@@ -655,8 +778,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
      * @param string $storeName
      * @param string $localeName
      * @param string $status
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun
      */
     protected function createTestOptimizerRun(string $storeName, string $localeName, string $status): SpySearchRankingOptimizerRun
     {
@@ -672,9 +793,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         return $optimizerRunEntity;
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByTermStoreLocaleReturnsTheMatchingQuery(): void
     {
         // Arrange
@@ -691,9 +809,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($matching->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByTermStoreLocaleReturnsNullWhenNoQueryMatches(): void
     {
         // Act
@@ -703,9 +818,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByIdReturnsTheMatchingQuery(): void
     {
         // Arrange
@@ -719,9 +831,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame($queryEntity->getIdSearchRankingQuery(), $resultTransfer->getIdSearchRankingQuery());
     }
 
-    /**
-     * @return void
-     */
     public function testFindQueryByIdReturnsNullForANonExistentId(): void
     {
         // Act
@@ -731,9 +840,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertNull($resultTransfer);
     }
 
-    /**
-     * @return void
-     */
     public function testFindAllQueriesOrderedByUpdatedAtReturnsNewestFirst(): void
     {
         // Arrange
@@ -758,9 +864,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
     public function testFindWeightCheckpointHistoryReturnsNewestFirst(): void
     {
         // Arrange
@@ -786,9 +889,31 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertLessThan($olderPosition, $newerPosition);
     }
 
-    /**
-     * @return void
-     */
+    public function testFindWeightCheckpointHistoryFilteredByStoreLocaleExcludesOtherScopes(): void
+    {
+        // Arrange
+        $matching = $this->createTestWeightCheckpoint(
+            SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL,
+            0.7,
+            'DE-TEST-CHECKPOINT-FILTER',
+            'en_US',
+        );
+        $otherLocale = $this->createTestWeightCheckpoint(
+            SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL,
+            0.8,
+            'DE-TEST-CHECKPOINT-FILTER',
+            'de_DE',
+        );
+
+        // Act
+        $historyTransfers = (new SearchRankingOptimizerRepository())->findWeightCheckpointHistory('DE-TEST-CHECKPOINT-FILTER', 'en_US');
+        $returnedIds = array_map(fn ($transfer) => $transfer->getIdSearchRankingWeightCheckpoint(), $historyTransfers);
+
+        // Assert
+        $this->assertContains($matching->getIdSearchRankingWeightCheckpoint(), $returnedIds);
+        $this->assertNotContains($otherLocale->getIdSearchRankingWeightCheckpoint(), $returnedIds);
+    }
+
     public function testFindWeightCheckpointByIdReturnsTheMatchingCheckpoint(): void
     {
         // Arrange
@@ -804,9 +929,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $this->assertSame(0.85, $resultTransfer->getRelevanceWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testFindWeightCheckpointByIdReturnsNullForANonExistentId(): void
     {
         // Act
@@ -819,18 +941,22 @@ class SearchRankingOptimizerRepositoryTest extends Unit
     /**
      * @param string $source
      * @param float $relevanceWeight
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint
      */
-    protected function createTestWeightCheckpoint(string $source, float $relevanceWeight): SpySearchRankingWeightCheckpoint
-    {
+    protected function createTestWeightCheckpoint(
+        string $source,
+        float $relevanceWeight,
+        ?string $storeName = null,
+        ?string $localeName = null,
+    ): SpySearchRankingWeightCheckpoint {
         $weightCheckpointEntity = new SpySearchRankingWeightCheckpoint();
         $weightCheckpointEntity->setSource($source);
+        $weightCheckpointEntity->setStoreName($storeName ?? SharedSearchRankingConfig::DEFAULT_SCOPE_STORE_NAME);
+        $weightCheckpointEntity->setLocaleName($localeName ?? SharedSearchRankingConfig::DEFAULT_SCOPE_LOCALE_NAME);
         $weightCheckpointEntity->setRelevanceWeight($relevanceWeight);
-        $weightCheckpointEntity->setEntropyProbeResultSize(50);
-        $weightCheckpointEntity->setEntropyWeightExponent(1.5);
-        $weightCheckpointEntity->setEntropyWeightShiftMagnitude(0.1);
-        $weightCheckpointEntity->setIsEntropyWeightingEnabled(true);
+        $weightCheckpointEntity->setSpecificityBlendWeight(0.7);
+        $weightCheckpointEntity->setSpecificityWeightExponent(1.5);
+        $weightCheckpointEntity->setSpecificityWeightShiftMagnitude(0.1);
+        $weightCheckpointEntity->setIsSpecificityWeightingEnabled(true);
         $weightCheckpointEntity->setMetricWeights(json_encode([['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 1.0]]));
         $weightCheckpointEntity->save();
 

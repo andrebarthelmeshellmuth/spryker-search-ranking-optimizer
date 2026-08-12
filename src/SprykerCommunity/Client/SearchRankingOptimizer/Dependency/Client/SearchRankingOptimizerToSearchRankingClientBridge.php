@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client;
 
+use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
+
 class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRankingOptimizerToSearchRankingClientInterface
 {
     /**
@@ -24,11 +27,26 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
         $this->searchRankingClient = $searchRankingClient;
     }
 
-    /**
-     * @return bool
-     */
-    public function isEntropyWeightingEnabled(): bool
+    public function isSpecificityWeightingEnabled(): bool
     {
-        return $this->searchRankingClient->isEntropyWeightingEnabled();
+        return $this->searchRankingClient->isSpecificityWeightingEnabled();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getSpecificityProbeFieldSearchAnalyzers(): array
+    {
+        return $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers();
+    }
+
+    public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
+    {
+        return $this->searchRankingClient->createFunctionScoreBuilder();
+    }
+
+    public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
+    {
+        return $this->searchRankingClient->createQuerySpecificityCalculator();
     }
 }

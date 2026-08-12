@@ -1,0 +1,37 @@
+namespace: SprykerCommunityTest\Yves\SearchRankingOptimizerWidgetPresentation
+
+paths:
+    tests: .
+    data: _data
+    support: _support
+    output: _output
+
+coverage:
+    enabled: true
+    remote: false
+    include:
+        - 'packages/spryker-community/search-ranking-optimizer/src/*'
+
+suites:
+    Presentation:
+        path: Presentation
+        actor: SearchRankingOptimizerWidgetPresentationTester
+        modules:
+            enabled:
+                - Asserts
+                - \PyzTest\Shared\Testify\Helper\Environment
+                - \SprykerTest\Shared\Config\Helper\ConfigInit
+                - \SprykerTest\Shared\Testify\Helper\LocatorHelper:
+                    projectNamespaces: ['Pyz']
+                - WebDriver:
+                    url: ''
+                    browser: chrome
+                    window_size: 1920x1080
+                    # See the sibling Zed suite's codeception.yml for why host/capabilities are set this
+                    # way — same gotchas, confirmed live on search-debug's and search-ranking's own suites.
+                    host: webdriver
+                    restart: false
+                    capabilities:
+                        goog:chromeOptions:
+                            args: ['--headless', '--disable-gpu', '--disable-dev-shm-usage', '--no-sandbox']
+                - \SprykerTest\Shared\Application\Helper\YvesHelper

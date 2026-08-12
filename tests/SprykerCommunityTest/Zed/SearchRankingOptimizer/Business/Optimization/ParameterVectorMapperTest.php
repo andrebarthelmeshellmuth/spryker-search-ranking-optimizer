@@ -27,51 +27,44 @@ class ParameterVectorMapperTest extends Unit
     /**
      * @var float
      */
-    protected const ENTROPY_WEIGHT_EXPONENT_AT_RUN_START = 1.0;
+    protected const SPECIFICITY_CURVE_EXPONENT_AT_RUN_START = 1.0;
 
     /**
      * @var float
      */
-    protected const ENTROPY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START = 0.2;
+    protected const SPECIFICITY_WEIGHT_EXPONENT_AT_RUN_START = 1.0;
 
     /**
-     * @var int
+     * @var float
      */
-    protected const ENTROPY_PROBE_RESULT_SIZE_AT_RUN_START = 10;
+    protected const SPECIFICITY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START = 0.2;
 
     /**
-     * @return void
+     * @var float
      */
-    public function testGetDimensionCountIsFourForZeroActiveMetrics(): void
+    protected const SPECIFICITY_BLEND_WEIGHT_AT_RUN_START = 0.7;
+
+    public function testGetDimensionCountIsFiveForZeroActiveMetrics(): void
     {
         $mapper = $this->buildMapper([]);
 
-        $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 3 entropy dimensions.');
+        $this->assertSame(5, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 4 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
-    public function testGetDimensionCountIsFourForASingleActiveMetric(): void
+    public function testGetDimensionCountIsFiveForASingleActiveMetric(): void
     {
         $mapper = $this->buildMapper([['idSearchRankingMetric' => 1, 'name' => 'top_seller']]);
 
-        $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 3 entropy dimensions.');
+        $this->assertSame(5, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z values + 4 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
-    public function testGetDimensionCountIsRelevanceWeightPlusNMinusOneMetricsPlusThreeEntropyDimensionsForNActiveMetrics(): void
+    public function testGetDimensionCountIsRelevanceWeightPlusNMinusOneMetricsPlusFourSpecificityDimensionsForNActiveMetrics(): void
     {
         $mapper = $this->buildMapper($this->buildThreeMetrics());
 
-        $this->assertSame(6, $mapper->getDimensionCount(), '1 (relevanceWeight) + (3 - 1) free z values + 3 entropy dimensions.');
+        $this->assertSame(7, $mapper->getDimensionCount(), '1 (relevanceWeight) + (3 - 1) free z values + 4 specificity dimensions.');
     }
 
-    /**
-     * @return void
-     */
     public function testBoundsClampTheRelevanceWeightTrustRegionToStayWithinZeroAndOne(): void
     {
         // Arrange -- a relevanceWeight of 0.05 with a trust region wider than 0.05 must clip the lower
@@ -84,14 +77,11 @@ class ParameterVectorMapperTest extends Unit
         $this->assertLessThanOrEqual(1.0, $mapper->getUpperBounds()[0]);
     }
 
-    /**
-     * @return void
-     */
     public function testFreeZDimensionsAreBoundedByTheConfiguredZSpaceBoundNotLiterallyInfinite(): void
     {
         // Arrange -- both CmaEsAlgorithm (needs a finite midpoint for its default initial mean) and
         // DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given
-        // bounds) need real, finite bounds to even start a run -- confirmed live.
+        // bounds) need real, finite bounds to even start a run -- a real constraint, not a hypothetical one.
         $mapper = $this->buildMapper($this->buildThreeMetrics());
         $zSpaceBound = SearchRankingOptimizerConfig::getMetricWeightZSpaceBound();
 
@@ -104,12 +94,9 @@ class ParameterVectorMapperTest extends Unit
         $this->assertSame($zSpaceBound, $upperBounds[1]);
     }
 
-    /**
-     * @return void
-     */
-    public function testEntropyDimensionsAppearAsTheFinalThreeBoundsAfterTheMetricSimplexDimensions(): void
+    public function testSpecificityDimensionsAppearAsTheFinalFourBoundsAfterTheMetricSimplexDimensions(): void
     {
-        // Arrange -- 3 metrics => 2 free z dimensions, so the entropy triplet must start at index 3
+        // Arrange -- 3 metrics => 2 free z dimensions, so the specificity quadruplet must start at index 3
         // (index 0 = relevanceWeight, indices 1-2 = free z).
         $mapper = $this->buildMapper($this->buildThreeMetrics());
 
@@ -118,57 +105,52 @@ class ParameterVectorMapperTest extends Unit
         $upperBounds = $mapper->getUpperBounds();
 
         // Assert
-        $this->assertCount(6, $lowerBounds);
-        $this->assertCount(6, $upperBounds);
+        $this->assertCount(7, $lowerBounds);
+        $this->assertCount(7, $upperBounds);
 
-        $this->assertEqualsWithDelta(0.5, $lowerBounds[3], 1e-9, 'exponent trust region: 1.0 - 0.5');
-        $this->assertEqualsWithDelta(1.5, $upperBounds[3], 1e-9, 'exponent trust region: 1.0 + 0.5');
-        $this->assertEqualsWithDelta(0.1, $lowerBounds[4], 1e-9, 'shift magnitude trust region: 0.2 - 0.1');
-        $this->assertEqualsWithDelta(0.3, $upperBounds[4], 1e-9, 'shift magnitude trust region: 0.2 + 0.1');
-        $this->assertEqualsWithDelta(2.0, $lowerBounds[5], 1e-9, 'probe result size trust region: max(2, 10 - 10)');
-        $this->assertEqualsWithDelta(20.0, $upperBounds[5], 1e-9, 'probe result size trust region: min(50, 10 + 10)');
+        $this->assertEqualsWithDelta(0.5, $lowerBounds[3], 1e-9, 'curve exponent trust region: 1.0 - 0.5');
+        $this->assertEqualsWithDelta(1.5, $upperBounds[3], 1e-9, 'curve exponent trust region: 1.0 + 0.5');
+        $this->assertEqualsWithDelta(0.5, $lowerBounds[4], 1e-9, 'exponent trust region: 1.0 - 0.5');
+        $this->assertEqualsWithDelta(1.5, $upperBounds[4], 1e-9, 'exponent trust region: 1.0 + 0.5');
+        $this->assertEqualsWithDelta(0.1, $lowerBounds[5], 1e-9, 'shift magnitude trust region: 0.2 - 0.1');
+        $this->assertEqualsWithDelta(0.3, $upperBounds[5], 1e-9, 'shift magnitude trust region: 0.2 + 0.1');
+        $this->assertEqualsWithDelta(0.5, $lowerBounds[6], 1e-9, 'blend weight trust region: max(0, 0.7 - 0.2)');
+        $this->assertEqualsWithDelta(0.9, $upperBounds[6], 1e-9, 'blend weight trust region: min(1, 0.7 + 0.2)');
     }
 
     /**
-     * Proves Task #51's fix: `search-ranking`'s entropy-aware relevance weighting has no live effect at all
-     * when disabled (see `RankEvalRunnerTest`'s own coverage of that gate), so spending any search budget on
-     * these 3 dimensions in that case would be pure waste -- they must be omitted from the vector entirely,
+     * Proves `search-ranking`'s specificity-aware relevance weighting has no live effect at all when
+     * disabled (see `RankEvalRunnerTest`'s own coverage of that gate), so spending any search budget on
+     * these 4 dimensions in that case would be pure waste -- they must be omitted from the vector entirely,
      * not merely fixed like an excluded non-deterministic metric.
-     *
-     * @return void
      */
-    public function testEntropyDimensionsAreOmittedEntirelyWhenEntropyWeightingIsDisabled(): void
+    public function testSpecificityDimensionsAreOmittedEntirelyWhenSpecificityWeightingIsDisabled(): void
     {
         // Arrange
         $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, false);
 
         // Act & Assert
-        $this->assertSame(3, $mapper->getDimensionCount(), '1 (relevanceWeight) + (3 - 1) free z values + 0 entropy dimensions.');
+        $this->assertSame(3, $mapper->getDimensionCount(), '1 (relevanceWeight) + (3 - 1) free z values + 0 specificity dimensions.');
         $this->assertCount(3, $mapper->getLowerBounds());
         $this->assertCount(3, $mapper->getUpperBounds());
     }
 
-    /**
-     * @return void
-     */
-    public function testMapVectorToConfigurationCarriesTheAtRunStartEntropyValuesUnchangedWhenDisabled(): void
+    public function testMapVectorToConfigurationCarriesTheAtRunStartSpecificityValuesUnchangedWhenDisabled(): void
     {
-        // Arrange -- no entropy tail on this vector at all (3 metrics => 1 relevanceWeight + 2 free z).
+        // Arrange -- no specificity tail on this vector at all (3 metrics => 1 relevanceWeight + 2 free z).
         $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, false);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5], 12.0, 3.0);
 
         // Assert -- exactly the constants passed into buildMapper() as the "at run start" values.
-        $this->assertSame(static::ENTROPY_WEIGHT_EXPONENT_AT_RUN_START, $configurationTransfer->getEntropyWeightExponent());
-        $this->assertSame(static::ENTROPY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START, $configurationTransfer->getEntropyWeightShiftMagnitude());
-        $this->assertSame(static::ENTROPY_PROBE_RESULT_SIZE_AT_RUN_START, $configurationTransfer->getEntropyProbeResultSize());
+        $this->assertSame(static::SPECIFICITY_CURVE_EXPONENT_AT_RUN_START, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(static::SPECIFICITY_WEIGHT_EXPONENT_AT_RUN_START, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(static::SPECIFICITY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(static::SPECIFICITY_BLEND_WEIGHT_AT_RUN_START, $configurationTransfer->getSpecificityBlendWeight());
     }
 
-    /**
-     * @return void
-     */
-    public function testMapConfigurationToVectorOmitsTheEntropyTailWhenDisabled(): void
+    public function testMapConfigurationToVectorOmitsTheSpecificityTailWhenDisabled(): void
     {
         // Arrange
         $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, false);
@@ -176,34 +158,33 @@ class ParameterVectorMapperTest extends Unit
             ->setRelevanceWeight(0.75)
             ->setRelevanceSaturationPoint(12.0)
             ->setMetricWeights(['top_seller' => 0.4, 'pdp_impressions' => 0.3, 'random' => 0.3])
-            ->setEntropyWeightExponent(1.0)
-            ->setEntropyWeightShiftMagnitude(0.2)
-            ->setEntropyProbeResultSize(10);
+            ->setSpecificityCurveExponent(1.0)
+            ->setSpecificityWeightExponent(1.0)
+            ->setSpecificityWeightShiftMagnitude(0.2)
+            ->setSpecificityBlendWeight(0.7);
 
         // Act
         $vector = $mapper->mapConfigurationToVector($configurationTransfer);
 
-        // Assert -- 1 (relevanceWeight) + 2 free z, no entropy tail, regardless of what the transfer carries.
+        // Assert -- 1 (relevanceWeight) + 2 free z, no specificity tail, regardless of what the transfer carries.
         $this->assertCount(3, $vector);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationProducesMetricWeightsSummingToOneKeyedByName(): void
     {
         // Arrange
         $mapper = $this->buildMapper($this->buildThreeMetrics());
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.6, $configurationTransfer->getRelevanceWeight());
         $this->assertSame(12.0, $configurationTransfer->getRelevanceSaturationPoint());
-        $this->assertSame(1.0, $configurationTransfer->getEntropyWeightExponent());
-        $this->assertSame(0.2, $configurationTransfer->getEntropyWeightShiftMagnitude());
-        $this->assertSame(10, $configurationTransfer->getEntropyProbeResultSize());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.7, $configurationTransfer->getSpecificityBlendWeight());
 
         $metricWeights = $configurationTransfer->getMetricWeights();
         $this->assertEqualsWithDelta(1.0, array_sum($metricWeights), 1e-9);
@@ -214,30 +195,23 @@ class ParameterVectorMapperTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
-    public function testMapVectorToConfigurationRoundsAndClampsEntropyProbeResultSizeToAnInteger(): void
+    public function testMapVectorToConfigurationClampsSpecificityBlendWeightToItsOwnAbsoluteBounds(): void
     {
-        // Arrange -- the vector is a plain continuous float per dimension (no algorithm shipped by
-        // blackbox-optimizer enforces ParameterType::Integer), so a fractional or out-of-absolute-range
-        // value must still be turned into a safe, usable integer.
+        // Arrange -- specificityBlendWeight's trust region [0.5, 0.9] (see
+        // testSpecificityDimensionsAppearAsTheFinalFourBoundsAfterTheMetricSimplexDimensions), unlike the
+        // old entropyProbeResultSize this replaces, it is a plain continuous float bounded to [0;1] overall
+        // -- no integer rounding involved.
         $mapper = $this->buildMapper([]);
 
         // Act
-        $rounded = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 7.6], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, -100.0], 12.0);
-        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 100.0], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 100.0], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, -100.0], 12.0, 3.0);
 
         // Assert
-        $this->assertSame(8, $rounded->getEntropyProbeResultSize());
-        $this->assertSame(2, $clampedLow->getEntropyProbeResultSize(), 'clamped to the absolute lower bound of 2');
-        $this->assertSame(50, $clampedHigh->getEntropyProbeResultSize(), 'clamped to the absolute upper bound of 50');
+        $this->assertEqualsWithDelta(0.9, $clampedHigh->getSpecificityBlendWeight(), 1e-9, 'clamped to this run\'s own trust-region upper bound of 0.7 + 0.2');
+        $this->assertEqualsWithDelta(0.5, $clampedLow->getSpecificityBlendWeight(), 1e-9, 'clamped to this run\'s own trust-region lower bound of 0.7 - 0.2');
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationClampsRelevanceWeightToItsOwnTrustRegionBounds(): void
     {
         // Arrange -- default relevanceWeightAtRunStart=0.75, trust region max distance 0.15 => [0.6, 0.9].
@@ -248,84 +222,109 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([5.0, 1.0, 0.2, 10.0], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([-5.0, 1.0, 0.2, 10.0], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([5.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([-5.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.9, $clampedHigh->getRelevanceWeight());
         $this->assertSame(0.6, $clampedLow->getRelevanceWeight());
     }
 
-    /**
-     * @return void
-     */
-    public function testMapVectorToConfigurationClampsEntropyWeightExponentAndShiftMagnitudeToTheirOwnTrustRegionBounds(): void
+    public function testMapVectorToConfigurationClampsSpecificityCurveExponentToItsOwnTrustRegionBounds(): void
     {
-        // Arrange -- exponent trust region [0.5, 1.5], shift magnitude trust region [0.1, 0.3] (see
-        // testEntropyDimensionsAppearAsTheFinalThreeBoundsAfterTheMetricSimplexDimensions).
+        // Arrange -- curve exponent trust region [0.5, 1.5] (see
+        // testSpecificityDimensionsAppearAsTheFinalFourBoundsAfterTheMetricSimplexDimensions). Checked in
+        // isolation from specificityWeightExponent -- an accidental index swap between the two would make
+        // this test fail even though the sibling exponent-clamping test above would still pass.
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 99.0, 99.0, 10.0], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([0.75, -99.0, -99.0, 10.0], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 99.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, -99.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
-        $this->assertEqualsWithDelta(1.5, $clampedHigh->getEntropyWeightExponent(), 1e-9);
-        $this->assertEqualsWithDelta(0.3, $clampedHigh->getEntropyWeightShiftMagnitude(), 1e-9);
-        $this->assertEqualsWithDelta(0.5, $clampedLow->getEntropyWeightExponent(), 1e-9);
-        $this->assertEqualsWithDelta(0.1, $clampedLow->getEntropyWeightShiftMagnitude(), 1e-9);
+        $this->assertEqualsWithDelta(1.5, $clampedHigh->getSpecificityCurveExponent(), 1e-9);
+        $this->assertEqualsWithDelta(0.5, $clampedLow->getSpecificityCurveExponent(), 1e-9);
+        // The neighboring dimensions must be untouched by clamping the curve exponent alone.
+        $this->assertSame(1.0, $clampedHigh->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $clampedHigh->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.7, $clampedHigh->getSpecificityBlendWeight());
     }
 
-    /**
-     * @return void
-     */
+    public function testMapVectorToConfigurationClampsSpecificityWeightExponentAndShiftMagnitudeToTheirOwnTrustRegionBounds(): void
+    {
+        // Arrange -- exponent trust region [0.5, 1.5], shift magnitude trust region [0.1, 0.3] (see
+        // testSpecificityDimensionsAppearAsTheFinalFourBoundsAfterTheMetricSimplexDimensions).
+        $mapper = $this->buildMapper([]);
+
+        // Act
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 99.0, 99.0, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, -99.0, -99.0, 0.7], 12.0, 3.0);
+
+        // Assert
+        $this->assertEqualsWithDelta(1.5, $clampedHigh->getSpecificityWeightExponent(), 1e-9);
+        $this->assertEqualsWithDelta(0.3, $clampedHigh->getSpecificityWeightShiftMagnitude(), 1e-9);
+        $this->assertEqualsWithDelta(0.5, $clampedLow->getSpecificityWeightExponent(), 1e-9);
+        $this->assertEqualsWithDelta(0.1, $clampedLow->getSpecificityWeightShiftMagnitude(), 1e-9);
+    }
+
     public function testMapVectorToConfigurationGivesTheSingleMetricWeightOneExactly(): void
     {
         // Arrange
         $mapper = $this->buildMapper([['idSearchRankingMetric' => 1, 'name' => 'top_seller']]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['top_seller' => 1.0], $configurationTransfer->getMetricWeights());
     }
 
     /**
-     * @return void
+     * Neither saturation point is searched (both are Calibration's own concern), but both have to reach
+     * the candidate transfer unchanged: the evaluation path reads them straight off it, so a candidate
+     * missing one would be scored under a different normalization constant than the live baseline it is
+     * being compared against.
      */
+    public function testMapVectorToConfigurationPassesBothSaturationPointsThroughUnchanged(): void
+    {
+        // Arrange
+        $mapper = $this->buildMapper($this->buildThreeMetrics());
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, -1.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+
+        // Assert
+        $this->assertSame(12.0, $configurationTransfer->getRelevanceSaturationPoint());
+        $this->assertSame(3.0, $configurationTransfer->getSpecificitySaturationPoint());
+    }
+
     public function testMapVectorToConfigurationProducesNoMetricWeightsAtAllForZeroActiveMetrics(): void
     {
         // Arrange
         $mapper = $this->buildMapper([]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame([], $configurationTransfer->getMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorIsTheInverseOfMapVectorToConfiguration(): void
     {
         // Arrange
         $mapper = $this->buildMapper($this->buildThreeMetrics());
-        $originalVector = [0.65, 0.8, -1.3, 1.0, 0.2, 10.0];
+        $originalVector = [0.65, 0.8, -1.3, 1.3, 1.0, 0.2, 0.7];
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0, 3.0);
         $roundTrippedVector = $mapper->mapConfigurationToVector($configurationTransfer);
 
         // Assert
         $this->assertEqualsWithDelta($originalVector, $roundTrippedVector, 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapConfigurationToVectorDefaultsAMissingMetricWeightToZero(): void
     {
         // Arrange -- a live configuration that predates one of the currently-active metrics being added
@@ -340,7 +339,7 @@ class ParameterVectorMapperTest extends Unit
         $vector = $mapper->mapConfigurationToVector($configurationTransfer);
 
         // Assert -- must not throw, and must produce a finite, usable vector.
-        $this->assertCount(6, $vector);
+        $this->assertCount(7, $vector);
 
         foreach ($vector as $value) {
             $this->assertFalse(is_nan($value));
@@ -348,14 +347,11 @@ class ParameterVectorMapperTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
-    public function testMapConfigurationToVectorFallsBackToSensibleEntropyDefaultsWhenUnset(): void
+    public function testMapConfigurationToVectorFallsBackToSensibleSpecificityDefaultsWhenUnset(): void
     {
-        // Arrange -- entropy fields are only ever populated once search-ranking's entropy weighting
-        // feature has actually been configured; an older/never-touched live configuration may still carry
-        // nulls for all 3.
+        // Arrange -- specificity fields are only ever populated once search-ranking's specificity
+        // weighting feature has actually been configured; an older/never-touched live configuration may
+        // still carry nulls for all 4.
         $mapper = $this->buildMapper([]);
         $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight(0.75)
@@ -365,13 +361,11 @@ class ParameterVectorMapperTest extends Unit
         // Act
         $vector = $mapper->mapConfigurationToVector($configurationTransfer);
 
-        // Assert
-        $this->assertEqualsWithDelta([0.75, 1.0, 0.0, 10.0], $vector, 1e-9);
+        // Assert -- specificityCurveExponent defaults to 1.0, the Hill-equation identity value that
+        // reproduces the pre-generalization curve exactly, same reasoning as the other 3 defaults.
+        $this->assertEqualsWithDelta([0.75, 1.0, 1.0, 0.0, 0.7], $vector, 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationHoldsAFixedMetricWeightConstantAndScalesTheOptimizableSimplexToFillTheRemainingBudget(): void
     {
         // Arrange -- "random" is excluded from the search (e.g. a non-deterministic formula) and pinned at
@@ -384,7 +378,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.4]);
 
         // Act -- all-zero z's produce a uniform split between the two optimizable metrics.
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 0.0, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 0.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $metricWeights = $configurationTransfer->getMetricWeights();
@@ -399,8 +393,6 @@ class ParameterVectorMapperTest extends Unit
      * weights that were never renormalized, or floating-point drift across many small weights) -- every
      * optimizable metric correctly gets zero either way, but the fixed weights themselves must be
      * rescaled down to sum to exactly 1, not left silently summing to more than that.
-     *
-     * @return void
      */
     public function testMapVectorToConfigurationRescalesFixedWeightsDownWhenTheyAloneExceedTheFullBudget(): void
     {
@@ -411,7 +403,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.7, 'other_random' => 0.5]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $metricWeights = $configurationTransfer->getMetricWeights();
@@ -421,9 +413,6 @@ class ParameterVectorMapperTest extends Unit
         $this->assertEqualsWithDelta(0.5 / 1.2, $metricWeights['other_random'], 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationGivesTheSingleOptimizableMetricTheFullRemainingBudget(): void
     {
         // Arrange
@@ -433,49 +422,175 @@ class ParameterVectorMapperTest extends Unit
         );
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['random' => 0.4, 'top_seller' => 0.6], $configurationTransfer->getMetricWeights());
     }
 
-    /**
-     * @return void
-     */
     public function testMapVectorToConfigurationReturnsOnlyTheFixedWeightsWhenNothingIsOptimizable(): void
     {
         // Arrange -- every active metric turned out non-deterministic; there's nothing left to search.
         $mapper = $this->buildMapper([], ['random' => 1.0]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 0.2, 10.0], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['random' => 1.0], $configurationTransfer->getMetricWeights());
+    }
+
+    public function testGetDimensionCountOmitsRelevanceWeightWhenFixed(): void
+    {
+        $mapper = $this->buildMapper([], [], 0.75, true, 0.42);
+
+        $this->assertSame(4, $mapper->getDimensionCount(), '0 (relevanceWeight fixed) + 0 free z + 4 specificity dimensions.');
+    }
+
+    public function testGetDimensionCountOmitsAnIndividuallyFixedSpecificityKnob(): void
+    {
+        $mapper = $this->buildMapper([], [], 0.75, true, null, 0.9);
+
+        $this->assertSame(4, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z + 3 free specificity dimensions (curve exponent fixed).');
+    }
+
+    public function testGetDimensionCountIgnoresFixedSpecificityValuesWhenWeightingIsDisabled(): void
+    {
+        // Arrange -- pinning individual knobs is meaningless once the whole block is disabled; the fixed
+        // values passed here must simply be ignored, same as the AtRunStart values already are elsewhere.
+        $mapper = $this->buildMapper([], [], 0.75, false, null, 0.9, 0.9, 0.9, 0.9);
+
+        $this->assertSame(1, $mapper->getDimensionCount(), '1 (relevanceWeight) + 0 free z + 0 specificity dimensions (block disabled).');
+    }
+
+    public function testFixingEveryScalarLeavesOnlyTheMetricSimplexDimensions(): void
+    {
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.5, 1.0, 1.0, 0.2, 0.7);
+
+        $this->assertSame(2, $mapper->getDimensionCount(), '0 (relevanceWeight fixed) + (3 - 1) free z + 0 specificity dimensions (all fixed).');
+        $this->assertCount(2, $mapper->getLowerBounds());
+        $this->assertCount(2, $mapper->getUpperBounds());
+    }
+
+    public function testGetBoundsOmitTheFixedRelevanceWeightBound(): void
+    {
+        // Arrange -- 0 metrics, specificity disabled, so with relevanceWeight fixed there is nothing left
+        // to bound at all.
+        $mapper = $this->buildMapper([], [], 0.75, false, 0.42);
+
+        $this->assertSame([], $mapper->getLowerBounds());
+        $this->assertSame([], $mapper->getUpperBounds());
+    }
+
+    public function testMapVectorToConfigurationUsesTheFixedRelevanceWeightInsteadOfReadingTheVector(): void
+    {
+        // Arrange -- relevanceWeight fixed, so the vector carries only the 4 (free) specificity dimensions.
+        $mapper = $this->buildMapper([], [], 0.75, true, 0.42);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+
+        // Assert
+        $this->assertSame(0.42, $configurationTransfer->getRelevanceWeight(), 'The fixed value, exactly as passed in -- never read off the vector.');
+        $this->assertSame([], $configurationTransfer->getMetricWeights());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.7, $configurationTransfer->getSpecificityBlendWeight());
+    }
+
+    public function testMapVectorToConfigurationUsesAFixedSpecificityKnobInsteadOfReadingTheVectorWhileLeavingSiblingsFree(): void
+    {
+        // Arrange -- only specificityBlendWeight fixed; relevanceWeight + the other 3 knobs stay free, so
+        // the vector carries exactly 4 values (no blend weight slot).
+        $mapper = $this->buildMapper([], [], 0.75, true, null, null, null, null, 0.65);
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2], 12.0, 3.0);
+
+        // Assert
+        $this->assertSame(0.75, $configurationTransfer->getRelevanceWeight());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityCurveExponent());
+        $this->assertSame(1.0, $configurationTransfer->getSpecificityWeightExponent());
+        $this->assertSame(0.2, $configurationTransfer->getSpecificityWeightShiftMagnitude());
+        $this->assertSame(0.65, $configurationTransfer->getSpecificityBlendWeight(), 'The fixed value, exactly as passed in -- never read off the vector.');
+    }
+
+    public function testMapConfigurationToVectorOmitsAFixedRelevanceWeightAndAFixedSpecificityKnob(): void
+    {
+        // Arrange -- relevanceWeight AND specificityWeightExponent both fixed; the other 3 scalar slots
+        // (curve exponent, shift magnitude, blend weight) stay free, on top of the metric simplex's own
+        // free z.
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.42, null, 0.9);
+        $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.99)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setMetricWeights(['top_seller' => 0.4, 'pdp_impressions' => 0.3, 'random' => 0.3])
+            ->setSpecificityCurveExponent(1.1)
+            ->setSpecificityWeightExponent(0.9)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setSpecificityBlendWeight(0.7);
+
+        // Act
+        $vector = $mapper->mapConfigurationToVector($configurationTransfer);
+
+        // Assert -- 0 (relevanceWeight fixed) + 2 free z (3 metrics) + 3 free specificity (curve exponent,
+        // shift magnitude, blend weight) = 5. The fixed relevanceWeight (0.99 on the transfer, ignored) and
+        // fixed specificityWeightExponent are both absent from the vector entirely.
+        $this->assertCount(5, $vector);
+    }
+
+    public function testMapConfigurationToVectorIsTheInverseOfMapVectorToConfigurationWithMixedFixedAndFreeScalars(): void
+    {
+        // Arrange -- relevanceWeight and specificityBlendWeight fixed, the rest free: 2 free z (3 metrics)
+        // + 3 free specificity (curve exponent, weight exponent, shift magnitude) = 5.
+        $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, true, 0.6, null, null, null, 0.65);
+        $originalVector = [0.8, -1.3, 1.3, 1.0, 0.2];
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0, 3.0);
+        $roundTrippedVector = $mapper->mapConfigurationToVector($configurationTransfer);
+
+        // Assert
+        $this->assertEqualsWithDelta($originalVector, $roundTrippedVector, 1e-9);
     }
 
     /**
      * @param array<int, array{idSearchRankingMetric: int, name: string}> $metrics
      * @param array<string, float> $fixedMetricWeights
      * @param float $relevanceWeightAtRunStart
-     * @param bool $entropyWeightingEnabled
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper
+     * @param bool $specificityWeightingEnabled
+     * @param float|null $fixedRelevanceWeight
+     * @param float|null $fixedSpecificityCurveExponent
+     * @param float|null $fixedSpecificityWeightExponent
+     * @param float|null $fixedSpecificityWeightShiftMagnitude
+     * @param float|null $fixedSpecificityBlendWeight
      */
     protected function buildMapper(
         array $metrics,
         array $fixedMetricWeights = [],
         float $relevanceWeightAtRunStart = 0.75,
-        bool $entropyWeightingEnabled = true,
+        bool $specificityWeightingEnabled = true,
+        ?float $fixedRelevanceWeight = null,
+        ?float $fixedSpecificityCurveExponent = null,
+        ?float $fixedSpecificityWeightExponent = null,
+        ?float $fixedSpecificityWeightShiftMagnitude = null,
+        ?float $fixedSpecificityBlendWeight = null,
     ): ParameterVectorMapper {
         return new ParameterVectorMapper(
             $metrics,
             $fixedMetricWeights,
             $relevanceWeightAtRunStart,
-            static::ENTROPY_WEIGHT_EXPONENT_AT_RUN_START,
-            static::ENTROPY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START,
-            static::ENTROPY_PROBE_RESULT_SIZE_AT_RUN_START,
-            $entropyWeightingEnabled,
+            static::SPECIFICITY_CURVE_EXPONENT_AT_RUN_START,
+            static::SPECIFICITY_WEIGHT_EXPONENT_AT_RUN_START,
+            static::SPECIFICITY_WEIGHT_SHIFT_MAGNITUDE_AT_RUN_START,
+            static::SPECIFICITY_BLEND_WEIGHT_AT_RUN_START,
+            $specificityWeightingEnabled,
+            $fixedRelevanceWeight,
+            $fixedSpecificityCurveExponent,
+            $fixedSpecificityWeightExponent,
+            $fixedSpecificityWeightShiftMagnitude,
+            $fixedSpecificityBlendWeight,
         );
     }
 

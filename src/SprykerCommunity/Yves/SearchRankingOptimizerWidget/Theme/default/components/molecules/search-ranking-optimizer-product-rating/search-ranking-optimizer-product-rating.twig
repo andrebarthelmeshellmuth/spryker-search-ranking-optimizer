@@ -13,6 +13,7 @@
     searchTerm: required,
     idProductAbstract: required,
     csrfToken: required,
+    activeRatingType: null,
 } %}
 
 {# component.twig (the base every molecule extends) only ever puts `config.name` on the outer tag's own
@@ -55,7 +56,15 @@
            (the filter/sort form) — without an explicit type a <button> defaults to type="submit", and
            an accidental click would submit the filter form (same reasoning as search-debug's own
            trigger/pin buttons). #}
-        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--heart {{ config.jsName }}__button" data-rating-type="heart" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.heart' | trans }}">
+        {# aria-pressed starts already true/false per button from data.activeRatingType, which the SRP
+           template supplies from one batched getSearchRelevanceRatings() call per page (see the README's
+           integration snippet) so an admin revisiting a search term they already rated sees their prior
+           judgment reflected immediately. Leave activeRatingType unset and every button renders unpressed
+           on every load, however many judgments are actually stored. It is the same attribute the .ts
+           click handler reads/writes at runtime, so no separate JS-side init state is needed; the scss's
+           own [aria-pressed='true'] rules apply identically whether that state came from a click or from
+           this initial render. #}
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--heart {{ config.jsName }}__button" data-rating-type="heart" aria-pressed="{{ data.activeRatingType == 'heart' ? 'true' : 'false' }}" title="{{ 'search_ranking_optimizer.rate.heart' | trans }}">
             {# Inlined rather than referenced via `atom('icon')`, same reasoning search-debug's own pin
                icon documents: a shop's icon sprite has no guaranteed heart/check/x symbols, so relying
                on the atom would render empty buttons until the adopter hand-added them. Standard
@@ -65,13 +74,13 @@
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
         </button>
-        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--check {{ config.jsName }}__button" data-rating-type="check" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.check' | trans }}">
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--check {{ config.jsName }}__button" data-rating-type="check" aria-pressed="{{ data.activeRatingType == 'check' ? 'true' : 'false' }}" title="{{ 'search_ranking_optimizer.rate.check' | trans }}">
             {# Material Symbols "check_circle" glyph. #}
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
         </button>
-        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--x {{ config.jsName }}__button" data-rating-type="x" aria-pressed="false" title="{{ 'search_ranking_optimizer.rate.x' | trans }}">
+        <button type="button" class="{{ config.name }}__button {{ config.name }}__button--x {{ config.jsName }}__button" data-rating-type="x" aria-pressed="{{ data.activeRatingType == 'x' ? 'true' : 'false' }}" title="{{ 'search_ranking_optimizer.rate.x' | trans }}">
             {# Material Symbols "cancel" glyph. #}
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>

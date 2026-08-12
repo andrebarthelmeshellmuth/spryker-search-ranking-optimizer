@@ -1,0 +1,21 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Assess Rated Search Queries' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block action %}
+    {{ viewActionButton('/search-ranking-optimizer/saturation-point-calibration', 'Saturation Point Calibration' | trans) }}
+{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Assess Rated Queries' } %}
+        {% block widget_content %}
+            <p>
+                One row per canonical search term that has accumulated at least one relevance rating from
+                the storefront's heart/check/X widget, newest activity first. Importance weight defaults to
+                1 for every query until a Query Curator assigns real importance here.
+            </p>
+            {{ queryTable | raw }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

@@ -14,7 +14,7 @@ namespace SprykerCommunityTest\GroundTruth\SearchRankingOptimizer;
 // matching *Test.php/*Cest.php, so a plain support class living alongside these tests (not matching either
 // pattern) is never autoloaded at all. An explicit require_once is the most surgical fix -- no change to
 // the demoshop's own composer.json (never committed, see the project's git workflow rules) needed.
-require_once __DIR__ . '/EntropyForcedEnabledFacadeDecorator.php';
+require_once __DIR__ . '/SpecificityForcedEnabledFacadeDecorator.php';
 
 use Codeception\Test\Unit;
 use Elastica\Client;
@@ -26,13 +26,16 @@ use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\StoreTransfer;
 use LogicException;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStoreClientInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
-use SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
@@ -44,6 +47,7 @@ use SprykerCommunity\Zed\SearchRanking\Business\SearchRankingFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
@@ -90,6 +94,15 @@ abstract class AbstractGroundTruthTest extends Unit
     protected const LOCALE_NAME = 'en_US';
 
     /**
+     * `runNextOptimization()` processes the OLDEST queued run across the whole shop, not scoped to this
+     * test's own (store, locale) or run id -- see {@see runRealOptimization()}'s own docblock for why a
+     * bounded drain loop, not a single call, is needed to reliably get back the run this test just queued.
+     *
+     * @var int
+     */
+    protected const MAX_QUEUE_DRAIN_ATTEMPTS = 20;
+
+    /**
      * Large enough that the real, already-rated queries in this shop (whatever their own importanceWeight)
      * contribute a statistically negligible fraction of the weighted aggregate rank_eval score -- see this
      * class's own docblock for why this is preferred over touching any real query's weight.
@@ -103,55 +116,28 @@ abstract class AbstractGroundTruthTest extends Unit
      */
     protected const CUSTOMER_REFERENCE = 'ground-truth-test';
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository|null
-     */
     protected ?SearchRankingOptimizerRepository $repository = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager|null
-     */
     protected ?SearchRankingOptimizerEntityManager $entityManager = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade|null
-     */
     protected ?SearchRankingOptimizerFacade $facade = null;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null
-     */
     protected ?SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade = null;
 
-    /**
-     * @var \Elastica\Client|null
-     */
     protected ?Client $elasticaClient = null;
 
-    /**
-     * @var string|null
-     */
     protected ?string $indexName = null;
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepository
-     */
     protected function getRepository(): SearchRankingOptimizerRepository
     {
         return $this->repository ??= new SearchRankingOptimizerRepository();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager
-     */
     protected function getEntityManager(): SearchRankingOptimizerEntityManager
     {
         return $this->entityManager ??= new SearchRankingOptimizerEntityManager();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade
-     */
     protected function getFacade(): SearchRankingOptimizerFacade
     {
         return $this->facade ??= new SearchRankingOptimizerFacade();
@@ -161,17 +147,12 @@ abstract class AbstractGroundTruthTest extends Unit
      * The real bridge production code already uses, wrapping a real, live `search-ranking` Zed facade --
      * reuses the exact same array-shape translation {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}
      * itself depends on, rather than re-deriving it from raw transfer collections here.
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
      */
     protected function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->searchRankingFacade ??= new SearchRankingOptimizerToSearchRankingFacadeBridge(new SearchRankingFacade());
     }
 
-    /**
-     * @return \Elastica\Client
-     */
     protected function getElasticaClient(): Client
     {
         if ($this->elasticaClient === null) {
@@ -182,9 +163,6 @@ abstract class AbstractGroundTruthTest extends Unit
         return $this->elasticaClient;
     }
 
-    /**
-     * @return string
-     */
     protected function getIndexName(): string
     {
         if ($this->indexName === null) {
@@ -197,11 +175,9 @@ abstract class AbstractGroundTruthTest extends Unit
 
     /**
      * Same id format {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::buildProductDocumentId()}
-     * uses, confirmed live against this shop's real index.
+     * uses, matching this shop's real index.
      *
      * @param int $idProductAbstract
-     *
-     * @return string
      */
     protected function buildProductDocumentId(int $idProductAbstract): string
     {
@@ -255,8 +231,8 @@ abstract class AbstractGroundTruthTest extends Unit
     {
         $names = [];
 
-        foreach ($this->getSearchRankingFacade()->getActiveMetrics() as $metric) {
-            $metricDetail = $this->getSearchRankingFacade()->findMetricDetail($metric['idSearchRankingMetric']);
+        foreach ($this->getSearchRankingFacade()->getActiveMetrics(static::STORE_NAME, static::LOCALE_NAME) as $metric) {
+            $metricDetail = $this->getSearchRankingFacade()->findMetricDetail($metric['idSearchRankingMetric'], static::STORE_NAME, static::LOCALE_NAME);
 
             if ($metricDetail !== null && preg_match('/\brandom\s*\(/', $metricDetail['formula']) === 1) {
                 continue;
@@ -287,7 +263,7 @@ abstract class AbstractGroundTruthTest extends Unit
     {
         $zeroedScores = [];
 
-        foreach ($this->getSearchRankingFacade()->getActiveMetrics() as $metric) {
+        foreach ($this->getSearchRankingFacade()->getActiveMetrics(static::STORE_NAME, static::LOCALE_NAME) as $metric) {
             $zeroedScores[$metric['name']] = 0.0;
         }
 
@@ -299,13 +275,10 @@ abstract class AbstractGroundTruthTest extends Unit
      * deliberately reuses a real, already-existing query's own search term (to guarantee it actually returns
      * both discovered products) -- so a literal duplicate would collide. Appending " ." (a punctuation-only
      * token most analyzers strip as noise, not merely trailing whitespace MySQL's own PAD SPACE collation
-     * comparison would silently treat as equal) sidesteps the DB constraint without meaningfully changing
-     * what Elasticsearch actually matches -- confirmed live (see this suite's own commit history / manual
-     * verification) that appending it does not change which real products the query returns.
+     * comparison would silently treat as equal) sidesteps the DB constraint without changing which real
+     * products the query returns.
      *
      * @param string $searchTerm
-     *
-     * @return int
      */
     protected function insertSyntheticQuery(string $searchTerm): int
     {
@@ -324,8 +297,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $idSearchRankingQuery
      * @param int $idProductAbstract
      * @param string $ratingType
-     *
-     * @return void
      */
     protected function insertSyntheticRating(int $idSearchRankingQuery, int $idProductAbstract, string $ratingType): void
     {
@@ -372,8 +343,6 @@ abstract class AbstractGroundTruthTest extends Unit
      *
      * @param int $idProductAbstract
      * @param array<string, float> $scores
-     *
-     * @return void
      */
     protected function overrideScores(int $idProductAbstract, array $scores): void
     {
@@ -383,9 +352,6 @@ abstract class AbstractGroundTruthTest extends Unit
         $this->getElasticaClient()->getIndex($this->getIndexName())->refresh();
     }
 
-    /**
-     * @return void
-     */
     protected function refreshIndex(): void
     {
         $this->getElasticaClient()->getIndex($this->getIndexName())->refresh();
@@ -399,8 +365,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * the query's own ratings (`onDelete="CASCADE"` on the FK).
      *
      * @param int $idSearchRankingQuery
-     *
-     * @return void
      */
     protected function deleteSyntheticQuery(int $idSearchRankingQuery): void
     {
@@ -517,24 +481,51 @@ abstract class AbstractGroundTruthTest extends Unit
      * -- the exact same call the Zed "Run now" button makes, no shortcuts. Blocks until done/failed since
      * this package's own console command does the same in-request for a shop this size (see the README).
      *
-     * @param string $algorithm
+     * `runNextOptimization()` (`OptimizationRunner::runNext()`) dequeues the SINGLE OLDEST queued run
+     * across the entire shop -- it has no store/locale/run-id scoping at all, by design (a real background
+     * worker just drains a global work queue in FIFO order, and each run is correctly scoped once it's
+     * picked up). That's fine for production, but not for this test: if anything else queued a run before
+     * this call -- another Presentation suite's own `OptimizationCest::queueingARunNeverSilentlyAppliesLive()`
+     * deliberately leaves one behind for its own default scope without processing it, and a real cron tick
+     * or another admin action could too -- the very next `runNextOptimization()` call can silently process
+     * THAT leftover run instead of the one this method just queued, and this method would misattribute its
+     * (unrelated) failure to this test. Confirmed empirically: running this suite right after the
+     * Presentation suite reproduces exactly this. So: drain and discard anything that isn't OUR run id,
+     * bounded by {@see MAX_QUEUE_DRAIN_ATTEMPTS} rather than looping forever if something is genuinely
+     * broken.
      *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
+     * @param string $algorithm
      */
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
     ): SearchRankingOptimizerRunTransfer {
-        $this->getFacade()->queueOptimizationRun(static::STORE_NAME, static::LOCALE_NAME, $algorithm);
-        $runTransfer = $this->getFacade()->runNextOptimization();
+        $queuedRunTransfer = $this->getFacade()->queueOptimizationRun(static::STORE_NAME, static::LOCALE_NAME, $algorithm);
+        $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
-        $this->assertNotNull($runTransfer, 'A run was just queued -- runNextOptimization() must pick it up.');
-        $this->assertSame(
-            SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
-            $runTransfer->getStatus(),
-            'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
-        );
+        for ($attempt = 0; $attempt < static::MAX_QUEUE_DRAIN_ATTEMPTS; $attempt++) {
+            $runTransfer = $this->getFacade()->runNextOptimization();
+            $this->assertNotNull($runTransfer, 'A run was just queued -- runNextOptimization() must pick it up.');
 
-        return $runTransfer;
+            if ($runTransfer->getIdSearchRankingOptimizerRunOrFail() !== $idQueuedRun) {
+                continue;
+            }
+
+            $this->assertSame(
+                SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
+                $runTransfer->getStatus(),
+                'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
+            );
+
+            return $runTransfer;
+        }
+
+        $this->fail(sprintf(
+            'Queued run #%d never came back from runNextOptimization() after %d attempts -- the shared run '
+                . 'queue has a bigger leftover backlog than expected (see this method\'s own docblock for why '
+                . 'the queue can contain other actors\' runs).',
+            $idQueuedRun,
+            static::MAX_QUEUE_DRAIN_ATTEMPTS,
+        ));
     }
 
     /**
@@ -551,8 +542,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param callable(\Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer): float $extractor
      * @param int $times
      * @param string $algorithm
-     *
-     * @return float
      */
     protected function runRealOptimizationRepeatedMedian(
         callable $extractor,
@@ -571,60 +560,135 @@ abstract class AbstractGroundTruthTest extends Unit
     }
 
     /**
-     * Scans every real, already-used search term this shop has (no hardcoded terms), computes the Shannon
-     * entropy of each one's real top-10 raw `_score` distribution the same way {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
-     * does live, and returns the most PEAKED (lowest entropy -- one dominant match) and most FLAT (highest
-     * entropy -- several near-equally-scored matches) terms found. Requires at least 2 scores per term to
-     * compute anything meaningful (same floor {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::applyEntropyWeighting()}
-     * itself enforces).
+     * Scans every real, already-used search term this shop has (no hardcoded terms), computes each one's
+     * real raw specificity (blended per-term idf, the same way {@see \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator}
+     * does live) via a real `_termvectors` probe, and returns the most SPECIFIC (highest idf -- a rare
+     * term like a SKU) and most UNSPECIFIC (lowest idf -- an only-common-words query) terms found. A term
+     * with zero query-term idf values at all (nothing survived the doc_freq>0 filter) is skipped -- same
+     * floor {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator} itself enforces.
      *
-     * @return array{0: string, 1: string} [mostPeakedSearchTerm, mostFlatSearchTerm]
+     * @return array{0: string, 1: string} [mostSpecificSearchTerm, mostUnspecificSearchTerm]
      */
-    protected function discoverPeakedAndFlatSearchTerms(): array
+    protected function discoverSpecificAndUnspecificSearchTerms(): array
     {
-        $entropyCalculator = new ShannonEntropyCalculator();
-        $entropyByTerm = [];
+        $termFrequencyFetcher = $this->createQueryTermFrequencyFetcher();
+        $querySpecificityCalculator = new QuerySpecificityCalculator();
+        $fieldToSearchAnalyzer = [
+            'full-text' => 'fulltext_search_analyzer',
+            'full-text-boosted' => 'fulltext_search_analyzer',
+        ];
+
+        $rawSpecificityByTerm = [];
 
         foreach ($this->getRepository()->findQueriesByStoreLocale(static::STORE_NAME, static::LOCALE_NAME) as $queryTransfer) {
             $searchTerm = $queryTransfer->getSearchTermOrFail();
-            $scores = array_values($this->fetchRawTextRelevanceScores($searchTerm));
-            $scores = array_slice($scores, 0, 10);
+            $termFrequencyResult = $termFrequencyFetcher->fetch($searchTerm, $fieldToSearchAnalyzer);
+            $docCount = $termFrequencyResult->getDocCount();
 
-            if (count($scores) < 2) {
+            if ($docCount <= 0) {
                 continue;
             }
 
-            $entropyByTerm[$searchTerm] = $entropyCalculator->calculateNormalizedEntropy($scores);
+            $idfByTerm = [];
+
+            foreach ($termFrequencyResult->getTermDocumentFrequencies() as $term => $documentFrequency) {
+                if ($documentFrequency <= 0) {
+                    continue;
+                }
+
+                $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
+            }
+
+            if ($idfByTerm === []) {
+                continue;
+            }
+
+            $rawSpecificityByTerm[$searchTerm] = $querySpecificityCalculator->calculateRawSpecificity($idfByTerm, 0.7);
         }
 
-        if (count($entropyByTerm) < 2) {
-            $this->markTestSkipped('Fewer than 2 real search terms have at least 2 raw catalog matches -- nothing to build an entropy ground truth on.');
+        if (count($rawSpecificityByTerm) < 2) {
+            $this->markTestSkipped('Fewer than 2 real search terms have usable corpus idf evidence -- nothing to build a specificity ground truth on.');
         }
 
-        asort($entropyByTerm);
-        $terms = array_keys($entropyByTerm);
+        asort($rawSpecificityByTerm);
+        $terms = array_keys($rawSpecificityByTerm);
 
-        return [$terms[0], $terms[count($terms) - 1]];
+        return [$terms[count($terms) - 1], $terms[0]];
+    }
+
+    /**
+     * @throws \LogicException
+     */
+    protected function createQueryTermFrequencyFetcher(): QueryTermFrequencyFetcher
+    {
+        $searchElasticsearchConfig = new SearchElasticsearchConfig();
+        $indexName = $this->getIndexName();
+
+        return new class (
+            $this->getElasticaClient(),
+            $searchElasticsearchConfig,
+            // Not NeverInvokedStoreClient -- that implements SearchElasticsearch's own store-client
+            // interface, not search-ranking's. Same "structurally required but never actually exercised"
+            // reasoning applies: resolveIndexName() below is overridden and never touches $storeClient.
+            new class implements SearchRankingToStoreClientInterface {
+            /**
+             * @throws \LogicException
+             *
+             * @return \Generated\Shared\Transfer\StoreTransfer
+             */
+            public function getCurrentStore(): StoreTransfer
+            {
+            throw new LogicException(__METHOD__ . '() was called -- resolveIndexName() below should have made this unreachable.');
+            }
+            },
+            $indexName,
+        ) extends QueryTermFrequencyFetcher
+        {
+            protected string $fixedIndexName;
+
+            /**
+             * @param \Elastica\Client $elasticaClient
+             * @param \Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig $searchElasticsearchConfig
+             * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStoreClientInterface $storeClient
+             * @param string $fixedIndexName
+             */
+            public function __construct(
+                Client $elasticaClient,
+                SearchElasticsearchConfig $searchElasticsearchConfig,
+                SearchRankingToStoreClientInterface $storeClient,
+                string $fixedIndexName,
+            ) {
+                parent::__construct($elasticaClient, $searchElasticsearchConfig, $storeClient);
+                $this->fixedIndexName = $fixedIndexName;
+            }
+
+            /**
+             * Overridden to bypass Store resolution entirely -- this ground-truth suite already resolves
+             * the real index name once via {@see AbstractGroundTruthTest::getIndexName()}.
+             */
+            protected function resolveIndexName(): string
+            {
+                return $this->fixedIndexName;
+            }
+        };
     }
 
     /**
      * Constructs and runs a REAL `OptimizationRunner` end-to-end, bypassing this package's own DI Factory
      * and the `search-ranking-optimizer:optimize` console command entirely -- necessary ONLY because
-     * `SearchRankingConfig::isEntropyWeightingEnabled()` is a hardcoded `return false;` with no project
+     * `SearchRankingConfig::isSpecificityWeightingEnabled()` is a hardcoded `return false;` with no project
      * override actually wired up anywhere (same finding as {@see \SprykerCommunityTest\Client\SearchRankingOptimizer\Search\RankEvalRunnerTest}'s
-     * own forced-enabled subclass), so the real Facade path would silently exclude the entropy dimensions
-     * from the search entirely (per Task #51's own fix) on a shop where the feature is off, as it is here.
-     * Every OTHER collaborator (repository, entity manager, rank evaluation runner, determinism checker,
-     * `ParameterVectorMapper`) is the real, unmodified production class -- only entropy's enablement is
+     * own forced-enabled subclass), so the real Facade path would silently exclude the specificity
+     * dimensions from the search entirely on a shop where the feature is off, as it is here. Every OTHER
+     * collaborator (repository, entity manager, rank evaluation runner, determinism checker,
+     * `ParameterVectorMapper`) is the real, unmodified production class -- only specificity's enablement is
      * forced, at exactly the 2 seams that ever check it.
      *
      * @param string $algorithm
      *
      * @throws \LogicException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
-    protected function runRealOptimizationWithEntropyForcedEnabled(
+    protected function runRealOptimizationWithSpecificityForcedEnabled(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
     ): SearchRankingOptimizerRunTransfer {
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
@@ -637,20 +701,15 @@ abstract class AbstractGroundTruthTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+            new QuerySpecificityCalculator(),
         ) extends RankEvalRunner {
-            /**
-             * @return bool
-             */
-            protected function isEntropyWeightingEnabled(): bool
+            protected function isSpecificityWeightingEnabled(): bool
             {
                 return true;
             }
         };
 
         $searchRankingClientDouble = new class ($forcedEnabledRankEvalRunner) implements SearchRankingOptimizerToSearchRankingClientInterface {
-            /**
-             * @var \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface
-             */
             protected RankEvalRunnerInterface $rankEvalRunner;
 
             /**
@@ -680,17 +739,46 @@ abstract class AbstractGroundTruthTest extends Unit
             }
 
             /**
-             * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
+             * @phpcsSuppress SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+             *   interface this test double implements; never called by the optimization path it exists for.
              *
-             * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
+             * @param string $searchTerm
+             * @param string $storeName
+             * @param float $blendWeight
+             *
+             * @throws \LogicException
+             */
+            public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
+            {
+                throw new LogicException('Not used by the optimization path this test double exists for.');
+            }
+
+            /**
+             * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
              */
             public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
             {
                 return $this->rankEvalRunner->evaluate($requestTransfer);
             }
+
+            /**
+             * @phpcsSuppress SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+             *   interface this test double implements; never called by the optimization path it exists for.
+             *
+             * @param string $searchTerm
+             * @param string $storeName
+             * @param string $localeName
+             * @param int $idProductAbstract
+             *
+             * @throws \LogicException
+             */
+            public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
+            {
+                throw new LogicException('Not used by the optimization path this test double exists for.');
+            }
         };
 
-        $forcedEnabledFacade = new EntropyForcedEnabledFacadeDecorator($this->getSearchRankingFacade());
+        $forcedEnabledFacade = new SpecificityForcedEnabledFacadeDecorator($this->getSearchRankingFacade());
 
         $optimizationRunner = new OptimizationRunner(
             $this->getRepository(),
@@ -698,6 +786,7 @@ abstract class AbstractGroundTruthTest extends Unit
             $forcedEnabledFacade,
             new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper()),
             new FormulaDeterminismChecker(),
+            new AlgorithmFactory(),
         );
 
         $queuedRunTransfer = $this->getEntityManager()->createOptimizerRun(
@@ -706,17 +795,35 @@ abstract class AbstractGroundTruthTest extends Unit
                 ->setLocaleName(static::LOCALE_NAME)
                 ->setAlgorithm($algorithm),
         );
+        $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
-        $optimizationRunner->runNext();
-        $runTransfer = $this->getRepository()->findOptimizerRunById($queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail());
+        // Same global-FIFO dequeue as OptimizationRunnerInterface::runNext() itself (this IS that real
+        // method, just constructed by hand here) -- see runRealOptimization()'s own docblock for why a
+        // bounded drain loop, not a single call, is needed to reliably process the run just queued above
+        // rather than some other leftover queued run.
+        for ($attempt = 0; $attempt < static::MAX_QUEUE_DRAIN_ATTEMPTS; $attempt++) {
+            $optimizationRunner->runNext();
+            $runTransfer = $this->getRepository()->findOptimizerRunById($idQueuedRun);
+            $this->assertNotNull($runTransfer, 'The run this method itself just created must still be findable by id.');
 
-        $this->assertNotNull($runTransfer);
-        $this->assertSame(
-            SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
-            $runTransfer->getStatus(),
-            'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
-        );
+            if ($runTransfer->getStatus() === SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED) {
+                continue;
+            }
 
-        return $runTransfer;
+            $this->assertSame(
+                SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE,
+                $runTransfer->getStatus(),
+                'Run failed: ' . ($runTransfer->getErrorMessage() ?? '(no error message)'),
+            );
+
+            return $runTransfer;
+        }
+
+        $this->fail(sprintf(
+            'Queued run #%d was still \'queued\' after %d runNext() attempts -- the shared run queue has a '
+                . 'bigger leftover backlog than expected.',
+            $idQueuedRun,
+            static::MAX_QUEUE_DRAIN_ATTEMPTS,
+        ));
     }
 }

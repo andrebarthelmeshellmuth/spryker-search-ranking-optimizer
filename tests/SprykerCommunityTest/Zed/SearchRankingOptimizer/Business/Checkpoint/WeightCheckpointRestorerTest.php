@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Checkpoint;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
@@ -30,9 +31,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class WeightCheckpointRestorerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testRestoreReturnsNullWhenCheckpointDoesNotExist(): void
     {
         // Arrange
@@ -48,26 +46,24 @@ class WeightCheckpointRestorerTest extends Unit
         $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
-        $result = $restorer->restore(999);
+        $result = $restorer->restore(999, 'DE', 'de_DE');
 
         // Assert
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
-    public function testRestoreWritesRelevanceWeightEntropyKnobsAndMetricWeightsBackThroughTheBridgeThenRecordsANewCheckpoint(): void
+    public function testRestoreWritesRelevanceWeightSpecificityKnobsAndMetricWeightsBackThroughTheBridgeThenRecordsANewCheckpoint(): void
     {
         // Arrange
         $checkpointTransfer = (new SearchRankingWeightCheckpointTransfer())
             ->setIdSearchRankingWeightCheckpoint(7)
             ->setSource('auto-tune')
             ->setRelevanceWeight(0.75)
-            ->setEntropyProbeResultSize(50)
-            ->setEntropyWeightExponent(2.0)
-            ->setEntropyWeightShiftMagnitude(0.25)
-            ->setIsEntropyWeightingEnabled(true)
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityCurveExponent(1.5)
+            ->setSpecificityWeightExponent(2.0)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setIsSpecificityWeightingEnabled(true)
             ->addMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(1)
@@ -85,34 +81,32 @@ class WeightCheckpointRestorerTest extends Unit
         $repositoryMock->method('findWeightCheckpointById')->with(7)->willReturn($checkpointTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with(0.75);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyProbeResultSize')->with(50);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightExponent')->with(2.0);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightShiftMagnitude')->with(0.25);
+        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with('DE', 'de_DE', 0.75);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityBlendWeight')->with('DE', 'de_DE', 0.7);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityCurveExponent')->with('DE', 'de_DE', 1.5);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightExponent')->with('DE', 'de_DE', 2.0);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightShiftMagnitude')->with('DE', 'de_DE', 0.25);
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
-                [1, 0.4, true],
-                [2, 0.6, true],
+                [1, 'DE', 'de_DE', 0.4, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE, true],
+                [2, 'DE', 'de_DE', 0.6, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE, true],
             ]);
-        $searchRankingFacadeMock->expects($this->never())->method('isEntropyWeightingEnabled');
+        $searchRankingFacadeMock->expects($this->never())->method('isSpecificityWeightingEnabled');
 
         $newCheckpointTransfer = (new SearchRankingWeightCheckpointTransfer())->setSource('manual');
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
-        $recorderMock->expects($this->once())->method('record')->with('manual')->willReturn($newCheckpointTransfer);
+        $recorderMock->expects($this->once())->method('record')->with('manual', 'DE', 'de_DE')->willReturn($newCheckpointTransfer);
 
         $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
-        $result = $restorer->restore(7);
+        $result = $restorer->restore(7, 'DE', 'de_DE');
 
         // Assert
         $this->assertSame($newCheckpointTransfer, $result);
     }
 
-    /**
-     * @return void
-     */
     public function testRestoreSkipsAMetricWeightThatNoLongerExistsWithoutFailing(): void
     {
         // Arrange
@@ -120,10 +114,11 @@ class WeightCheckpointRestorerTest extends Unit
             ->setIdSearchRankingWeightCheckpoint(7)
             ->setSource('auto-tune')
             ->setRelevanceWeight(0.75)
-            ->setEntropyProbeResultSize(50)
-            ->setEntropyWeightExponent(2.0)
-            ->setEntropyWeightShiftMagnitude(0.25)
-            ->setIsEntropyWeightingEnabled(false)
+            ->setSpecificityBlendWeight(0.7)
+            ->setSpecificityCurveExponent(1.5)
+            ->setSpecificityWeightExponent(2.0)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setIsSpecificityWeightingEnabled(false)
             ->addMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(999)
@@ -137,7 +132,7 @@ class WeightCheckpointRestorerTest extends Unit
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
         $searchRankingFacadeMock->expects($this->once())
             ->method('saveMetricWeight')
-            ->with(999, 1.0)
+            ->with(999, 'DE', 'de_DE', 1.0, SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE)
             ->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
@@ -146,7 +141,7 @@ class WeightCheckpointRestorerTest extends Unit
         $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
-        $result = $restorer->restore(7);
+        $result = $restorer->restore(7, 'DE', 'de_DE');
 
         // Assert
         $this->assertNotNull($result);

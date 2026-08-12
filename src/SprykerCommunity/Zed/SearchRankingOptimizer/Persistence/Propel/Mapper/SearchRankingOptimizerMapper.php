@@ -10,48 +10,47 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint;
 
 class SearchRankingOptimizerMapper
 {
     /**
-     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration $calibrationEntity
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationTransfer $calibrationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration $calibrationEntity
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
      */
     public function mapCalibrationEntityToTransfer(
-        SpySearchRankingCalibration $calibrationEntity,
-        SearchRankingCalibrationTransfer $calibrationTransfer,
-    ): SearchRankingCalibrationTransfer {
+        SpySearchRankingSaturationPointCalibration $calibrationEntity,
+        SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer,
+    ): SearchRankingSaturationPointCalibrationTransfer {
         return $calibrationTransfer
-            ->setIdSearchRankingCalibration($calibrationEntity->getIdSearchRankingCalibration())
+            ->setIdSearchRankingSaturationPointCalibration($calibrationEntity->getIdSearchRankingSaturationPointCalibration())
+            ->setCalibrationType($calibrationEntity->getCalibrationType())
             ->setRelevantProductCount($calibrationEntity->getRelevantProductCount())
             ->setStoreName($calibrationEntity->getStoreName())
             ->setLocaleName($calibrationEntity->getLocaleName())
             ->setStatus($calibrationEntity->getStatus())
             ->setComputedK($calibrationEntity->getComputedK())
-            ->setScoreMin($calibrationEntity->getScoreMin())
-            ->setScoreMax($calibrationEntity->getScoreMax())
-            ->setScoreMean($calibrationEntity->getScoreMean())
-            ->setScoreMedian($calibrationEntity->getScoreMedian())
-            ->setScoreP25($calibrationEntity->getScoreP25())
-            ->setScoreP75($calibrationEntity->getScoreP75())
+            ->setValueMin($calibrationEntity->getValueMin())
+            ->setValueMax($calibrationEntity->getValueMax())
+            ->setValueMean($calibrationEntity->getValueMean())
+            ->setValueMedian($calibrationEntity->getValueMedian())
+            ->setValueP25($calibrationEntity->getValueP25())
+            ->setValueP75($calibrationEntity->getValueP75())
             ->setSampleCount($calibrationEntity->getSampleCount())
             ->setCalculatedAt($calibrationEntity->getCalculatedAt()?->format(DATE_ATOM))
             ->setErrorMessage($calibrationEntity->getErrorMessage())
@@ -61,52 +60,46 @@ class SearchRankingOptimizerMapper
     }
 
     /**
-     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm $searchTermEntity
-     * @param \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer $searchTermTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer
+     * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm $searchTermEntity
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer $searchTermTransfer
      */
     public function mapCalibrationSearchTermEntityToTransfer(
-        SpySearchRankingCalibrationSearchTerm $searchTermEntity,
-        SearchRankingCalibrationSearchTermTransfer $searchTermTransfer,
-    ): SearchRankingCalibrationSearchTermTransfer {
+        SpySearchRankingSaturationPointCalibrationSearchTerm $searchTermEntity,
+        SearchRankingSaturationPointCalibrationSearchTermTransfer $searchTermTransfer,
+    ): SearchRankingSaturationPointCalibrationSearchTermTransfer {
         return $searchTermTransfer
-            ->setIdSearchRankingCalibrationSearchTerm($searchTermEntity->getIdSearchRankingCalibrationSearchTerm())
-            ->setFkSearchRankingCalibration($searchTermEntity->getFkSearchRankingCalibration())
+            ->setIdSearchRankingSaturationPointCalibrationSearchTerm($searchTermEntity->getIdSearchRankingSaturationPointCalibrationSearchTerm())
+            ->setFkSearchRankingSaturationPointCalibration($searchTermEntity->getFkSearchRankingSaturationPointCalibration())
             ->setSearchTerm($searchTermEntity->getSearchTerm())
             ->setProductsFound($searchTermEntity->getProductsFound())
-            ->setScores($this->explodeScores($searchTermEntity->getScores()));
+            ->setValues($this->explodeValues($searchTermEntity->getValues()));
     }
 
     /**
-     * @param string|null $scores
+     * @param string|null $values
      *
      * @return array<float>
      */
-    protected function explodeScores(?string $scores): array
+    protected function explodeValues(?string $values): array
     {
-        if ($scores === null || $scores === '') {
+        if ($values === null || $values === '') {
             return [];
         }
 
-        return array_map(static fn (string $value): float => (float)$value, explode(',', $scores));
+        return array_map(static fn (string $value): float => (float)$value, explode(',', $values));
     }
 
     /**
-     * @param array<float> $scores
-     *
-     * @return string|null
+     * @param array<float> $values
      */
-    public function implodeScores(array $scores): ?string
+    public function implodeValues(array $values): ?string
     {
-        return $scores === [] ? null : implode(',', $scores);
+        return $values === [] ? null : implode(',', $values);
     }
 
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery $queryEntity
      * @param \Generated\Shared\Transfer\SearchRankingQueryTransfer $queryTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     public function mapQueryEntityToTransfer(
         SpySearchRankingQuery $queryEntity,
@@ -125,8 +118,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating $ratingEntity
      * @param \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer $ratingTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function mapQueryRatingEntityToTransfer(
         SpySearchRankingQueryRating $ratingEntity,
@@ -145,8 +136,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation $evaluationEntity
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationTransfer $evaluationTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer
      */
     public function mapEvaluationEntityToTransfer(
         SpySearchRankingEvaluation $evaluationEntity,
@@ -164,8 +153,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint $weightCheckpointEntity
      * @param \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer $weightCheckpointTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
      */
     public function mapWeightCheckpointEntityToTransfer(
         SpySearchRankingWeightCheckpoint $weightCheckpointEntity,
@@ -174,11 +161,14 @@ class SearchRankingOptimizerMapper
         $weightCheckpointTransfer
             ->setIdSearchRankingWeightCheckpoint($weightCheckpointEntity->getIdSearchRankingWeightCheckpoint())
             ->setSource($weightCheckpointEntity->getSource())
+            ->setStoreName($weightCheckpointEntity->getStoreName())
+            ->setLocaleName($weightCheckpointEntity->getLocaleName())
             ->setRelevanceWeight($weightCheckpointEntity->getRelevanceWeight())
-            ->setEntropyProbeResultSize($weightCheckpointEntity->getEntropyProbeResultSize())
-            ->setEntropyWeightExponent($weightCheckpointEntity->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($weightCheckpointEntity->getEntropyWeightShiftMagnitude())
-            ->setIsEntropyWeightingEnabled($weightCheckpointEntity->getIsEntropyWeightingEnabled())
+            ->setSpecificityBlendWeight($weightCheckpointEntity->getSpecificityBlendWeight())
+            ->setSpecificityCurveExponent($weightCheckpointEntity->getSpecificityCurveExponent())
+            ->setSpecificityWeightExponent($weightCheckpointEntity->getSpecificityWeightExponent())
+            ->setSpecificityWeightShiftMagnitude($weightCheckpointEntity->getSpecificityWeightShiftMagnitude())
+            ->setIsSpecificityWeightingEnabled($weightCheckpointEntity->getIsSpecificityWeightingEnabled())
             ->setCreatedAt($weightCheckpointEntity->getCreatedAt()?->format(DATE_ATOM));
 
         foreach ($this->decodeMetricWeights($weightCheckpointEntity->getMetricWeights()) as $metricWeightTransfer) {
@@ -190,8 +180,6 @@ class SearchRankingOptimizerMapper
 
     /**
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $metricWeightTransfers
-     *
-     * @return string
      */
     public function encodeMetricWeights(array $metricWeightTransfers): string
     {
@@ -231,8 +219,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer
      */
     public function mapAutoTuneMetricConfigEntityToTransfer(
         SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
@@ -241,6 +227,8 @@ class SearchRankingOptimizerMapper
         return $autoTuneMetricConfigTransfer
             ->setIdSearchRankingAutoTuneMetricConfig($autoTuneMetricConfigEntity->getIdSearchRankingAutoTuneMetricConfig())
             ->setIdSearchRankingMetric($autoTuneMetricConfigEntity->getFkSearchRankingMetric())
+            ->setStoreName($autoTuneMetricConfigEntity->getStoreName())
+            ->setLocaleName($autoTuneMetricConfigEntity->getLocaleName())
             ->setAutoTuneThreshold($autoTuneMetricConfigEntity->getAutoTuneThreshold())
             ->setIsAutoUpdateEnabled($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled())
             ->setAutoUpdateScope($autoTuneMetricConfigEntity->getAutoUpdateScope())
@@ -250,14 +238,14 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
-     *
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig
      */
     public function mapAutoTuneMetricConfigTransferToEntity(
         SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer,
         SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity,
     ): SpySearchRankingAutoTuneMetricConfig {
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric($autoTuneMetricConfigTransfer->getIdSearchRankingMetricOrFail());
+        $autoTuneMetricConfigEntity->setStoreName($autoTuneMetricConfigTransfer->getStoreNameOrFail());
+        $autoTuneMetricConfigEntity->setLocaleName($autoTuneMetricConfigTransfer->getLocaleNameOrFail());
         $autoTuneMetricConfigEntity->setAutoTuneThreshold($autoTuneMetricConfigTransfer->getAutoTuneThreshold());
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled() ?? false);
         $autoTuneMetricConfigEntity->setAutoUpdateScope($autoTuneMetricConfigTransfer->getAutoUpdateScopeOrFail());
@@ -269,8 +257,6 @@ class SearchRankingOptimizerMapper
     /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun $optimizerRunEntity
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $optimizerRunTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer
      */
     public function mapOptimizerRunEntityToTransfer(
         SpySearchRankingOptimizerRun $optimizerRunEntity,
@@ -281,15 +267,24 @@ class SearchRankingOptimizerMapper
             ->setStoreName($optimizerRunEntity->getStoreName())
             ->setLocaleName($optimizerRunEntity->getLocaleName())
             ->setAlgorithm($optimizerRunEntity->getAlgorithm())
+            ->setIsTerminationCriteriaTrusted($optimizerRunEntity->getIsTerminationCriteriaTrusted())
+            ->setWarmStartFraction($optimizerRunEntity->getWarmStartFraction())
+            ->setFixedRelevanceWeight($optimizerRunEntity->getFixedRelevanceWeight())
+            ->setFixedSpecificityCurveExponent($optimizerRunEntity->getFixedSpecificityCurveExponent())
+            ->setFixedSpecificityWeightExponent($optimizerRunEntity->getFixedSpecificityWeightExponent())
+            ->setFixedSpecificityWeightShiftMagnitude($optimizerRunEntity->getFixedSpecificityWeightShiftMagnitude())
+            ->setFixedSpecificityBlendWeight($optimizerRunEntity->getFixedSpecificityBlendWeight())
             ->setStatus($optimizerRunEntity->getStatus())
             ->setTotalCount($optimizerRunEntity->getTotalCount())
             ->setProcessedCount($optimizerRunEntity->getProcessedCount())
+            ->setGenerationsUsed($optimizerRunEntity->getGenerationsUsed())
             ->setBaselineScore($optimizerRunEntity->getBaselineScore())
             ->setBestRelevanceWeight($optimizerRunEntity->getBestRelevanceWeight())
             ->setBestScore($optimizerRunEntity->getBestScore())
-            ->setBestEntropyWeightExponent($optimizerRunEntity->getBestEntropyWeightExponent())
-            ->setBestEntropyWeightShiftMagnitude($optimizerRunEntity->getBestEntropyWeightShiftMagnitude())
-            ->setBestEntropyProbeResultSize($optimizerRunEntity->getBestEntropyProbeResultSize())
+            ->setBestSpecificityBlendWeight($optimizerRunEntity->getBestSpecificityBlendWeight())
+            ->setBestSpecificityCurveExponent($optimizerRunEntity->getBestSpecificityCurveExponent())
+            ->setBestSpecificityWeightExponent($optimizerRunEntity->getBestSpecificityWeightExponent())
+            ->setBestSpecificityWeightShiftMagnitude($optimizerRunEntity->getBestSpecificityWeightShiftMagnitude())
             ->setCompletedAt($optimizerRunEntity->getCompletedAt()?->format(DATE_ATOM))
             ->setErrorMessage($optimizerRunEntity->getErrorMessage())
             ->setAppliedAt($optimizerRunEntity->getAppliedAt()?->format(DATE_ATOM))
@@ -301,6 +296,14 @@ class SearchRankingOptimizerMapper
         if ($bestMetricWeightsJson !== null) {
             foreach ($this->decodeMetricWeights($bestMetricWeightsJson) as $metricWeightTransfer) {
                 $optimizerRunTransfer->addBestMetricWeight($metricWeightTransfer);
+            }
+        }
+
+        $fixedMetricWeightsJson = $optimizerRunEntity->getFixedMetricWeights();
+
+        if ($fixedMetricWeightsJson !== null) {
+            foreach ($this->decodeMetricWeights($fixedMetricWeightsJson) as $metricWeightTransfer) {
+                $optimizerRunTransfer->addFixedMetricWeight($metricWeightTransfer);
             }
         }
 

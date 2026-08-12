@@ -22,24 +22,12 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class RankEvaluationRunner implements RankEvaluationRunnerInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface
-     */
     protected SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface
-     */
     protected RelevanceJudgmentGainMapperInterface $gainMapper;
 
     /**
@@ -65,8 +53,6 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function evaluate(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
@@ -93,8 +79,6 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
      * @param string $storeName
      * @param string $localeName
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $candidateConfigurationTransfer
-     *
-     * @return float|null
      */
     public function evaluateCandidate(
         string $storeName,
@@ -186,8 +170,6 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
      * @param string $localeName
      * @param array<\Generated\Shared\Transfer\SearchRankingQueryTransfer> $queryTransfers
      * @param array<int, array<int, float>> $meanGainsByQueryAndProduct
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer
      */
     protected function buildEvaluationRequest(
         string $storeName,

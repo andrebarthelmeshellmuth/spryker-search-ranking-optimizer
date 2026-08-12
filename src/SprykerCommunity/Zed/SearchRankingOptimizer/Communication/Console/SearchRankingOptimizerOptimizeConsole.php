@@ -28,11 +28,8 @@ class SearchRankingOptimizerOptimizeConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Picks up the oldest still-queued automated weight-optimization run (Phase O6), scores its live configuration as a baseline, runs the run\'s own algorithm (CMA-ES or Differential Evolution) against the metric-weight simplex + relevanceWeight trust region, and persists the winning candidate for a human to review and, if they choose, apply -- never applies it automatically.';
+    public const COMMAND_DESCRIPTION = 'Picks up the oldest still-queued automated weight-optimization run, scores its live configuration as a baseline, runs the run\'s own algorithm (CMA-ES, the Rechenberg/Schwefel ES, or Differential Evolution) against the metric-weight simplex + relevanceWeight trust region, and persists the winning candidate for a human to review and, if they choose, apply -- never applies it automatically.';
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME);
@@ -42,12 +39,9 @@ class SearchRankingOptimizerOptimizeConsole extends Console
     }
 
     // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
-
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

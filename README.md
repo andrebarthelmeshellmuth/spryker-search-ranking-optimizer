@@ -9,18 +9,22 @@ This package is a real, one-directional dependent of `search-ranking`: it reads 
 tuning parameters through that package's own facade. `search-ranking` has no knowledge of this package and
 installs and runs completely standalone without it (see [Relationship to search-ranking](#relationship-to-search-ranking)).
 
+*Part of the [Search Relevance](https://search-relevance.dev/) project — explore the interactive ranking-formula walkthrough there.*
+
 ## Contents
 
 - [Terminology](#terminology)
 - [Status](#status)
+- [Before you start: this needs real relevance ratings](#before-you-start-this-needs-real-relevance-ratings)
 - [What it does today](#what-it-does-today)
-  - [Calibration — empirically sampling `relevanceSaturationPoint` (k)](#calibration--empirically-sampling-relevancesaturationpoint-k)
+  - [Saturation Point Calibration — empirically sampling `relevanceSaturationPoint` (k)](#saturation-point-calibration--empirically-sampling-relevancesaturationpoint-k)
   - [SRP relevance rating — capturing real (query, product) judgments](#srp-relevance-rating--capturing-real-query-product-judgments)
   - [Rank evaluation — a real objective score, not averaged opinion](#rank-evaluation--a-real-objective-score-not-averaged-opinion)
   - [Weight checkpoints — a way back before changing anything by hand](#weight-checkpoints--a-way-back-before-changing-anything-by-hand)
   - [Auto-tune — a monthly fit-quality check per metric](#auto-tune--a-monthly-fit-quality-check-per-metric)
   - [Automated weight optimization — searching relevanceWeight and metric weights algorithmically](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
 - [Relationship to search-ranking](#relationship-to-search-ranking)
+- [Bootstrapping one store/locale, then fanning out everywhere](#bootstrapping-one-storelocale-then-fanning-out-everywhere)
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [1. Install the package](#1-install-the-package)
@@ -32,8 +36,9 @@ installs and runs completely standalone without it (see [Relationship to search-
   - [5. Translations](#5-translations)
   - [6. Build (transfers, Propel tables, caches)](#6-build-transfers-propel-tables-caches)
   - [7. Schedule the calibration, auto-tune, and optimize crons](#7-schedule-the-calibration-auto-tune-and-optimize-crons)
+  - [8. Verify the installation](#8-verify-the-installation)
+- [Calling `Client\Catalog`/`Client\Search` from Zed or console (optional)](#calling-clientcatalogclientsearch-from-zed-or-console-optional)
 - [Modules](#modules)
-- [Roadmap](#roadmap)
 - [Limitations](#limitations)
 - [Testing and CI](#testing-and-ci)
   - [Automated checks](#automated-checks)
@@ -49,6 +54,10 @@ for the fuller explanation given where each is first introduced in context. `sea
 has its own [Terminology](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#terminology)
 section for the terms it owns (metric, weight, relevanceWeight, relevanceSaturationPoint, digest, signal,
 raw/normalized value) — not repeated here.
+
+For the full store/locale scoping picture across every feature this package owns — including exactly which
+ones fan a save out to sibling locales and which never do — see [SCOPING.md](SCOPING.md); it builds on
+`search-ranking`'s own [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md).
 
 ### rating / judgment
 
@@ -91,12 +100,10 @@ allowed to search within, so one run can't propose a wildly untested value in a 
 
 ## Status
 
-**Calibration, the SRP relevance-rating widget, the Zed Queries curation page, offline `rank_eval`
+**Saturation Point Calibration, the SRP relevance-rating widget, the Zed Assess Rated Queries page, offline `rank_eval`
 evaluation, weight checkpoint/rollback, the monthly auto-tune job, and automated weight optimization
-(CMA-ES/differential evolution against the rank-evaluation score, including `search-ranking`'s
-entropy-aware relevance weighting knobs) are all built, tested, and shipping.**
-The rest of the tuning layer (an SRP weight-slider live preview) is designed and on the
-[Roadmap](#roadmap) but not built yet.
+(CMA-ES, the Rechenberg/Schwefel ES, or differential evolution against the rank-evaluation score, including
+`search-ranking`'s specificity-aware relevance weighting knobs) are all built, tested, and shipping.**
 
 Verified live end-to-end in a real browser (not just the automated test suite — see
 [Testing and CI](#testing-and-ci) for why that alone wouldn't have been enough): a customer clicks a rating
@@ -105,37 +112,89 @@ permission re-check, and lands correctly in the database.
 
 ![The SRP relevance-rating widget: heart/check/X buttons below each product tile, colorized once rated — heart red, check green, X red](docs/screenshots/srp-rating-widget.png)
 
+## Before you start: this needs real relevance ratings
+
+A fresh install has zero rows in `spy_search_ranking_query_rating`. Someone has to actually click
+heart/check/X on real search results — via the storefront rating widget, as a customer holding the
+**Relevance Rater** permission — before most of what this package does can run at all. Unlike
+`spryker-community/search-ranking`'s silent no-op degradation on missing business-signal data (see that
+package's own README), the features here fail loudly and explicitly rather than quietly doing nothing:
+
+- **`RankEvaluationRunner::computeWeightedAggregateFor()`** returns `null`, not `0.0` or `NaN`, the moment
+  either no rated queries exist or no ratings exist for this store/locale — a clean "not evaluable" signal
+  every caller checks explicitly, never a silently-wrong score.
+- **Automated weight optimization refuses to even start** without a baseline: `OptimizationRunner::process()`
+  fails the run immediately with `"No rated query with at least one rated product exists for this
+  store/locale yet -- nothing to evaluate."` (and, separately, `"No active metrics exist -- nothing to
+  optimize."` if `search-ranking` itself has no active metrics either) — visible in the run's status in the
+  Zed GUI, not a run that silently completes having changed nothing.
+- **The Zed "Assess Rated Queries" and offline `rank_eval` evaluation pages** have nothing to display until
+  ratings exist — there is no fallback dataset, synthetic or otherwise.
+- **Saturation Point Calibration** is the one feature that does *not* strictly require ratings — its
+  default search-term source is accumulated ratings, but `SaturationPointCalibrationUploadForm` also
+  accepts a manually uploaded CSV of search terms, so calibration alone can bootstrap without a single
+  click on the widget.
+
+**In short:** register the permission plugin (`RateSearchRelevancePermissionPlugin`) and the Yves widget
+plugins, grant the **Relevance Rater** permission to at least one real B2B `CompanyUser`, and have that
+user actually rate a handful of (query, product) pairs on the storefront — *then* Saturation Point
+Calibration's rating-based source, rank_eval, weight checkpoints' evaluation context, auto-tune, and
+automated weight optimization all have something real to work from. Before that, expect explicit
+"nothing to evaluate" failures, not incorrect results.
+
 ## What it does today
 
-### Calibration — empirically sampling `relevanceSaturationPoint` (k)
+### Saturation Point Calibration — empirically sampling `relevanceSaturationPoint`/`specificitySaturationPoint` (k)
 
-`search-ranking` blends text relevance with business signals using a saturating transform of the raw
-Elasticsearch/OpenSearch `_score`: `_score / (_score + k)`, where `k` (`relevanceSaturationPoint`) is the
-score at which text relevance contributes exactly 0.5. That constant has no universal correct value — it
-depends entirely on a shop's own field boosts and typical query shapes, and `search-ranking`'s README is
-explicit that it should be **sampled from real `_score` values, not guessed**. Calibration is the tool that
-does that sampling.
+`search-ranking` blends text relevance with business signals using a saturating transform of an unbounded
+raw value: `raw / (raw + k)`, where `k` is the raw value at which the normalized result contributes
+exactly 0.5. Two separate signals use this exact same shape and each needs its OWN `k`, sampled from real
+data, not guessed:
 
-![The Calibration page: the current live saturation point (k) — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/calibration.png)
+- **`relevance_score`** — `k` is `relevanceSaturationPoint`, the raw Elasticsearch/OpenSearch `_score` at
+  which text relevance contributes 0.5. Sampled from real per-product `_score` values via a live catalog
+  query per search term.
+- **`specificity`** — `k` is `specificitySaturationPoint`, the raw blended-idf specificity value (see
+  `search-ranking`'s own README) at which normalized specificity reaches 0.5. Sampled from one raw
+  specificity value per search term via a lightweight `_termvectors` probe — **no catalog query at all**,
+  cheaper than the `relevance_score` path.
 
-The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page:
+Both constants have no universal correct value — they depend entirely on a shop's own field boosts, catalog
+size, and typical query shapes. Saturation Point Calibration is the one tool, with a type selector, that samples either.
 
-1. **Start a run.** Pick the store and locale to run against (Zed has no implicit current store, so both
-   are picked explicitly) and the number of top results per term to sample (X). By default, search terms
+![The Saturation Point Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/saturation-point-calibration.png)
+
+The workflow, all from the **Search Ranking Optimizer → Saturation Point Calibration** Zed page, which has
+its own **Viewing** Store+Locale picker at the top — independent of the "Start New Calibration Run"
+form's own store/locale fields below (bootstrapping AT while still reviewing DE's own latest run is a
+normal, supported thing to do). Everything else on the page is scoped to whatever the Viewing picker is
+currently set to: the two live `k` values, which calibration run (if any) counts as "latest", and which
+in-progress run (if any) the progress poll reports — a run for a different store/locale never leaks into
+either:
+
+1. **Start a run.** Pick the **calibration type** (`Relevance score` or `Specificity`), the store and
+   locale to run against (Zed has no implicit current store, so both are picked explicitly — independent of
+   the Viewing picker above), and the number of top results per term to sample (X) — ignored for
+   `Specificity`, which always samples exactly one value per term regardless of X. By default, search terms
    come from the distinct queries already organically rated via the SRP widget below for that store/locale
-   — no upload needed. Check **"Bootstrap from CSV upload instead"** to bypass those and provide a CSV
-   (one term per line) instead — useful to bootstrap calibration before real ratings exist, or for testing.
+   — no upload needed. Check **"Bootstrap from CSV upload instead"** to bypass those and provide a CSV (one
+   term per line) instead — useful to bootstrap calibration before real ratings exist, or for testing.
    Either way, the run is persisted in status `uploaded`.
 2. **Calculate.** The `search-ranking-optimizer:calibrate` console command (run on a cron, or by hand)
-   picks up the newest `uploaded` run, marks any older uploaded runs `skipped`, fires the **live catalog
-   search-string query** for each term against the real search index, pools the top-X raw text-relevance
-   `_score` values across all terms, and computes a suggested `k` from that pool. The run moves to
-   `calculated` (or `failed`, with a stored error message). While it's running, the Calibration page shows
-   a live "X / Y search terms processed" counter (a small `progressAction()` JSON endpoint the page polls
-   once a second) — no fake/indeterminate spinner, since the console command's own per-term loop is a
-   genuinely trackable count.
-3. **Apply.** Back on the Calibration page, review the suggested `k` against the current live value and
-   click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint` setting — through
+   picks up the newest `uploaded` run SYSTEM-WIDE (across every store/locale, not just the one being
+   viewed), marks any older uploaded runs `skipped`, and — branching on the run's own `calibrationType` —
+   either fires the **live catalog search-string query** for each term (`relevance_score`) or a single
+   lightweight `_termvectors` probe per term (`specificity`), pools the sampled values across all terms,
+   and computes a suggested `k` from that pool. The run moves to `calculated` (or `failed`, with a stored
+   error message). While it's running, the Saturation Point Calibration page shows a live "X / Y search
+   terms processed" counter in its own box — but only when the in-progress run's own store/locale matches
+   the Viewing picker; a run for a different scope is still processing, just not shown on this page while
+   you're looking at a different one.
+3. **Apply.** Back on the Saturation Point Calibration page's own **"Latest Calibration Run"** box (kept
+   deliberately separate from the **"Current Saturation Point (k)"** box above it, so the live values and
+   the specific run being offered for Apply are never visually conflated), review the suggested `k` against
+   the current live value and click **Apply** to write it into `search-ranking`'s `relevanceSaturationPoint`
+   or `specificitySaturationPoint` setting (routed by the run's own `calibrationType`) — through
    `search-ranking`'s own facade, which republishes the ranking configuration exactly as a manual edit on
    its Settings page would. Applying is a deliberate, separate step: calibration *suggests*, a human
    *decides*.
@@ -143,16 +202,17 @@ The workflow, all from the **Search Ranking Optimizer → Calibration** Zed page
 The console prints, e.g.:
 
 ```
-Calibration #7 done: sampled 214 score(s) across 12 search term(s), computed k = 6.4180.
+Saturation Point Calibration #7 done: sampled 214 value(s) across 12 search term(s), computed k = 6.4180.
 ```
 
-Firing the query from Zed reuses `search-ranking`'s solved raw-Elastica bypass pattern (the standard
-`Client\Search` stack assumes a Yves request context that doesn't exist in a console/Zed process), shipped
-here as the `Client\SearchRankingOptimizer\Search` component.
+Firing the `relevance_score` query (or the `specificity` probe) from Zed reuses `search-ranking`'s solved
+raw-Elastica bypass pattern (the standard `Client\Search` stack assumes a Yves request context that
+doesn't exist in a console/Zed process), shipped here as the `Client\SearchRankingOptimizer\Search`
+component.
 
 ### SRP relevance rating — capturing real (query, product) judgments
 
-Calibration answers "what should `relevanceSaturationPoint` be" from a *sample* of search terms. Longer
+Saturation Point Calibration answers "what should `relevanceSaturationPoint` be" from a *sample* of search terms. Longer
 term, tuning any part of the ranking formula needs a real, organically-grown judgment set — actual people
 saying "this product was/wasn't a good result for this query." The rating widget is how that judgment set
 gets built, one click at a time, directly on the storefront search results page (SRP).
@@ -186,7 +246,7 @@ gets built, one click at a time, directly on the storefront search results page 
   permission via the customer's active `CompanyUser` (never trusts the Yves-side check alone) before
   persisting anything.
 - **Rejects fabricated (query, product) pairs.** Before persisting a submitted judgment,
-  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Calibration/rank_eval use
+  `ProductRelevanceJudgmentWriter` re-runs the same live catalog search Saturation Point Calibration/rank_eval use
   (`ProductSearchMatchVerifier`, narrowed to the one candidate document) and confirms the product is
   actually among the *current* real search results for that term — a request claiming an unrelated product
   matched some search term is rejected outright, never silently trusted from the client.
@@ -198,30 +258,30 @@ gets built, one click at a time, directly on the storefront search results page 
   non-Form AJAX actions), rendered onto the widget as a data attribute, and sent back with every submit/
   clear request — re-validated server-side before anything else runs.
 
-This is also Calibration's default search-term source (see above) — accumulated ratings feed straight into
+This is also Saturation Point Calibration's default search-term source (see above) — accumulated ratings feed straight into
 the next calibration run with no export/import step. The ratings are also the direct input to rank_eval
 evaluation, below.
 
 ### Rank evaluation — a real objective score, not averaged opinion
 
-Phases like a weight-slider preview or a propose/review/apply workflow can't answer "did that change make
+A weight-slider preview or a propose/review/apply workflow alone can't answer "did that change make
 search better?" without something to measure against. Rank evaluation turns the ratings the widget above
 already collects into a real nDCG (Normalized Discounted Cumulative Gain) score via OpenSearch/
 Elasticsearch's `_rank_eval` API — a genuine information-retrieval metric, not human opinion averaged
 together.
 
-![The Evaluation page: a store/locale picker with an "Evaluate now" button, the latest weighted nDCG@10 result, and a history of past evaluations for that store/locale](docs/screenshots/evaluation.png)
+![The Test Current Evaluation page: a store/locale picker with an "Evaluate now" button, the latest weighted nDCG@10 result, and a history of past evaluations for that store/locale](docs/screenshots/test-current-evaluation.png)
 
-The workflow, from the **Search Ranking Optimizer → Evaluation** Zed page:
+The workflow, from the **Search Ranking Optimizer → Test Current Evaluation** Zed page:
 
-1. **Pick a store and locale** and click **Evaluate now**. Unlike Calibration's upload-then-cron-then-poll
+1. **Pick a store and locale** and click **Evaluate now**. Unlike Saturation Point Calibration's upload-then-cron-then-poll
    flow, `_rank_eval` fires as a single batched HTTP request covering every rated query at once — fast
    enough to run synchronously, so there's no progress counter or polling needed here.
 2. Every individual rating for that store/locale is grouped into a mean gain per (query, product) pair
    (heart/check/x → a configurable numeric gain, default 3/1/0 —
    `SearchRankingOptimizerConfig::getRelevanceJudgmentGainMap()`; a query rated by multiple admins is
    averaged, never overwritten, the same disagreement-preserving design the rating widget itself uses).
-3. One `_rank_eval` request per query is built from the exact same live catalog query Calibration fires
+3. One `_rank_eval` request per query is built from the exact same live catalog query Saturation Point Calibration fires
    (shared via `LiveCatalogSearchQueryBuilder`), paired with that query's rated products as judgments.
    `metric.dcg.normalize=true` computes nDCG@10 (cutoff configurable —
    `SearchRankingOptimizerConfig::getRankEvalCutoff()`).
@@ -234,7 +294,7 @@ The workflow, from the **Search Ranking Optimizer → Evaluation** Zed page:
 Evaluated 12 rated queries: weighted nDCG@10 = 0.7123.
 ```
 
-Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Calibration
+Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Saturation Point Calibration
 established (`Client\SearchRankingOptimizer\Search` component), verified live against this shop's real
 OpenSearch index and real catalog products.
 
@@ -245,42 +305,92 @@ apply, auto-tune) is still, today, something an admin edits directly on `search-
 page. A checkpoint is a point-in-time snapshot of every one of those knobs, so a manual edit — or a future
 automated one — is always reversible.
 
-![The Weight Checkpoints page: the current live relevanceWeight, entropy knobs, and per-metric weights, a "Take checkpoint now" button, and a history of past checkpoints each with its own Restore action](docs/screenshots/weight-checkpoints.png)
+![The Weight Checkpoints page: the current live relevanceWeight, specificity knobs, and per-metric weights, a "Take checkpoint now" button, and a history of past checkpoints each with its own Restore action](docs/screenshots/weight-checkpoints.png)
 
-From the **Search Ranking Optimizer → Weight Checkpoints** Zed page:
+From the **Search Ranking Optimizer → Weight Checkpoints** Zed page, which — like every other scoped page
+in this package — has its own **Store + Locale selector** at the top:
 
-1. **Current State** shows exactly what `search-ranking` is using right now, read live off its own facade:
-   `relevanceWeight`, every metric's own weight, the 3 entropy-weighting knobs (probe result size, weight
-   exponent, weight shift magnitude), and whether entropy weighting is currently enabled at the code level.
-   Deliberately excluded: `relevanceSaturationPoint` (k), which already has its own versioning story via
-   Calibration and stays out of checkpoint scope.
-2. **Take checkpoint now** persists that current state as a new row — a manual snapshot, before hand-editing
-   anything.
-3. **History** lists every checkpoint newest-first, each with a **Restore** button. Restoring writes that
-   checkpoint's `relevanceWeight`, metric weights, and 3 entropy knobs back through `search-ranking`'s own
-   facade (a metric that no longer exists is skipped silently — a safe, best-effort restore, not an
-   all-or-nothing transaction), then immediately records the resulting state as a **new** checkpoint of its
-   own. Restoring IS applying, not a special "undo" mechanism — there is always a way back from a restore
-   too.
+1. **Current State** shows exactly what `search-ranking` is using right now **for the selected scope**,
+   read live off its own facade: `relevanceWeight`, every metric's own weight, the 4 specificity-weighting
+   knobs (blend weight, weight exponent, weight shift magnitude, curve exponent), and whether specificity
+   weighting is currently enabled at the code level. Deliberately excluded: `relevanceSaturationPoint`/
+   `specificitySaturationPoint` (k), which already have their own versioning story via Saturation Point Calibration and
+   stay out of checkpoint scope.
+2. **Take checkpoint now** persists that current state as a new row **tagged with the selected (store,
+   locale)** — a manual snapshot, before hand-editing anything.
+3. **History** lists **every** checkpoint newest-first across every scope (with its own Store/Locale
+   columns, not filtered to the currently selected one), each with a **Restore** button. Restoring writes
+   that checkpoint's `relevanceWeight`, metric weights, and 4 specificity knobs back through
+   `search-ranking`'s own facade **for the currently selected scope** — independent of whichever scope the
+   checkpoint itself was originally recorded for, so a DE checkpoint can deliberately be restored into AT
+   if that's genuinely what's wanted (a metric that no longer exists is skipped silently — a safe,
+   best-effort restore, not an all-or-nothing transaction) — then immediately records the resulting state
+   as a **new** checkpoint of its own, for that same target scope. Restoring IS applying, not a special
+   "undo" mechanism — there is always a way back from a restore too. If any metric in a checkpoint is
+   store-wide (`isLocaleScoped=false`) in the currently selected target store, restoring fans that metric's
+   weight out to every real locale of that store, not just the selected one — the same fan-out
+   `search-ranking`'s own `saveMetricWeight()` always does. The page names exactly which metric and which
+   sibling locales are affected next to that Restore button before it's clicked.
 
-`isEntropyWeightingEnabled` is captured on every checkpoint for historical transparency but is **never**
-written back by a restore — it is a pure code-level project flag (`Pyz\Shared\SearchRanking\SearchRankingConfig::isEntropyWeightingEnabled()`
-in a host shop), with no corresponding save method on `search-ranking`'s facade, deliberately out of scope
-for anything database-driven.
+`isSpecificityWeightingEnabled` is captured on every checkpoint for historical transparency but is
+**never** written back by a restore — it is a pure code-level project flag
+(`Pyz\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` in a host shop), with no
+corresponding save method on `search-ranking`'s facade, deliberately out of scope for anything
+database-driven.
 
 ### Auto-tune — a monthly fit-quality check per metric
 
-Weight checkpoints above cover `relevanceWeight`/metric weights/entropy knobs — but a metric's own
+Weight checkpoints above cover `relevanceWeight`/metric weights/specificity knobs — but a metric's own
 normalization **formula** (does `pdp_impressions` still fit an `atan` curve, or has the underlying data
 drifted enough that a different shape now fits better?) is a completely separate axis, with its own
 audit trail already built into `search-ranking` itself (`spy_search_ranking_metric_history`, see that
 package's own README). Auto-tune is the monthly job that watches that axis and, per metric, proposes or
-applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the entropy
-knobs, so it has no reason to write a weight checkpoint of its own.
+applies a refit once the fit degrades — it never touches `relevanceWeight`, metric weight, or the
+specificity knobs, so it has no reason to write a weight checkpoint of its own.
+
+**Auto-tune runs independently for every real configured store, and — for a genuinely locale-scoped
+metric — independently for every real locale of that store too.** `search-ranking` itself supports a
+metric whose formula genuinely differs per locale for a metric explicitly flagged `isLocaleScoped=true`
+(rare — most metrics stay store-wide; see that package's own README and `SCOPING.md`). For a store-wide
+metric (the common case), this job checks/refits only the store's own default locale — a refit/apply for
+it fans out to every real locale of the store on `search-ranking`'s own side regardless of which one
+locale triggered it, so checking every locale independently would be redundant AND actively wrong: an
+independent refit per locale would refit against each locale's own digest and re-fan-out on every
+iteration, leaving whichever locale was processed last to silently overwrite every earlier one. For a
+genuinely locale-scoped metric, this job instead checks/refits/applies EVERY real locale of the store
+fully independently, since a save for one locale never touches another there.
+
+Auto-Tune's own settings table (`spy_search_ranking_auto_tune_metric_config`) is store+locale scoped, the
+same grain `search-ranking`'s own formula/isActive/shape settled on — an earlier version of this table was
+deliberately store-only ("what auto-tune tunes is locale-scoped, but its own threshold doesn't need to
+be"), but that stopped being coherent once a metric's formula can genuinely diverge per locale: a curator
+tuning `de_DE` and `en_US` independently has no way to give them independent thresholds if the config
+itself can't tell the two apart. `AutoTuneMetricConfigWriterInterface::save()` reuses `search-ranking`'s
+own `resolveEffectiveWeightLocales()` to decide the real footprint of a save, exactly mirroring how that
+package's own formula/weight writes work: for a store-wide metric, saving at ANY one locale of a store
+fans the same threshold/auto-update/notify settings out to every real locale of it, so it doesn't matter
+which locale was selected when you saved; for a genuinely locale-scoped metric, only the one locale
+selected is touched, and a sibling locale never explicitly configured simply has no row and is treated as
+opted out for itself — same "absence means opted out" contract `autoTuneThreshold=null` already has, now
+applied per locale too, not just per metric. A store that has never had `search-ranking` configured for it
+is skipped entirely, never evaluated against empty/default state.
+
+For a store-wide metric, this job also surfaces the evidence for *whether* it should become locale-scoped
+in the first place: its one result line is followed, when the spread across its real locales exceeds
+`SearchRankingOptimizerConfig::getLocaleFitDivergenceWarningThreshold()` (0.1 by default), by a warning
+line showing every real locale's own current fit (purely informational — nothing acts on it
+automatically; a genuinely locale-scoped metric never gets this warning, since it already gets its own
+full result line per locale instead):
+
+```
+[DE/de_DE] top_seller: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] top_seller:   ⚠ fit varies by locale (spread 0.3861): de_DE=0.9883, en_US=0.6022 — this store-wide formula may not fit every locale equally well.
+```
 
 ![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
-From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page, per active metric:
+From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page — like every other scoped page in
+this package, with its own **Store + Locale selector** at the top — per active metric:
 
 - **Auto-tune threshold (R²)** — left blank by default, meaning the metric is opted OUT of auto-tune
   entirely. Setting a value opts it in: the monthly job compares the metric's CURRENT fit (evaluated
@@ -301,10 +411,15 @@ Running `vendor/bin/console search-ranking-optimizer:auto-tune` (intended for th
 [Installation](#installation)):
 
 ```
-pdp_impressions: fit still adequate (R² = 0.9883), no change.
-random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+[DE/de_DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] random: fit dropped to R² = -1.0634 (below threshold) — skipped, no refit: formula is non-deterministic.
+[AT/de_DE] pdp_impressions: fit dropped to R² = 0.6021 (below threshold) — proposed atan(x / 4.1) (R² = 0.9412).
 Notified 0 admin(s) by email.
 ```
+
+Each line is prefixed with the store and locale it applies to — a multi-store run checks the same metric
+name once per store (each at its own default locale, unless it's genuinely locale-scoped — see below), so
+the prefix is what tells two "pdp_impressions" lines apart.
 
 A metric whose formula calls a non-deterministic function (`random()` is the one that ships in
 `search-ranking`'s own formula DSL today — see
@@ -322,14 +437,17 @@ The failed metric shows up instead with its error, both in the console output an
 in the summary email, rather than silently vanishing or taking every other metric's check down with it:
 
 ```
-pdp_impressions: fit still adequate (R² = 0.9883), no change.
-top_seller: FAILED to check — Elasticsearch unreachable.
+[DE/de_DE] pdp_impressions: fit still adequate (R² = 0.9883), no change.
+[DE/de_DE] top_seller: FAILED to check — Elasticsearch unreachable.
 Notified 1 admin(s) by email.
 ```
 
-Exactly **one** combined before/after summary email is sent per run — never one per metric — covering
-every metric that crossed its threshold with notify on, to every admin holding an ACL role named
+Exactly **one** combined before/after summary email is sent per run — never one per metric, and never
+one per store — covering every metric (across every store, and across every real locale for a
+locale-scoped one) that crossed its threshold with notify on, to every admin holding an ACL role named
 `search-score-admin` (every member of every ACL group holding that role; see [Requirements](#requirements)).
+The summary email's table has its own Store and Locale columns for the same reason the console output has
+its `[DE/de_DE]`/`[AT/de_DE]` prefix.
 A run that needs to notify but finds no admin holding that role yet simply sends to nobody
 (`notifiedEmailCount = 0`), logged rather than treated as an error — the same posture the weight-checkpoint
 restore path takes toward a metric deleted since a checkpoint was taken.
@@ -352,23 +470,28 @@ shift-invariant direction softmax would otherwise introduce), and `ParameterVect
 from a real `SearchRankingConfigurationStorageTransfer` — so every candidate the optimizer proposes is a
 valid, real configuration by construction, with no rejection/repair step needed.
 
-Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 3
-entropy-aware relevance weighting parameters — `entropyWeightExponent`, `entropyWeightShiftMagnitude`, and
-`entropyProbeResultSize` (see `search-ranking`'s own README for what these do: shifting `relevanceWeight`
-per query based on how peaked vs. flat that query's raw text-relevance scores are). Each gets its own
-independent trust region around its current live value, the same "can't wander off in one shot" shape as
-`relevanceWeight`'s own trust region. This closes what would otherwise be a real gap: `search-ranking`'s
-evaluation path builds its own `function_score` query directly rather than going through the live
-storefront's query-expander plugin stack, so without this, a candidate's entropy settings would silently
-never be exercised at all during optimization, no matter how they were configured live.
+Alongside `relevanceWeight` and the metric-weight simplex, the search also covers `search-ranking`'s 4
+specificity-aware relevance weighting parameters — `specificityWeightExponent`,
+`specificityWeightShiftMagnitude`, `specificityBlendWeight`, and `specificityCurveExponent` (see
+`search-ranking`'s own README for what these do: shifting `relevanceWeight` per query based on how specific
+that query's own text is — a rare term like a SKU vs. only common words; `specificityCurveExponent`
+specifically controls how sharply the `[0;1[`-normalized specificity value transitions around the
+calibrated saturation point). Each gets its own independent trust region around its current live value, the
+same "can't wander off in one shot" shape as `relevanceWeight`'s own trust region.
+`specificitySaturationPoint` is deliberately NOT one of these dimensions — like `relevanceSaturationPoint`,
+it's Saturation-Point-Calibration-tunable only, the same precedent `ParameterVectorMapper`'s own docblock already documents
+for the text-relevance side. This closes what would otherwise be a real gap: `search-ranking`'s evaluation
+path builds its own `function_score` query directly rather than going through the live storefront's
+query-expander plugin stack, so without this, a candidate's specificity settings would silently never be
+exercised at all during optimization, no matter how they were configured live.
 
-These 3 dimensions are only ever searched at all when `search-ranking`'s
-`SearchRankingConfig::isEntropyWeightingEnabled()` is on — a project-level code flag, off by default, the
-same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live probe
-query. When it's off, this package respects that at every layer: evaluation never applies the shift
-regardless of what a candidate's own entropy fields say, and the 3 dimensions are omitted from the search
-vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no live
-effect for the optimizer to spend search budget improving.
+These 4 dimensions are only ever searched at all when `search-ranking`'s
+`SearchRankingConfig::isSpecificityWeightingEnabled()` is on — a project-level code flag, off by default,
+the same gate `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before ever firing the live
+probe. When it's off, this package respects that at every layer: evaluation never applies the shift
+regardless of what a candidate's own specificity fields say, and the 4 dimensions are omitted from the
+search vector entirely rather than merely held fixed like an excluded metric — a disabled feature has no
+live effect for the optimizer to spend search budget improving.
 
 Any active metric whose own formula calls a non-deterministic function (`random()` — see
 [Auto-tune](#auto-tune--a-monthly-fit-quality-check-per-metric) above for the same concept applied there)
@@ -380,6 +503,17 @@ against pure noise would be meaningless. Excluding it isn't just "drop it from t
 sums to `1` on every candidate this mapper produces — a naive filter would either silently zero the
 excluded metric's weight on apply, or let the other metrics quietly absorb its whole share.
 
+A metric with `isLocaleScoped=false` (a store-wide fact — see `search-ranking`'s own
+[SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
+searched and proposed exactly like any other deterministic metric — this run's own (store, locale) reads
+and writes it the same way a human editing it from the Metrics page in any one locale already does today,
+via `search-ranking`'s own `saveMetricWeight()`, which fans that write out to every real locale of the
+store. Excluding it would have been solving a problem that doesn't exist: the fan-out isn't a new risk the
+optimizer introduces, it's the existing, accepted semantics of `isLocaleScoped=false`. The Automated Weight
+Optimization page still discloses the blast radius before Apply — via
+`resolveEffectiveWeightLocales()`, the same call the Weight Checkpoints restore warning uses — so a human
+approving Apply always sees which sibling locales a store-wide metric's proposed weight will also land on.
+
 The actual black-box optimization — the algorithms, their generic `Parameter`/`ProblemInterface`
 vocabulary, and the objective-function contract — lives in a separate, Spryker-agnostic package,
 [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer),
@@ -387,18 +521,30 @@ a real `require` of this one. `ParameterVectorMapper` and `SimplexSoftmaxReparam
 package's own side of that boundary — the domain-specific glue translating `search-ranking`'s real
 configuration to and from the unconstrained vectors the generic optimizer works with.
 
-Two black-box algorithms ship, selectable per run:
+Three black-box algorithms ship, selectable per run:
 
 - **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) — the default. Adapts both a step size and a
   full covariance matrix from generation to generation, so it learns the search space's actual shape
   (correlated weights, differing sensitivities) rather than searching each dimension independently.
-- **Differential evolution** — deliberately simpler (mutate-crossover-select against the current population,
-  no covariance adaptation at all), included as a baseline "the thing to beat" rather than because it's
-  expected to win.
+- **Rechenberg/Schwefel ES** — CMA-ES's own historical predecessor: isotropic Gaussian mutation and
+  plus-selection, with step size adapted by Rechenberg's classic 1/5 success rule instead of a learned
+  covariance matrix. Meaningfully simpler than CMA-ES, at the cost of not learning correlations between
+  weights.
+- **Differential evolution** — deliberately simpler still (mutate-crossover-select against the current
+  population, no covariance adaptation at all), included as a baseline "the thing to beat" rather than
+  because it's expected to win.
 
-![The Automated Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-optimization.png)
+As of `blackbox-optimizer` 1.2, all three also stop before `maxGenerations` on their own once they've
+converged, diverged, or plateaued (each algorithm's own criteria — see that package's own README for the
+per-algorithm detail), and expose a `trustTerminationCriteria()` escape hatch to trust that over an
+arbitrary generation-count guess. `OptimizationRunner` doesn't call it yet — every run here still uses the
+fixed `getOptimizationMaxGenerations()` budget (150) as its own stopping point; wiring up
+`trustTerminationCriteria()` as a run option is a natural, still-open follow-up, not done as part of this
+bump.
 
-The workflow, from the **Search Ranking Optimizer → Automated Optimization** Zed page:
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-weight-optimization.png)
+
+The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
 1. **Run now.** Pick the store, locale, and algorithm. This queues a run and immediately processes it
    in-request (small population/generation counts keep a run to a handful of seconds against this demoshop's
@@ -407,9 +553,9 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
    oldest queued run first), and let the page's poll pick up the result once it lands.
 2. **Compare.** Once done, the page shows the baseline score (the live configuration's own rank-evaluation
    score) against the winning candidate's score, plus the concrete `relevanceWeight`, per-metric weight, and
-   entropy-knob values that produced it — never applied automatically.
+   specificity-knob values that produced it — never applied automatically.
 3. **Apply**, only if the comparison looks like a real improvement. Applying writes the winning
-   `relevanceWeight`, metric weights, and entropy knobs through `search-ranking`'s own facade, records an
+   `relevanceWeight`, metric weights, and specificity knobs through `search-ranking`'s own facade, records an
    optimizer-sourced weight checkpoint first (so it's one click back to the prior state via the
    [Weight checkpoints](#weight-checkpoints--a-way-back-before-changing-anything-by-hand) page), and
    republishes the live storefront configuration — the same "write through facade, checkpoint first,
@@ -423,9 +569,83 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - **A real `require` (`^1.1`).** `search-ranking` is public, so a hard `require` resolves cleanly in CI too
   — no `suggest`-plus-runtime-note workaround needed. The coupling goes beyond the Zed dependency bridges'
   own docblock `@param`/`@var` type hints (Spryker's standard untyped-bridge convention): the Client layer
-  (`RankEvalRunner`) also imports `search-ranking`'s `FunctionScoreBuilder`/`ShannonEntropyCalculator`
-  directly, to apply the exact same ranking formula and entropy-aware relevance-weight shift a real
-  storefront search would, rather than reimplementing either.
+  (`RankEvalRunner`) also imports `search-ranking`'s `FunctionScoreBuilder`/`QuerySpecificityCalculator`
+  directly, to apply the exact same ranking formula and specificity-aware relevance-weight shift a real
+  storefront search would, rather than reimplementing either (only the `_termvectors` IO itself is
+  reimplemented, for the same Zed/console execution-context reasons documented in `RankEvalRunner`'s own
+  docblock).
+- **`search-ranking`'s metric formula/active-flag/shape are (store, locale)-scoped**, same tier as weight
+  (see that package's own README) — but for the common `isLocaleScoped=false` metric, a save at any one
+  locale fans out to every real locale of the store, so it's effectively still store-wide in outcome. The
+  bridge methods this package calls through
+  (`SearchRankingOptimizerToSearchRankingFacadeInterface::getActiveMetrics()`/`findMetricDetail()`/
+  `saveMetricFormula()`) all require explicit `$storeName`/`$localeName` accordingly. Automated weight
+  optimization (a real per-`spy_search_ranking_optimizer_run` store/locale) passes its own run's real
+  scope; Auto-tune (genuinely per-store, AND per-locale for a genuinely locale-scoped metric — see above)
+  passes each real locale it's actually checking, derived from `evaluateCurrentMetricFitAcrossLocales()`'s
+  own return map rather than re-deriving locales any other way.
+- **`search-ranking`'s per-metric `isLocaleScoped` flag** (see that package's own
+  [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md)) is
+  a store-wide-vs-per-locale fact this package respects end to end for weight, not just reads:
+  `getActiveMetrics()`/`getMetricWeights()`/`findMetricDetail()` all surface it, and
+  `resolveEffectiveWeightLocales()` — a thin passthrough to `search-ranking`'s own method of the same name
+  (which now also governs formula/active/shape fan-out on that side, not just weight) — lets this package
+  ask which locales a given weight write would actually touch before committing one. Two independent
+  callers use it for the same purpose: the Weight Checkpoints restore warning, and the Automated Weight
+  Optimization Apply disclosure (see above) — both surface the real blast radius of a store-wide metric's
+  write before a human clicks the button, rather than treating `OptimizationRunner` as needing to exclude
+  such a metric at all.
+
+## Bootstrapping one store/locale, then fanning out everywhere
+
+A common way to roll this package out across a multi-store, multi-locale shop: do the real tuning work
+once, against one (store, locale), then let `search-ranking`'s own Scope Copy/Lock carry the *result* to
+every other scope — rather than repeating ratings/calibration/optimization independently per scope, most of
+which would just re-derive the same answer at real cost (query traffic, admin rating effort, optimizer
+runs).
+
+1. **Rate and gather data for exactly one (store, locale)** — e.g. `DE`/`de_DE`. Collect real SRP
+   heart/check/x ratings via the storefront widget, and make sure `search-ranking`'s own product-metric raw
+   values are imported for that scope (see that package's README).
+2. **Calibrate `k` for that one scope** — run Saturation Point Calibration (feature 1 in
+   [SCOPING.md](SCOPING.md)) and Apply, so the relevance-score curve is on a sane footing before optimizing
+   against it.
+3. **Let the black-box optimizer tune `relevanceWeight` and every metric weight for that one scope** —
+   queue an [Automated weight optimization](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+   run against `DE`/`de_DE`'s own real ratings, review the winning candidate against baseline, and Apply.
+4. **Fan the result out via `search-ranking`'s own Scope Copy/Lock** — from `search-ranking`'s Scope Copy
+   page, copy (or Lock, for an ongoing daily resync) `DE`/`de_DE`'s now-tuned weight, the 6 settings
+   (`relevanceWeight`/`relevanceSaturationPoint`/4 specificity knobs), and formula/isActive/shape out to
+   every other real store and locale. One Lock covers everything Scope Copy's combined action copies — see
+   that package's own [SCOPING.md](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/SCOPING.md#quick-reference).
+
+That's the whole loop: tune once for real, replicate everywhere else. It's not free of manual steps, though
+— the known exceptions, all things Scope Copy/Lock simply cannot touch because they're not part of
+`search-ranking`'s own copyable configuration at all:
+
+- **Saturation Point Calibration itself doesn't fan out** (see [SCOPING.md](SCOPING.md), feature 1) — a
+  copied/locked `k` value is exactly as good as the scope it was calibrated for, but if a target locale's
+  own score distribution genuinely differs (a real risk once vocabulary/catalog density diverges enough),
+  its `k` is now a copy of a value calibrated for different data. Locked scopes don't re-calibrate
+  themselves; recalibrating a specific target scope once real traffic exists there is a manual, deliberate
+  follow-up, not something this workflow does automatically.
+- **SRP ratings and rank evaluation never fan out** (SCOPING.md, features 2/3) — a target scope with real
+  customers of its own will need its own real ratings to eventually evaluate or re-optimize against; copied
+  weights don't come with copied ratings, by design (ratings reflect real buyer judgment for that scope,
+  which can't legitimately be assumed identical elsewhere).
+- **Auto-Tune's own config only fans out by `isLocaleScoped`, not by Scope Copy/Lock** (SCOPING.md, feature
+  5) — turning on auto-tune's threshold/notify settings for `DE`/`de_DE` does NOT get copied to `AT`/`de_DE`
+  by Scope Copy or Lock; that's a separate, independent save (though for a store-wide metric, saving it once
+  per *store* still fans across that store's own locales the normal way — see SCOPING.md).
+- **`search-ranking`'s own metric `name`/`isHigherBetter`/`isLocaleScoped` are global already** — nothing to
+  copy there; they're the same everywhere a metric exists at all, by definition (see that package's own
+  SCOPING.md step 4/5).
+- **One index per store, not per locale, is Spryker's own real ES/OpenSearch convention** — this package
+  and `search-ranking` don't control or enforce it, but it means specificity/idf-style signals that read off
+  term statistics are computed from an index shared across every locale of a store, not isolated per locale
+  — a real, accepted blending limitation worth knowing about when interpreting a specificity-related
+  calibration or optimization result for a multi-locale store (see `SpecificitySearcher`/`RankEvalRunner`'s
+  own docblocks in `search-ranking` for where this is documented at the code level).
 
 ## Requirements
 
@@ -433,14 +653,13 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
 - Spryker (kernel/gui/catalog/store/locale/propel-orm/search-elasticsearch/permission/permission-extension/
   company-user/acl/symfony-mailer — see `composer.json` for floors, verified by `composer check-floors`)
 - A running Elasticsearch/OpenSearch catalog search (calibration fires real queries against it)
-- **`spryker-community/search-ranking` installed and wired** — a real `require` (`^1.1`, since
-  `RankEvalRunner`'s entropy-aware relevance weighting support depends on `ShannonEntropyCalculator`,
-  only introduced in `search-ranking` v1.1.1); the Apply step writes into its `relevanceSaturationPoint`
-  setting via its facade, and the auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^1.0`); not on Packagist, so
+- **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
+  into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
+  auto-tune job writes into its metric formulas the same way
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^3.0.0`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
-  [Installation](#installation)). Provides the actual CMA-ES/Differential Evolution algorithms the
-  automated weight optimization feature searches with.
+  [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
+  algorithms the automated weight optimization feature searches with.
 - **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
   active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
   shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
@@ -448,7 +667,10 @@ The workflow, from the **Search Ranking Optimizer → Automated Optimization** Z
   metric's "notify by email" auto-tune toggle; everything else in this package works without it.
 - **An ACL role named `search-score-admin`** — only needed for the same reason, to resolve who receives
   the auto-tune notification email (every member of every ACL group holding that role). Create it via the
-  Zed ACL Gui or your own `data:import acl-role`-style fixture; nothing here creates it for you.
+  Zed ACL Gui or your own `data:import acl-role`-style fixture; nothing here creates it for you. Creating
+  the role is not enough on its own — it also has to be assigned to a group that has users in it, or the
+  email still resolves to nobody. `search-ranking-optimizer:check-installation`
+  ([step 8](#8-verify-the-installation)) warns about both cases once any metric has notification enabled.
 
 ## Installation
 
@@ -484,6 +706,23 @@ either, so both need their own `vcs` repository entries too (skip whichever you 
 composer require spryker-community/search-ranking-optimizer:@dev
 ```
 
+**If your project's `search-ranking` is installed from a dev branch rather than a tagged release**,
+Composer can fail this step with `require spryker-community/search-ranking ^1.3.0 -> found
+spryker-community/search-ranking[dev-your-branch] but it does not match the constraint` — a dev-branch
+version doesn't satisfy a normal semver constraint on its own, regardless of what commits it actually
+contains. Fix it in `search-ranking`'s own `composer.json`, not this package's:
+
+```json
+"extra": {
+    "branch-alias": {
+        "dev-your-branch-name": "1.3.x-dev"
+    }
+}
+```
+
+telling Composer to treat that branch as the `1.3.x` version line for constraint-matching purposes. Pick
+the alias version to match whichever tagged release your branch is actually built on top of.
+
 ### 2. Register the core namespace
 
 In `config/Shared/config_default.php`, ensure `SprykerCommunity` is in `KernelConstants::CORE_NAMESPACES`
@@ -496,11 +735,13 @@ In `Pyz\Zed\Console\ConsoleDependencyProvider::getConsoleCommands()`:
 ```php
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerAutoTuneConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCalibrateConsole;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerCheckInstallationConsole;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console\SearchRankingOptimizerOptimizeConsole;
 
 new SearchRankingOptimizerCalibrateConsole(),
 new SearchRankingOptimizerAutoTuneConsole(),
 new SearchRankingOptimizerOptimizeConsole(),
+new SearchRankingOptimizerCheckInstallationConsole(),
 ```
 
 ### 3a. Register the permission plugin (required for the SRP rating widget)
@@ -522,6 +763,17 @@ customer's company role is actually given `RateSearchRelevancePermissionPlugin` 
 company-role/permission fixture data, e.g. `company_role_permission.csv` if you use the standard
 `CompanyRoleDataImport`). A customer already logged in when the grant is added needs to log out and back
 in for the permission to take effect in their session.
+
+**A freshly-registered permission plugin also needs a one-time DB sync before it's usable anywhere** —
+`spryker/permission`'s own `spy_permission` table is the source of truth the Company Role edit GUI's
+checkbox list (and step 8's `check-installation` command) both read against, and nothing populates a new
+row for it automatically. Until that sync runs, granting or even *checking* the permission throws
+`Undefined array key "RateSearchRelevancePermissionPlugin"` deep inside
+`PermissionFacade::findMergedRegisteredNonInfrastructuralPermissions()` — not a message that points back
+to this step. The sync itself (`PermissionFacade::syncPermissionPlugins()`) runs automatically the moment
+anyone loads `spryker/permission`'s own Zed landing page (`Spryker\Zed\Permission\Communication\Controller\IndexController`)
+— visit it once in Zed (wire up its route/navigation entry if your project doesn't have one already) and
+every registered-but-unsynced permission plugin, this one included, gets its row.
 
 ### 3b. Register the Yves widget plugins
 
@@ -546,17 +798,38 @@ Then render the widget below each product tile in your SRP template (this packag
 `page-layout-catalog.twig` itself — that stays project-owned):
 
 ```twig
+{# Once per page, BEFORE the product loop. #}
+{% set canRateSearchRelevanceValue = canRateSearchRelevance() %}
+{% set searchRelevanceRatings = canRateSearchRelevanceValue
+    ? getSearchRelevanceRatings(data.searchString, data.products | default([]) | map((product) => product.id_product_abstract))
+    : {} %}
+
+{# Once per product, INSIDE the loop. #}
 {% include molecule('search-ranking-optimizer-product-rating', 'SearchRankingOptimizerWidget') with {
     data: {
-        canRate: canRateSearchRelevance(),
+        canRate: canRateSearchRelevanceValue,
         searchTerm: data.searchString,
         idProductAbstract: product.id_product_abstract,
+        csrfToken: searchRankingOptimizerRatingCsrfToken(),
+        activeRatingType: searchRelevanceRatings[product.id_product_abstract] | default(null),
     }
 } only %}
 ```
 
-Compute `canRateSearchRelevance()` **once per page**, not once per product, and pass the same value into
-every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
+`searchRankingOptimizerRatingCsrfToken()` comes from the same Twig plugin registered above — the widget's
+submit/clear actions are plain POST controllers, not bound to a Symfony Form, so without this field they'd
+carry none of the CSRF protection every Form-backed POST in this project gets automatically.
+
+`getSearchRelevanceRatings(searchTerm, idProductAbstracts)` comes from that same plugin and is **not
+optional if you want prior judgments to show up**: it returns this customer's already-persisted rating type
+per product abstract, and the widget's `activeRatingType` is what turns the corresponding button's
+`aria-pressed` on at render time. Omit it and every button renders unpressed on every page load — ratings
+are still submitted and stored correctly, they just silently never appear again after a reload, which reads
+as "the rating didn't save". Call it **once per page** with the whole result page's product ids (one
+batched Zed round trip), never once per product.
+
+Compute `canRateSearchRelevance()` **once per page** too, not once per product, and pass the same value
+into every product's include. If your SRP template also renders `spryker-community/search-debug`'s overlay in a
 `.search-debug-product-wrapper` (or any other wrapper that stretches to a fixed row height via CSS Grid/
 flex `align-items: stretch`), make sure that wrapper's first child does not have a hard `height: 100%` —
 combined with `flex-shrink: 0` that silently eats all the wrapper's height and pushes this widget outside
@@ -568,6 +841,31 @@ a working reference.
 **Yves build gotcha:** a template-paired `.scss` file is silently never bundled unless that same template
 directory also has an `index.ts` (`import './your-template';`) — webpack's entry-point discovery keys off
 `templates/*/index.ts`, SCSS discovery only piggybacks on that entry point already existing.
+
+#### 3c. Optional but recommended: the Yves installation-check page
+
+Everything in 3b fails **silently**. A missing `activeRatingType`, an unimported glossary and an unbuilt
+frontend all leave a storefront that renders perfectly and simply never reflects a stored judgment — there
+is no error anywhere to notice, and the symptom (a rating that "didn't save") points at the wrong layer.
+
+Set the flag in a development-tier config (e.g. `config/Shared/config_default-development.php`):
+
+```php
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConstants;
+
+$config[SearchRankingOptimizerConstants::IS_CHECK_INSTALLATION_PAGE_ENABLED] = true;
+```
+
+Then visit `/search-ranking-optimizer-widget/check-installation` as a customer holding
+`RateSearchRelevancePermissionPlugin`. It reports on the Twig helper functions, the submit/clear routes,
+whether the stored-judgment lookup actually completes against Zed, whether the glossary was imported, and
+whether the frontend build picked this package's components up — each with the exact remedy.
+
+The flag defaults to `false`, so the route does not exist at all until a project opts in; the URL 404s
+rather than existing-but-denied. It complements `vendor/bin/console
+search-ranking-optimizer:check-installation` (Propel tables, console-command registration, the permission
+plugin, Zed translations) — Zed never bootstraps the
+Yves DI container, so neither can see the other's half.
 
 ### 4. Register the Zed navigation entry
 
@@ -582,9 +880,16 @@ rm -f src/Generated/Zed/Navigation/codeBucket/navigation*.cache
 vendor/bin/console navigation:build-cache
 ```
 
+Because a missing entry never errors — the page simply cannot be reached from the sidebar, and a stale
+cache hides a correct copy just as completely — `vendor/bin/console search-ranking-optimizer:check-installation` verifies every one of
+this package's page keys against the built navigation cache, reading the expected list from the package's
+own `navigation.xml` so it also catches a page added by a later version that your project never copied. It
+tells the two failures apart: "not in your navigation.xml" and "in your navigation.xml but not in the
+cache" get different remedies.
+
 ### 5. Translations
 
-**Zed GUI** (Calibration page): like its siblings, this package ships its Zed strings as
+**Zed GUI** (Saturation Point Calibration page): like its siblings, this package ships its Zed strings as
 `spryker/translator` CSV catalogs under [`data/translation/Zed/`](data/translation/Zed/) (Zed's `trans`
 filter does **not** use the Yves-facing Glossary module). If your project already extended
 `Pyz\Zed\Translator\TranslatorConfig::getCoreTranslationFilePathPatterns()` with the
@@ -595,6 +900,18 @@ extra step. Otherwise add it once:
 $coreTranslationFilePathPatterns[] = APPLICATION_VENDOR_DIR . '/spryker-community/*/data/translation/Zed/[a-z][a-z]_[A-Z][A-Z].csv';
 ```
 
+Adding the glob is not enough on its own — Zed's translation catalog is cached. Rebuild it once after
+wiring the glob (or after this package is installed at all, if the glob was already present):
+
+```bash
+vendor/bin/console translator:clean-cache
+vendor/bin/console translator:generate-cache
+```
+
+Skipping this makes any of this package's Zed GUI strings — e.g. the "Search Ranking Saturation Point
+Calibration" page title — resolve to their raw translation key instead of real text, with no error either
+in the console or in the browser.
+
 **Yves widget** (the three button titles): the opposite mechanism — a plain
 [`data/glossary.csv`](data/glossary.csv), imported the normal Spryker way (this is the same
 Redis-backed Glossary module every Yves-facing string in a Spryker shop already uses):
@@ -603,10 +920,18 @@ Redis-backed Glossary module every Yves-facing string in a Spryker shop already 
 vendor/bin/console data:import glossary
 ```
 
+**If your project's glossary import source is a single merged CSV** (the common demo-data-starter
+pattern — one `data/import/common/common/glossary.csv` covering the whole project, rather than a
+per-bundle glob), running the command above alone does nothing for this package: it re-imports whatever
+your project's own file already contains, and this package's rows in its own `data/glossary.csv` were
+never part of that. Copy this package's rows into your project's file first, then import. The three
+`search_ranking_optimizer.rate.*` glossary keys and the `permission.name.RateSearchRelevancePermissionPlugin`
+row are both shipped in [`data/glossary.csv`](data/glossary.csv) for exactly this copy-paste.
+
 ### 6. Build (transfers, Propel tables, caches)
 
-This package ships a Propel schema for **eight** tables: `spy_search_ranking_calibration` +
-`spy_search_ranking_calibration_search_term` (Calibration), `spy_search_ranking_query` +
+This package ships a Propel schema for **eight** tables: `spy_search_ranking_saturation_point_calibration` +
+`spy_search_ranking_saturation_point_calibration_search_term` (Saturation Point Calibration), `spy_search_ranking_query` +
 `spy_search_ranking_query_rating` (the SRP rating widget), `spy_search_ranking_evaluation` (rank
 evaluation), `spy_search_ranking_weight_checkpoint` (weight checkpoints),
 `spy_search_ranking_auto_tune_metric_config` (auto-tune), and `spy_search_ranking_optimizer_run`
@@ -653,27 +978,140 @@ oldest queued run, FIFO); the [Zed page](#automated-weight-optimization--searchi
 already processes a run in-request when you click "Run now", so the cron only matters for runs queued some
 other way.
 
+Nothing registers a cron job for you: `SymfonySchedulerConfig::getCronJobs()` returns `[]` in Spryker core
+and has no plugin stack, so a package cannot contribute an entry even in principle — this is project config
+by design, for every package, not just this one. Because skipping it produces no error (just a queued run
+that sits in `queued` forever), the [next step](#8-verify-the-installation) verifies these registrations for
+you. If your project schedules jobs some other way than `spryker/symfony-scheduler`, that check degrades to
+a warning listing what to confirm by hand rather than failing.
+
+### 8. Verify the installation
+
+```bash
+vendor/bin/console search-ranking-optimizer:check-installation
+```
+
+Most of the steps above fail *silently* when missed — a forgotten DependencyProvider wire-up produces no
+error, just a feature that quietly never does anything (a permission nobody can ever be granted, a widget
+button with no translated label). This command checks the core namespace registration, that every console
+command from step 3 actually registered, that RateSearchRelevancePermissionPlugin (step 3a) is registered
+on BOTH Zed and Client — either half missing independently makes the rating widget silently ungrantable or
+invisible — that the Yves glossary key and Zed GUI translation catalog (step 5) both resolve, and that all
+8 Propel tables this package ships (step 6) exist and are queryable. It exits non-zero and names the exact
+remedy for whatever is wrong.
+
+It also checks something no step above can create for you: whether the `search-score-admin` ACL role
+([Requirements](#requirements)) actually resolves to anybody. Every way it can fail to is silent — a role
+that was never created, a role no ACL group holds, or groups with no users in them all make the auto-tune
+summary email go to zero recipients while the run still reports success, and the only surface is a console
+line nobody reads, since that job runs under cron. This is reported as a **warning, not a failure**, and
+only when at least one metric actually has "notify by email" enabled — the role is genuinely optional for a
+shop that never turned notifications on, and the two unstaffed cases are distinguished from the
+missing-role case because the remedy differs (staff the role vs. create it).
+
+It also reports whether anybody other than a root-style admin can reach this package's Zed pages. Zed
+access is deny-by-default outside a matching ACL rule, and a nav entry the current user has no rule for is
+filtered out of the sidebar entirely rather than 403ing — so on a shop with real restricted back-office
+roles, "nobody adjusted ACL" looks exactly like "the package was never installed". A default Spryker
+install needs nothing done here (`root_role` holds a total wildcard), which is why this is a **warning at
+most, never a failure**, and only when restricted roles exist and not one of them has a rule for this
+package's module. Restricting these pages to root-style admins is a perfectly ordinary choice; the command
+cannot know which roles you meant to grant, so it asks you to confirm rather than telling you to fix.
+
+It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
+and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below
+product tiles and submits successfully on a live storefront page — those need a real browser request, not
+a CLI probe.
+
+## Calling `Client\Catalog`/`Client\Search` from Zed or console (optional)
+
+This package's own `SaturationPointCalibrationSearcher`/`RankEvalRunner` don't call `Client\Catalog`/
+`Client\Search` at all — they fire a raw `Elastica` query directly, deliberately bypassing this problem
+(see [Limitations](#limitations)). This section is for a different, broader need: if *your own* project
+code (a console command, a Zed controller, a cron job — anything with no live Yves/Glue HTTP session)
+ever wants to call the real `Client\Catalog::catalogSearch()`/`Client\Search::search()`, two of Spryker's
+own core plugins stand in the way, unconditionally, in every Spryker project we've checked.
+
+**The problem.** `StoreQueryExpanderPlugin`/`LocalizedQueryExpanderPlugin`
+(`spryker/search-elasticsearch`) unconditionally call `Client\Store::getCurrentStore()`/
+`Client\Locale::getCurrentLocale()` — both require live HTTP/customer session state that simply doesn't
+exist in Zed or console context, so the call throws. This is **not specific to this package or to
+search tuning** — it breaks the moment *any* Zed/console code calls the real catalog search facade, full
+stop, in any project using the standard Elasticsearch query-expander stack.
+
+**Two copy-paste overrides fix it**, reading an explicit store/locale from `$requestParameters` (the
+override channel `QueryExpanderPluginInterface::expandQuery()` already defines) and falling back to the
+core behavior — i.e. today's storefront/Glue behavior — when that key isn't passed:
+
+- [`docs/examples/StoreQueryExpanderPlugin.php`](docs/examples/StoreQueryExpanderPlugin.php)
+- [`docs/examples/LocalizedQueryExpanderPlugin.php`](docs/examples/LocalizedQueryExpanderPlugin.php)
+
+Copy both into your project at `src/Pyz/Client/SearchElasticsearch/Plugin/QueryExpander/`, then register
+them in place of the core plugins everywhere your own `CatalogDependencyProvider` (and any other
+search-domain `DependencyProvider` — see the audit note below) currently does `new
+StoreQueryExpanderPlugin()`/`new LocalizedQueryExpanderPlugin()`. The store override also stamps the
+resolved store name onto the query's own `SearchContextTransfer`, not just the Elastica filter clause —
+that part is what actually matters: `Client\Catalog::catalogSearch()` runs query expanders *before*
+`Client\Search::search()` resolves the Elasticsearch index name via `IndexNameResolver`, and that
+resolver falls back to the identical `Client\Store::getCurrentStore()` call whenever the query's context
+has no store name set. Fixing only the Elastica filter, without that stamp, leaves the index-resolution
+call site crashing on its own — see the plugin's own docblock for the full trace.
+
+**If you have `spryker-eco/algolia` installed, also remove it from any `*QueryPluginVariants()` method**
+in your `CatalogDependencyProvider` that registers it (`createCatalogSearchQueryPluginVariants()` and
+friends). `AlgoliaSearchQueryPlugin`'s own constructor unconditionally makes the same three
+session-dependent calls — and because Spryker's `CatalogFactory` builds the *entire* variants array
+eagerly regardless of which variant ultimately gets selected, every registered Algolia variant runs its
+constructor on every single search, Algolia or not, active or not. **Most Spryker shops don't have
+Algolia installed at all — if that's you, this step is a no-op, skip it.** It only matters if your
+project genuinely registers an Algolia variant, in which case it's worth removing even independent of
+this section: we found that in a project where Algolia is registered but switched off
+(`AlgoliaConfig::getIsActive()` false, e.g. left over from an evaluation that didn't go ahead), every real
+customer search was still silently constructing and discarding an `AlgoliaSearchQueryPlugin` instance —
+three wasted client calls per request, forever, invisible unless you profile for it.
+
+**One more thing worth checking before you assume you're done**: `StoreQueryExpanderPlugin`/
+`LocalizedQueryExpanderPlugin` are commonly registered in *more than one* `DependencyProvider` — Catalog
+is rarely the only search domain a project has. Auditing our own demo shop (not this package, the shop
+we develop it against) turned up **seven** other `DependencyProvider`s registering the same two
+unmodified core plugins for their own search domains (CMS page search, product-set search, merchant
+search, configurable-bundle search, sales-return search, and others) — none of which this package touches
+or needs, but every one of them has the identical Zed/console crash waiting the moment anyone calls into
+them from a session-less context. If you adopt these overrides, grep your own project for
+`new StoreQueryExpanderPlugin()`/`new LocalizedQueryExpanderPlugin()` (and any project-specific
+query-expander plugins your own team wrote that similarly assume a live session) and swap all of them —
+not just Catalog's — or you'll fix the domain you tested and still get paged by the next one.
+
+**Once you've applied the overrides above, you can swap this package's own bypass for the real facade —
+no package change needed.** `SaturationPointCalibrationSearcher`/`RankEvalRunner`/`SpecificitySearcher`
+are each built by an ordinary, interface-typed `SearchRankingOptimizerFactory` method
+(`createCalibrationSearcher()`/`createRankEvalRunner()`/`createSpecificitySearcher()`) — standard Spryker
+project-override territory. Extend the factory in your own project
+(`Pyz\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory extends
+SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory`), override whichever
+`create*()` method you want, and return your own implementation of the same interface built on the real
+`Client\Catalog`/`Client\Search` facade instead — the Locator picks it up automatically, nothing else to
+register. This is deliberately **not** something this package auto-detects or switches on internally:
+there's no reliable way for the package to tell whether a project has actually applied the overrides
+correctly (a project-declared flag would be no more trustworthy than the override method already is, and
+reflection on plugin class identity is brittle against future core changes), so the decision is left where
+it belongs — with the project that knows what it's actually wired up. Worth doing only if you've confirmed
+the bundled bypass's known gap (no customer-group visibility, no price-list scoping, no project-registered
+expanders — see [Limitations](#limitations)) actually skews your own calibration/rank_eval results; for
+most shops the bypass's statistical shape is close enough that this isn't worth the parallel implementation
+to maintain.
+
 ## Modules
 
 - **`SearchRankingOptimizer`** (Client/Zed/Shared) — the calibration, rank_eval evaluation, weight
   checkpoint/rollback, monthly auto-tune, and automated weight optimization business logic, persistence,
-  console commands, Zed GUI (Calibration + Apply, Queries listing/edit-importance, Evaluation, Weight
-  Checkpoints, Auto-Tune Settings, and Automated Optimization + Apply controllers), the raw-Elastica search
-  components (shared query builder, calibration searcher, rank_eval runner), the rated-query data model,
+  console commands, Zed GUI (Saturation Point Calibration + Apply, Assess Rated Queries listing/edit-importance, Test Current Evaluation, Weight
+  Checkpoints, Auto-tune metrics settings, and Automated Weight Optimization + Apply controllers), the raw-Elastica search
+  components (shared query builder, saturation point calibration searcher, rank_eval runner), the rated-query data model,
   the simplex softmax reparametrization bridging this package's own weight-simplex constraint to the
   generic optimizer (see below), and the Zed Gateway endpoint that persists a rating.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
-
-## Roadmap
-
-Calibration, judgment capture (rating collection + curation), rank_eval evaluation, weight checkpoint/
-rollback, the monthly auto-tune job, and automated weight optimization are the tuning layer built so far.
-Designed, not yet built:
-
-- **SRP weight-slider live preview** — an admin-only panel on the storefront results page: one slider per
-  metric plus the relevance/business blend weight, live client-side re-ranking of a buffered result set,
-  and a "fetch with these settings" button for a real, verified re-rank.
 
 ## Limitations
 
@@ -690,9 +1128,9 @@ Designed, not yet built:
 - **One store/locale per run.** Weights found optimal for one store/locale combination are never
   cross-checked against any other; a shop running several stores needs a separate run (and separate
   judgment set) per combination it cares about.
-- **Candidate evaluation is serial, not parallel**, within a single run — CMA-ES/differential evolution
-  both evaluate one candidate configuration at a time in the same PHP process ("Run now" in the Zed page or
-  the `optimize` console command), even though every candidate in a generation is independent and could in
+- **Candidate evaluation is serial, not parallel**, within a single run — every shipped algorithm evaluates
+  one candidate configuration at a time in the same PHP process ("Run now" in the Zed page or the
+  `optimize` console command), even though every candidate in a generation is independent and could in
   principle be evaluated concurrently. A run's total wall-clock time is roughly
   `population size × generations × one rank_eval call's own cost`, so it scales directly with both the
   algorithm's own settings and the judgment set's size.
@@ -700,7 +1138,7 @@ Designed, not yet built:
   production-scale one. A shop with hundreds or thousands of rated queries would need to retune
   `SearchRankingOptimizerConfig::getOptimizationMaxGenerations()` and each algorithm's own population size
   — and, given the previous point, budget proportionally more wall-clock time per run.
-- **Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
+- **Saturation Point Calibration and rank_eval both search against a deliberately narrowed live query, not the full one.**
   `LiveCatalogSearchQueryBuilder` reproduces the CORE catalog search-string query shape (base full-text
   query + store/locale/is_active/is_active_in_date_range filters) — real customer-facing search may layer
   further scope narrowing on top of that (customer-group visibility, price-list scoping, pinned category/
@@ -709,7 +1147,7 @@ Designed, not yet built:
   for tuning purposes, and closer parity would mean executing the real query expander stack from a Zed/
   console process, which — like `Client\Catalog`/`Client\Search` themselves — isn't reliably possible
   outside a real Yves request context in this shop (see the raw-Elastica-bypass reasoning documented on
-  `CalibrationSearcher`/`RankEvalRunner`).
+  `SaturationPointCalibrationSearcher`/`RankEvalRunner`).
 
 ## Testing and CI
 
@@ -722,6 +1160,7 @@ Designed, not yet built:
 | `composer validate` | the manifest stays well-formed |
 | `phpcs` (PHP 8.3, 8.4) | coding standard, via this package's own `phpcs.xml` |
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
+| `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | complexity / method- and class-length limits, run as two separate invocations (PHPMD merges every ruleset's `exclude-pattern` into one global list per run, and only the public-method-count rule should skip Facades/Factories) |
 
 `check-floors` resolves every declared constraint to its **oldest** allowed version
@@ -735,8 +1174,8 @@ composer check-floors
 
 ### Test suite
 
-**199 tests, 657 assertions** across two Codeception suites (`Zed/SearchRankingOptimizer`,
-`Client/SearchRankingOptimizer`) — down from a prior count that included `CmaEsAlgorithm`/
+**322 tests, 1100 assertions** across three Codeception suites (`Zed/SearchRankingOptimizer`,
+`Client/SearchRankingOptimizer`, `Yves/SearchRankingOptimizerWidget`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
 own test suite. From a shop that has the package installed:
@@ -750,7 +1189,7 @@ The CSV search-term parser, the score calibrator (skip-older-uploads, failing-te
 fail-when-nothing-scored, the vanished-row race), the statistics calculator, the persistence mapper, the
 search-term canonicalizer, `ProductRelevanceJudgmentWriter` (canonicalization-before-lookup, creating a
 query on first rating, rejecting an unknown rating type before touching persistence), and
-`RelevanceJudgmentAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
+`CompanyUserPermissionAuthorizer` (never trusts an identifier from the request itself, always re-resolves via
 the CompanyUser facade; grants access if *any* of a customer's active company users holds the permission),
 `AutoTuneNotificationRecipientResolver` (no role yet vs. de-duplicating usernames across multiple ACL
 groups), `AutoTuneRunner` (skipping a deleted metric or one with no digest yet, the at-or-above-
@@ -761,35 +1200,40 @@ crossed its threshold and has notify on), `FormulaDeterminismChecker` (detects a
 call by name, precisely enough not to false-positive on an unrelated function merely sharing a prefix),
 `SimplexSoftmaxReparametrization` (round-trips weights through `toFreeZ`/`toSimplex`, the numerically-stable
 softmax under an extreme input, the floor that keeps the inverse from taking `log(0)`), `ParameterVectorMapper`
-(the trust-region bound around the run's starting `relevanceWeight` and each entropy knob, round-tripping a
-configuration through `mapConfigurationToVector`/`mapVectorToConfiguration`, rounding/clamping
-`entropyProbeResultSize` back to a safe integer, a fixed metric's weight held exactly constant while
+(the trust-region bound around the run's starting `relevanceWeight` and each specificity knob, round-tripping a
+configuration through `mapConfigurationToVector`/`mapVectorToConfiguration`, clamping `specificityBlendWeight`
+to its own absolute bounds, a fixed metric's weight held exactly constant while
 the optimizable metrics' own simplex is scaled to fill only the remaining budget), `OptimizationRunner`
 (queues and processes a run, population/generation-count sizing, the objective function's sign flip since
 the algorithms minimize but a higher rank-evaluation score is better, always propose-only, a
-non-deterministic-formula metric excluded from the search end-to-end, the live entropy knobs seeding the
+non-deterministic-formula metric excluded from the search end-to-end, the live specificity knobs seeding the
 run's baseline candidate and every subsequent candidate staying within its own trust region), and
 `OptimizationApplier` (null when the run doesn't exist or isn't done yet, writing the winning candidate and
-entropy knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied) are
+specificity knobs through the facade, recording an optimizer-sourced checkpoint, marking the run applied),
+`AlgorithmFactory` (the single place `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*` values map to
+concrete `BlackboxOptimizer\Algorithm\*` classes, including the fallback to CMA-ES for an unrecognized name),
+and `AutomatedWeightOptimizationRunForm`'s own `buildAlgorithmChoices()`/`buildAlgorithmHelp()` (invoked
+directly via reflection, same approach `RankEvalRunnerTest` already uses for this package's own protected
+methods, rather than standing up a full Symfony `FormFactory` for two pure string/array transformations) are
 covered as pure unit tests — no database needed.
 
-Three real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove
-the entropy wiring isn't just plumbed through but actually changes behavior:
-`RankEvalRunner::applyEntropyWeighting()` shifts `relevanceWeight` for a real, non-symmetric "chair" query's
-score distribution when entropy weighting is force-enabled (it's off by default — see [above](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)),
-is a no-op when `entropyProbeResultSize` isn't configured at all, and is *also* a no-op — even with a fully
-populated entropy configuration — when the feature flag itself is disabled, which documents this shop's own
-real current behavior (entropy weighting is inert end-to-end here today). A
-synthetic ground-truth exercise went further still — two throwaway rated queries against this shop's real
-catalog, one with a single dominant text match (a peaked score distribution) and one with several
-identically-scored matches (a maximally flat distribution), each rated so that only the "correct" per-query
-relevanceWeight would rank the intended product first. A real automated optimization run (not a toy) found
-a positive `entropyWeightShiftMagnitude` and reached a perfect combined score, and — the important
-part — disabling the entropy shift on the exact same winning configuration reproduced the peaked query's
-score exactly but dropped the flat query's score substantially, confirming the shift (not just
-`relevanceWeight` alone) is what makes the difference. Both throwaway queries, their ratings, and the run
-itself were deleted afterward; nothing from this exercise is part of the shipped test suite (it depends on
-this demoshop's specific catalog content, not something portable to another shop's data).
+Real, non-mocked integration tests against this shop's own live Elasticsearch/OpenSearch index prove the
+specificity wiring isn't just plumbed through but actually changes behavior:
+`RankEvalRunner::applySpecificityWeighting()` shifts `relevanceWeight` for a real query term when
+specificity weighting is force-enabled (it's off by default — see [above](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)),
+is a no-op when no query term carries any real corpus evidence, and is *also* a no-op — even with a fully
+populated specificity configuration — when the feature flag itself is disabled, which documents this
+shop's own real current behavior (specificity weighting is inert end-to-end here today). A synthetic
+ground-truth exercise went further still — two throwaway rated queries against this shop's real catalog,
+one built from a highly specific search term and one built from an unspecific/browsy one, each rated so
+that only the "correct" per-query relevanceWeight would rank the intended product first. A real automated
+optimization run (not a toy) found a positive `specificityWeightShiftMagnitude` and reached a perfect
+combined score, and — the important part — disabling the specificity shift on the exact same winning
+configuration reproduced the specific query's score exactly but dropped the unspecific query's score
+substantially, confirming the shift (not just `relevanceWeight` alone) is what makes the difference. Both
+throwaway queries, their ratings, and the run itself were deleted afterward; nothing from this exercise is
+part of the shipped test suite (it depends on this demoshop's specific catalog content, not something
+portable to another shop's data).
 
 **Important limitation of this suite, worth knowing before trusting a green run alone:** none of it renders
 real Twig or compiled JS/CSS — it is 100% PHP. The SRP widget's actual on-page behavior (does the button
@@ -798,8 +1242,49 @@ fixture grant what the code expects) can only be confirmed with a real browser a
 This is not hypothetical: exactly that class of bug (a wrapper-CSS interaction hiding the widget, a
 class-naming mismatch between the Twig and the SCSS/JS, a missing permission fixture row) shipped
 undetected in this package's own history despite every automated check passing throughout, and was only
-caught by a manual click-through. A real WebDriver-based Presentation/Cest suite would close this gap; not
-built yet.
+caught by a manual click-through. The Browser (Presentation) suite below closes this gap.
+
+### Browser (Presentation) suite
+
+> **This suite is a development tool for this package's own reference demoshop — it is not something
+> to install or run against YOUR shop.** It logs in as `admin@spryker.com` (Zed) and
+> `search-admin@test-company.example` (Yves, the one account this demoshop's fixtures grant
+> `RateSearchRelevancePermissionPlugin` to), drives the real Zed GUI through a store/locale scope this
+> demoshop seeds (`DE`/`de_DE`), and — for the tests that exercise a full calibrate/optimize cycle — runs
+> the real `search-ranking-optimizer:calibrate`/`:optimize` console commands directly (this test process
+> and `vendor/bin/console` share one working directory), the same commands this shop's own cron ticks
+> would run. Point it at a different shop and most of it will simply fail on missing data, not on a real
+> defect. It exists to catch UI regressions while developing this package, not as something adopters are
+> expected to run.
+
+Two suites, split by layer:
+
+- `tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation/` (15 tests) — all 7 Zed pages
+  (Calibration, Assess Rated Queries, Ratings, Test Current Evaluation, Weight Checkpoints, Auto-tune
+  metrics settings, Automated Weight Optimization — the labels this package's own `navigation.xml`
+  ships, which the sidebar assertions match verbatim). Every
+  test that mutates live `search-ranking` config (relevanceWeight, metric weights, relevanceSaturationPoint)
+  is fully self-contained — it captures the real value first, mutates, verifies, and restores it again
+  before finishing (via a checkpoint restore where checkpoints cover the field, or a direct Settings edit
+  for `relevanceSaturationPoint`, which checkpoints deliberately exclude — see [Weight
+  Checkpoints](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)) —
+  so test order never matters and the suite leaves the environment exactly as it found it.
+- `tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation/` (9 tests) — the SRP
+  heart/check/X rating widget: renders, colorizes, persists across reload (which only holds once the SRP
+  template feeds `activeRatingType` back in — see [3b](#3b-register-the-yves-widget-plugins)), only one
+  button active per product, un-rating
+  removes the row rather than just deselecting it, coexists with search-debug's own overlay on the same
+  tile, and the permission gate (two negative-test accounts).
+
+```bash
+vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation
+vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Zed/SearchRankingOptimizerGuiPresentation
+vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation
+vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/Yves/SearchRankingOptimizerWidgetPresentation
+```
+
+Like the rest of the test suite, neither is part of CI — both need a real running shop plus the Selenium/
+chromedriver service already provisioned in this demoshop's `docker-compose.yml`.
 
 ### Opt-in ground-truth suite (not part of the default test run)
 
@@ -837,20 +1322,20 @@ right methods were called but never that. This includes the per-metric auto-tune
 second save updates the existing row rather than creating a duplicate) and its threshold-set filtering.
 One case (`findLatestCalculatedCalibration` returning `null`
 when nothing is calculated yet) is exempted from this shop's own suite: this demoshop always has at least
-one real calculated calibration already, so the "nothing calculated yet" branch can't be reached without
+one real calculated saturation point calibration already, so the "nothing calculated yet" branch can't be reached without
 deleting real data — covered by inspection instead (a two-line early-return, same shape as the four
 sibling not-found guards that *are* exercised).
 
 The `Client/SearchRankingOptimizer` suite lives at `tests/SprykerCommunityTest/Client/SearchRankingOptimizer`.
-`CalibrationSearcherTest` is a real integration test, not a unit test: it builds the exact query
+`SaturationPointCalibrationSearcherTest` is a real integration test, not a unit test: it builds the exact query
 `SearchRankingOptimizerFactory::createCalibrationSearcher()` builds in production and fires it at this
 shop's own real product-page index (a throwaway fixture index would prove nothing here — this class exists
 specifically to sample real relevance scores from the real catalog), asserting a known search term returns
 real positive scores and an unmatched term returns none. `RawRelevanceScoreExtractorTest` covers the
 explanation-parsing logic itself as a pure unit test against all four known `_explanation` shapes
-(function-score-wrapped, unwrapped, nested, the zero-value guard) — `CalibrationSearcher` never wraps its
+(function-score-wrapped, unwrapped, nested, the zero-value guard) — `SaturationPointCalibrationSearcher` never wraps its
 query in `function_score` (unlike search-ranking's live serving path), so the unwrapped-fallback shape
-those unit tests assume is the same shape confirmed live against this shop's real OpenSearch 1.3.4.
+those unit tests assume is the same shape this shop's real OpenSearch 1.3.4 actually returns.
 `NeverInvokedStoreClient` is the one class with no test: a `LogicException`-throwing stub that structurally
 satisfies an interface but is documented, by construction, to never actually be called — the same
 exemption this project's own audit convention already grants exception/boilerplate classes.
@@ -859,11 +1344,11 @@ Coverage (Codeception + pcov): 100% of methods/lines on every business-logic cla
 documented exemptions above (`NeverInvokedStoreClient`, and the one unreachable-in-this-shop branch in
 `SearchRankingOptimizerRepository`). `GatewayController::submitProductRelevanceJudgmentAction()` itself is
 the one further exemption, same class as those two: it is a thin pass-through to
-`RelevanceJudgmentAuthorizer` and `SearchRankingOptimizerFacade` (both independently unit-tested above) and
+`CompanyUserPermissionAuthorizer` and `SearchRankingOptimizerFacade` (both independently unit-tested above) and
 needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
 verification in [Status](#status) instead of a unit test.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 80
+Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 151
 files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
 generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
 `transfer:generate`. **Invoke it via the real `packages/` path, not the `vendor/` symlink** — running it

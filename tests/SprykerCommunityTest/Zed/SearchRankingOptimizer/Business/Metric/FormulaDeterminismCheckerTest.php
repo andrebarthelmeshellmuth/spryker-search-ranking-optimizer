@@ -22,33 +22,21 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDetermini
  */
 class FormulaDeterminismCheckerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testIsDeterministicReturnsFalseForARandomFormula(): void
     {
         $this->assertFalse((new FormulaDeterminismChecker())->isDeterministic('random()'));
     }
 
-    /**
-     * @return void
-     */
     public function testIsDeterministicReturnsFalseWhenRandomIsPartOfALargerExpression(): void
     {
         $this->assertFalse((new FormulaDeterminismChecker())->isDeterministic('x + random() * 0.1'));
     }
 
-    /**
-     * @return void
-     */
     public function testIsDeterministicReturnsFalseRegardlessOfWhitespaceBeforeTheParenthesis(): void
     {
         $this->assertFalse((new FormulaDeterminismChecker())->isDeterministic('random ()'));
     }
 
-    /**
-     * @return void
-     */
     public function testIsDeterministicReturnsTrueForARealBusinessFormula(): void
     {
         $checker = new FormulaDeterminismChecker();
@@ -61,8 +49,6 @@ class FormulaDeterminismCheckerTest extends Unit
      * A different, hypothetical function that merely starts with the same letters as "random" must never
      * false-positive -- there is no word boundary between "random" and "_", so \b alone wouldn't catch
      * this; the formula must literally be "random(" (optionally with whitespace) to match.
-     *
-     * @return void
      */
     public function testIsDeterministicDoesNotFalsePositiveOnADifferentFunctionSharingAPrefix(): void
     {

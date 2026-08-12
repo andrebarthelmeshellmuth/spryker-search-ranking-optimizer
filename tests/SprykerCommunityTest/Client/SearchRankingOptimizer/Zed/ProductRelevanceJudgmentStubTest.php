@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Client\SearchRankingOptimizer\Zed;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestInterface;
@@ -27,9 +29,6 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentS
  */
 class ProductRelevanceJudgmentStubTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testSubmitProductRelevanceJudgmentCallsTheExpectedGatewayUrlWithTheRequestTransfer(): void
     {
         // Arrange
@@ -58,9 +57,6 @@ class ProductRelevanceJudgmentStubTest extends Unit
         $this->assertSame($responseTransfer, $result);
     }
 
-    /**
-     * @return void
-     */
     public function testClearProductRelevanceJudgmentCallsTheExpectedGatewayUrlWithTheRequestTransfer(): void
     {
         // Arrange
@@ -83,6 +79,33 @@ class ProductRelevanceJudgmentStubTest extends Unit
 
         // Act
         $result = $stub->clearProductRelevanceJudgment($requestTransfer);
+
+        // Assert
+        $this->assertSame($responseTransfer, $result);
+    }
+
+    public function testGetProductRelevanceJudgmentsCallsTheExpectedGatewayUrlWithTheBatchRequestTransfer(): void
+    {
+        // Arrange
+        $requestTransfer = (new SearchRankingProductRelevanceJudgmentBatchRequestTransfer())
+            ->setSearchTerm('chair')
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setIdProductAbstracts([1, 2, 3])
+            ->setCustomerReference('CUST-1');
+
+        $responseTransfer = (new SearchRankingProductRelevanceJudgmentBatchResponseTransfer())->setIsSuccess(true);
+
+        $zedRequestClientMock = $this->createMock(SearchRankingOptimizerToZedRequestInterface::class);
+        $zedRequestClientMock->expects($this->once())
+            ->method('call')
+            ->with('/search-ranking-optimizer/gateway/get-product-relevance-judgments', $requestTransfer)
+            ->willReturn($responseTransfer);
+
+        $stub = new ProductRelevanceJudgmentStub($zedRequestClientMock);
+
+        // Act
+        $result = $stub->getProductRelevanceJudgments($requestTransfer);
 
         // Assert
         $this->assertSame($responseTransfer, $result);

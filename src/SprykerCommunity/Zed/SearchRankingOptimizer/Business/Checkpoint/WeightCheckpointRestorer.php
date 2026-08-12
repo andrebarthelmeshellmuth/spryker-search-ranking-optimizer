@@ -10,25 +10,17 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint;
 
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
 class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
-     */
     protected WeightCheckpointRecorderInterface $recorder;
 
     /**
@@ -50,10 +42,10 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
      * {@inheritDoc}
      *
      * @param int $idSearchRankingWeightCheckpoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function restore(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer
+    public function restore(int $idSearchRankingWeightCheckpoint, string $storeName, string $localeName): ?SearchRankingWeightCheckpointTransfer
     {
         $weightCheckpointTransfer = $this->repository->findWeightCheckpointById($idSearchRankingWeightCheckpoint);
 
@@ -61,18 +53,22 @@ class WeightCheckpointRestorer implements WeightCheckpointRestorerInterface
             return null;
         }
 
-        $this->searchRankingFacade->saveRelevanceWeight($weightCheckpointTransfer->getRelevanceWeightOrFail());
-        $this->searchRankingFacade->saveEntropyProbeResultSize($weightCheckpointTransfer->getEntropyProbeResultSizeOrFail());
-        $this->searchRankingFacade->saveEntropyWeightExponent($weightCheckpointTransfer->getEntropyWeightExponentOrFail());
-        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($weightCheckpointTransfer->getEntropyWeightShiftMagnitudeOrFail());
+        $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $weightCheckpointTransfer->getRelevanceWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $weightCheckpointTransfer->getSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $weightCheckpointTransfer->getSpecificityCurveExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $weightCheckpointTransfer->getSpecificityWeightShiftMagnitudeOrFail());
 
         foreach ($weightCheckpointTransfer->getMetricWeights() as $metricWeightTransfer) {
             $this->searchRankingFacade->saveMetricWeight(
                 $metricWeightTransfer->getIdSearchRankingMetricOrFail(),
+                $storeName,
+                $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
+                SharedSearchRankingConfig::CHANGE_SOURCE_CHECKPOINT_RESTORE,
             );
         }
 
-        return $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL);
+        return $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL, $storeName, $localeName);
     }
 }

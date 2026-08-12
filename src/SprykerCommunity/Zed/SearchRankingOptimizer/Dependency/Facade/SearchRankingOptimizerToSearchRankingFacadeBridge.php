@@ -9,6 +9,9 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
+
 class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRankingOptimizerToSearchRankingFacadeInterface
 {
     /**
@@ -25,115 +28,168 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     }
 
     /**
-     * @return float
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function getRelevanceSaturationPoint(): float
+    public function getConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
-        return $this->searchRankingFacade->getRelevanceSaturationPoint();
+        return $this->searchRankingFacade->getConfiguration($storeName, $localeName);
     }
 
     /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getRelevanceSaturationPoint(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getRelevanceSaturationPoint($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
      * @param float $relevanceSaturationPoint
-     *
-     * @return void
      */
-    public function saveRelevanceSaturationPoint(float $relevanceSaturationPoint): void
+    public function saveRelevanceSaturationPoint(string $storeName, string $localeName, float $relevanceSaturationPoint): void
     {
-        $this->searchRankingFacade->saveRelevanceSaturationPoint($relevanceSaturationPoint);
+        $this->searchRankingFacade->saveRelevanceSaturationPoint($storeName, $localeName, $relevanceSaturationPoint);
     }
 
     /**
-     * @return float
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function getRelevanceWeight(): float
+    public function getRelevanceWeight(string $storeName, string $localeName): float
     {
-        return $this->searchRankingFacade->getRelevanceWeight();
+        return $this->searchRankingFacade->getRelevanceWeight($storeName, $localeName);
     }
 
     /**
+     * @param string $storeName
+     * @param string $localeName
      * @param float $relevanceWeight
+     */
+    public function saveRelevanceWeight(string $storeName, string $localeName, float $relevanceWeight): void
+    {
+        $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $relevanceWeight);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificitySaturationPoint(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificitySaturationPoint($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificitySaturationPoint
+     */
+    public function saveSpecificitySaturationPoint(string $storeName, string $localeName, float $specificitySaturationPoint): void
+    {
+        $this->searchRankingFacade->saveSpecificitySaturationPoint($storeName, $localeName, $specificitySaturationPoint);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificityBlendWeight(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityBlendWeight
+     */
+    public function saveSpecificityBlendWeight(string $storeName, string $localeName, float $specificityBlendWeight): void
+    {
+        $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $specificityBlendWeight);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificityCurveExponent(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityCurveExponent
+     */
+    public function saveSpecificityCurveExponent(string $storeName, string $localeName, float $specificityCurveExponent): void
+    {
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $specificityCurveExponent);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificityWeightExponent(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityWeightExponent
+     */
+    public function saveSpecificityWeightExponent(string $storeName, string $localeName, float $specificityWeightExponent): void
+    {
+        $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $specificityWeightExponent);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getSpecificityWeightShiftMagnitude(string $storeName, string $localeName): float
+    {
+        return $this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName);
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $specificityWeightShiftMagnitude
+     */
+    public function saveSpecificityWeightShiftMagnitude(string $storeName, string $localeName, float $specificityWeightShiftMagnitude): void
+    {
+        $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $specificityWeightShiftMagnitude);
+    }
+
+    public function isSpecificityWeightingEnabled(): bool
+    {
+        return $this->searchRankingFacade->isSpecificityWeightingEnabled();
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
      *
-     * @return void
+     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float, isLocaleScoped: bool}>
      */
-    public function saveRelevanceWeight(float $relevanceWeight): void
-    {
-        $this->searchRankingFacade->saveRelevanceWeight($relevanceWeight);
-    }
-
-    /**
-     * @return int
-     */
-    public function getEntropyProbeResultSize(): int
-    {
-        return $this->searchRankingFacade->getEntropyProbeResultSize();
-    }
-
-    /**
-     * @param int $entropyProbeResultSize
-     *
-     * @return void
-     */
-    public function saveEntropyProbeResultSize(int $entropyProbeResultSize): void
-    {
-        $this->searchRankingFacade->saveEntropyProbeResultSize($entropyProbeResultSize);
-    }
-
-    /**
-     * @return float
-     */
-    public function getEntropyWeightExponent(): float
-    {
-        return $this->searchRankingFacade->getEntropyWeightExponent();
-    }
-
-    /**
-     * @param float $entropyWeightExponent
-     *
-     * @return void
-     */
-    public function saveEntropyWeightExponent(float $entropyWeightExponent): void
-    {
-        $this->searchRankingFacade->saveEntropyWeightExponent($entropyWeightExponent);
-    }
-
-    /**
-     * @return float
-     */
-    public function getEntropyWeightShiftMagnitude(): float
-    {
-        return $this->searchRankingFacade->getEntropyWeightShiftMagnitude();
-    }
-
-    /**
-     * @param float $entropyWeightShiftMagnitude
-     *
-     * @return void
-     */
-    public function saveEntropyWeightShiftMagnitude(float $entropyWeightShiftMagnitude): void
-    {
-        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($entropyWeightShiftMagnitude);
-    }
-
-    /**
-     * @return bool
-     */
-    public function isEntropyWeightingEnabled(): bool
-    {
-        return $this->searchRankingFacade->isEntropyWeightingEnabled();
-    }
-
-    /**
-     * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float}>
-     */
-    public function getMetricWeights(): array
+    public function getMetricWeights(string $storeName, string $localeName): array
     {
         $metricWeights = [];
 
-        foreach ($this->searchRankingFacade->getMetricCollection()->getMetrics() as $metricTransfer) {
+        foreach ($this->searchRankingFacade->getMetricCollection($storeName, $localeName)->getMetrics() as $metricTransfer) {
             $metricWeights[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
                 'weight' => $metricTransfer->getWeightOrFail(),
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
             ];
         }
 
@@ -142,58 +198,95 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
 
     /**
      * @param int $idSearchRankingMetric
-     * @param float $weight
+     * @param string $storeName
+     * @param string $localeName
      *
-     * @return bool
+     * @return array<string>
      */
-    public function saveMetricWeight(int $idSearchRankingMetric, float $weight): bool
+    public function resolveEffectiveWeightLocales(int $idSearchRankingMetric, string $storeName, string $localeName): array
     {
-        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+        return $this->searchRankingFacade->resolveEffectiveWeightLocales($idSearchRankingMetric, $storeName, $localeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $weight
+     * @param string $changeSource
+     */
+    public function saveMetricWeight(int $idSearchRankingMetric, string $storeName, string $localeName, float $weight, string $changeSource): bool
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return false;
         }
 
-        $this->searchRankingFacade->saveMetric($metricTransfer->setWeight($weight));
+        $this->searchRankingFacade->saveMetricWeight($idSearchRankingMetric, $storeName, $localeName, $weight, $changeSource);
 
         return true;
     }
 
     /**
-     * @return array<int, array{idSearchRankingMetric: int, name: string}>
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>
      */
-    public function getActiveMetrics(): array
+    public function getActiveMetrics(string $storeName, string $localeName): array
     {
         $metrics = [];
 
-        foreach ($this->searchRankingFacade->getActiveMetricCollection()->getMetrics() as $metricTransfer) {
+        foreach (
+            $this->searchRankingFacade->getActiveMetricCollection($storeName, $localeName)->getMetrics() as $metricTransfer
+        ) {
             $metrics[] = [
                 'idSearchRankingMetric' => $metricTransfer->getIdSearchRankingMetricOrFail(),
                 'name' => $metricTransfer->getNameOrFail(),
+                'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
             ];
         }
 
         return $metrics;
     }
 
-    /**
-     * @param int $idSearchRankingMetric
-     *
-     * @return float|null
-     */
-    public function evaluateCurrentMetricFit(int $idSearchRankingMetric): ?float
+    public function getRandomMetricName(): string
     {
-        return $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric);
+        return $this->searchRankingFacade->getRandomMetricName();
     }
 
     /**
      * @param int $idSearchRankingMetric
-     *
-     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null}|null
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findMetricDetail(int $idSearchRankingMetric): ?array
+    public function evaluateCurrentMetricFit(int $idSearchRankingMetric, string $storeName, string $localeName): ?float
     {
-        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+        return $this->searchRankingFacade->evaluateCurrentMetricFit($idSearchRankingMetric, $storeName, $localeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     *
+     * @return array<string, float|null>
+     */
+    public function evaluateCurrentMetricFitAcrossLocales(int $idSearchRankingMetric, string $storeName): array
+    {
+        return $this->searchRankingFacade->evaluateCurrentMetricFitAcrossLocales($idSearchRankingMetric, $storeName);
+    }
+
+    /**
+     * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
+     *
+     * @return array{idSearchRankingMetric: int, name: string, formula: string, isHigherBetter: bool, shape: string|null, isLocaleScoped: bool}|null
+     */
+    public function findMetricDetail(int $idSearchRankingMetric, string $storeName, string $localeName): ?array
+    {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return null;
@@ -205,17 +298,20 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             'formula' => $metricTransfer->getFormulaOrFail(),
             'isHigherBetter' => $metricTransfer->getIsHigherBetter() ?? true,
             'shape' => $metricTransfer->getShape(),
+            'isLocaleScoped' => $metricTransfer->getIsLocaleScoped() ?? false,
         ];
     }
 
     /**
      * @param int $idSearchRankingMetric
+     * @param string $storeName
+     * @param string $localeName
      *
      * @return array<int, array{shape: string, formula: string, rSquared: float, isWinner: bool}>
      */
-    public function getFitCandidates(int $idSearchRankingMetric): array
+    public function getFitCandidates(int $idSearchRankingMetric, string $storeName, string $localeName): array
     {
-        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return [];
@@ -225,6 +321,8 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
             $idSearchRankingMetric,
             $metricTransfer->getFormulaOrFail(),
             $metricTransfer->getIsHigherBetter() ?? true,
+            $storeName,
+            $localeName,
         );
 
         $candidates = [];
@@ -244,37 +342,55 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     /**
      * @param int $idSearchRankingMetric
      * @param string $formula
-     *
-     * @return bool
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $changeSource
      */
-    public function saveMetricFormula(int $idSearchRankingMetric, string $formula): bool
-    {
-        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+    public function saveMetricFormula(
+        int $idSearchRankingMetric,
+        string $formula,
+        string $storeName,
+        string $localeName,
+        string $changeSource = SharedSearchRankingConfig::CHANGE_SOURCE_AUTO_TUNE,
+    ): bool {
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return false;
         }
 
-        $this->searchRankingFacade->saveMetric($metricTransfer->setFormula($formula));
+        $this->searchRankingFacade->saveMetric(
+            $metricTransfer->setFormula($formula)->setChangeSource($changeSource),
+            $storeName,
+            $localeName,
+        );
 
         return true;
     }
 
     /**
      * @param int $idSearchRankingMetric
-     *
-     * @return bool
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function recordMetricCheckOnly(int $idSearchRankingMetric): bool
+    public function recordMetricCheckOnly(int $idSearchRankingMetric, string $storeName, string $localeName): bool
     {
-        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric);
+        $metricTransfer = $this->searchRankingFacade->findMetricById($idSearchRankingMetric, $storeName, $localeName);
 
         if ($metricTransfer === null) {
             return false;
         }
 
-        $this->searchRankingFacade->recordCheckOnly($metricTransfer);
+        $this->searchRankingFacade->recordCheckOnly($metricTransfer, $storeName, $localeName);
 
         return true;
+    }
+
+    /**
+     * @param string $storeName
+     */
+    public function hasStoreConfiguration(string $storeName): bool
+    {
+        return $this->searchRankingFacade->hasStoreConfiguration($storeName);
     }
 }

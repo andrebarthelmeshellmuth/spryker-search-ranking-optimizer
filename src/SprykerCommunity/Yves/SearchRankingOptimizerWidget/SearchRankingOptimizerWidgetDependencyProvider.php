@@ -39,9 +39,8 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
+    #[\Override]
     public function provideDependencies(Container $container): Container
     {
         $container = parent::provideDependencies($container);
@@ -55,48 +54,36 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addSearchRankingOptimizerClient(Container $container): Container
     {
-        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, function (Container $container) {
-            return new SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge(
-                $container->getLocator()->searchRankingOptimizer()->client(),
-            );
-        });
+        $container->set(static::CLIENT_SEARCH_RANKING_OPTIMIZER, fn (Container $container) => new SearchRankingOptimizerWidgetToSearchRankingOptimizerClientBridge(
+            $container->getLocator()->searchRankingOptimizer()->client(),
+        ));
 
         return $container;
     }
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addCustomerClient(Container $container): Container
     {
-        $container->set(static::CLIENT_CUSTOMER, function (Container $container) {
-            return new SearchRankingOptimizerWidgetToCustomerClientBridge(
-                $container->getLocator()->customer()->client(),
-            );
-        });
+        $container->set(static::CLIENT_CUSTOMER, fn (Container $container) => new SearchRankingOptimizerWidgetToCustomerClientBridge(
+            $container->getLocator()->customer()->client(),
+        ));
 
         return $container;
     }
 
     /**
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addStoreClient(Container $container): Container
     {
-        $container->set(static::CLIENT_STORE, function (Container $container) {
-            return new SearchRankingOptimizerWidgetToStoreClientBridge(
-                $container->getLocator()->store()->client(),
-            );
-        });
+        $container->set(static::CLIENT_STORE, fn (Container $container) => new SearchRankingOptimizerWidgetToStoreClientBridge(
+            $container->getLocator()->store()->client(),
+        ));
 
         return $container;
     }
@@ -107,14 +94,10 @@ class SearchRankingOptimizerWidgetDependencyProvider extends AbstractBundleDepen
      * registered in the project's `ShopApplicationDependencyProvider` (already true in this shop).
      *
      * @param \Spryker\Yves\Kernel\Container $container
-     *
-     * @return \Spryker\Yves\Kernel\Container
      */
     protected function addCsrfTokenManager(Container $container): Container
     {
-        $container->set(static::SERVICE_FORM_CSRF_PROVIDER, function (Container $container) {
-            return $container->getApplicationService(static::SERVICE_FORM_CSRF_PROVIDER);
-        });
+        $container->set(static::SERVICE_FORM_CSRF_PROVIDER, fn (Container $container) => $container->getApplicationService(static::SERVICE_FORM_CSRF_PROVIDER));
 
         return $container;
     }

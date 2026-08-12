@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Yves\SearchRankingOptimizerWidget\Plugin\Twig;
 
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
 use Spryker\Service\Container\ContainerInterface;
 use Spryker\Shared\TwigExtension\Dependency\Plugin\TwigPluginInterface;
 use Spryker\Yves\Kernel\AbstractPlugin;
@@ -32,6 +33,13 @@ use Twig\TwigFunction;
  * the CSRF protection every Form-backed POST in this project gets automatically — same
  * `Symfony\Component\Security\Csrf\CsrfTokenManagerInterface` mechanism `spryker/multi-factor-auth`'s own
  * Yves module uses for its own non-Form AJAX actions.
+ *
+ * Also registers `getSearchRelevanceRatings(searchTerm, idProductAbstracts)` — one batched Zed round trip
+ * per SRP render (not one per product tile) returning `[idProductAbstract => ratingType]` for whichever of
+ * the given products this customer has already rated, so the widget can pre-fill its buttons on load
+ * instead of always starting blank. Fails open to an empty array (nothing pre-filled, buttons still fully
+ * usable) on any permission/session/gateway failure — a stale rating display is never worth breaking SRP
+ * rendering over.
  */
 class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements TwigPluginInterface
 {
@@ -46,6 +54,11 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
      * @var string
      */
     public const FUNCTION_NAME_RATING_CSRF_TOKEN = 'searchRankingOptimizerRatingCsrfToken';
+
+    /**
+     * @var string
+     */
+    public const FUNCTION_NAME_GET_SEARCH_RELEVANCE_RATINGS = 'getSearchRelevanceRatings';
 
     /**
      * Shared by both submit and clear — re-checked in {@see \SprykerCommunity\Yves\SearchRankingOptimizerWidget\Controller\SubmitRelevanceJudgmentController},
@@ -64,8 +77,6 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
      *
      * @param \Twig\Environment $twig
      * @param \Spryker\Service\Container\ContainerInterface $container
-     *
-     * @return \Twig\Environment
      */
     public function extend(Environment $twig, ContainerInterface $container): Environment
     {
@@ -79,6 +90,57 @@ class SearchRankingOptimizerWidgetTwigPlugin extends AbstractPlugin implements T
             fn (): string => $this->getFactory()->getCsrfTokenManager()->getToken(static::CSRF_TOKEN_ID)->getValue(),
         ));
 
+        $twig->addFunction(new TwigFunction(
+            static::FUNCTION_NAME_GET_SEARCH_RELEVANCE_RATINGS,
+            /**
+             * @param string $searchTerm
+             * @param array<int> $idProductAbstracts
+             *
+             * @return array<int, string>
+             */
+            fn (string $searchTerm, array $idProductAbstracts): array => $this->getSearchRelevanceRatings($searchTerm, $idProductAbstracts),
+        ));
+
         return $twig;
+    }
+
+    /**
+     * @param string $searchTerm
+     * @param array<int> $idProductAbstracts
+     *
+     * @return array<int, string>
+     */
+    protected function getSearchRelevanceRatings(string $searchTerm, array $idProductAbstracts): array
+    {
+        if ($idProductAbstracts === [] || !$this->can(RateSearchRelevancePermissionPlugin::KEY)) {
+            return [];
+        }
+
+        $customerTransfer = $this->getFactory()->getCustomerClient()->getCustomer();
+
+        if ($customerTransfer === null || $customerTransfer->getCustomerReference() === null) {
+            return [];
+        }
+
+        $requestTransfer = (new SearchRankingProductRelevanceJudgmentBatchRequestTransfer())
+            ->setSearchTerm($searchTerm)
+            ->setStoreName($this->getFactory()->getStoreClient()->getCurrentStore()->getNameOrFail())
+            ->setLocaleName($this->getLocale())
+            ->setIdProductAbstracts($idProductAbstracts)
+            ->setCustomerReference($customerTransfer->getCustomerReference());
+
+        $responseTransfer = $this->getFactory()->getSearchRankingOptimizerClient()->getProductRelevanceJudgments($requestTransfer);
+
+        if (!$responseTransfer->getIsSuccess()) {
+            return [];
+        }
+
+        $ratingTypesByIdProductAbstract = [];
+
+        foreach ($responseTransfer->getRatings() as $ratingTransfer) {
+            $ratingTypesByIdProductAbstract[$ratingTransfer->getFkProductAbstractOrFail()] = $ratingTransfer->getRatingTypeOrFail();
+        }
+
+        return $ratingTypesByIdProductAbstract;
     }
 }

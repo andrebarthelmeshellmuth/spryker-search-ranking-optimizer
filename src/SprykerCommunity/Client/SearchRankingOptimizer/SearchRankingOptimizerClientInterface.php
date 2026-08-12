@@ -11,6 +11,8 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 
@@ -21,7 +23,7 @@ interface SearchRankingOptimizerClientInterface
      * - Used only by the calibration feature. Fires the calibration query for $searchTerm directly
      *   against Elasticsearch (bypassing `Client\Catalog`/`Client\Search`, which are unusable from Zed in
      *   this shop — see
-     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcherInterface} for
+     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcherInterface} for
      *   why), and returns each matched product's raw text-relevance score, up to $limit.
      *
      * @api
@@ -37,6 +39,21 @@ interface SearchRankingOptimizerClientInterface
 
     /**
      * Specification:
+     * - Used only by the calibration feature, for `calibrationType=specificity` runs. Fires ONE
+     *   `_termvectors` probe for $searchTerm directly against Elasticsearch — no real catalog query at
+     *   all, unlike {@see getCalibrationScores()} — and returns the same blended raw specificity value
+     *   `search-ranking`'s own live weighting would compute, at the given $blendWeight.
+     *
+     * @api
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float;
+
+    /**
+     * Specification:
      * - Submits a Relevance Rater's heart/checkmark/X judgment for a (query, product) pair via a
      *   synchronous Zed gateway call. Zed independently re-authorizes the caller — this method does not
      *   itself check the RateSearchRelevancePermissionPlugin permission, that only gates whether the
@@ -45,8 +62,6 @@ interface SearchRankingOptimizerClientInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -62,12 +77,25 @@ interface SearchRankingOptimizerClientInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
     ): SearchRankingProductRelevanceJudgmentResponseTransfer;
+
+    /**
+     * Specification:
+     * - Fetches a Relevance Rater's own previously submitted judgments for a batch of product-abstract ids
+     *   via a synchronous Zed gateway call — backs the widget's "show me what I already rated" pre-fill on
+     *   page load. One call per page render (covering every product on it), not one per product tile. Zed
+     *   independently re-authorizes the caller, same as {@see submitProductRelevanceJudgment()}.
+     *
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 
     /**
      * Specification:
@@ -78,8 +106,6 @@ interface SearchRankingOptimizerClientInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer;
 
@@ -96,8 +122,6 @@ interface SearchRankingOptimizerClientInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
 }

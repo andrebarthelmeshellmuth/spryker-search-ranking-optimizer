@@ -11,15 +11,15 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence\Propel\Map
 
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationSearchTermTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationSearchTermTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
@@ -37,25 +37,23 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\Search
  */
 class SearchRankingOptimizerMapperTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testMapsCalibrationEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
-        $calibrationEntity = new SpySearchRankingCalibration();
-        $calibrationEntity->setIdSearchRankingCalibration(4);
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
+        $calibrationEntity->setIdSearchRankingSaturationPointCalibration(4);
         $calibrationEntity->setRelevantProductCount(20);
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('de_DE');
         $calibrationEntity->setStatus('finished');
+        $calibrationEntity->setCalibrationType('relevance_score');
         $calibrationEntity->setComputedK(1.2);
-        $calibrationEntity->setScoreMin(1.0);
-        $calibrationEntity->setScoreMax(9.0);
-        $calibrationEntity->setScoreMean(5.0);
-        $calibrationEntity->setScoreMedian(5.0);
-        $calibrationEntity->setScoreP25(3.0);
-        $calibrationEntity->setScoreP75(7.0);
+        $calibrationEntity->setValueMin(1.0);
+        $calibrationEntity->setValueMax(9.0);
+        $calibrationEntity->setValueMean(5.0);
+        $calibrationEntity->setValueMedian(5.0);
+        $calibrationEntity->setValueP25(3.0);
+        $calibrationEntity->setValueP75(7.0);
         $calibrationEntity->setSampleCount(20);
         $calibrationEntity->setCalculatedAt('2026-01-15 10:00:00');
         $calibrationEntity->setCreatedAt('2026-01-15 09:00:00');
@@ -65,21 +63,22 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $calibrationTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationEntityToTransfer(
             $calibrationEntity,
-            new SearchRankingCalibrationTransfer(),
+            new SearchRankingSaturationPointCalibrationTransfer(),
         );
 
         // Assert
-        $this->assertSame(4, $calibrationTransfer->getIdSearchRankingCalibration());
+        $this->assertSame(4, $calibrationTransfer->getIdSearchRankingSaturationPointCalibration());
         $this->assertSame(20, $calibrationTransfer->getRelevantProductCount());
         $this->assertSame('DE', $calibrationTransfer->getStoreName());
         $this->assertSame('de_DE', $calibrationTransfer->getLocaleName());
         $this->assertSame('finished', $calibrationTransfer->getStatus());
+        $this->assertSame('relevance_score', $calibrationTransfer->getCalibrationType());
         $this->assertSame(1.2, $calibrationTransfer->getComputedK());
-        $this->assertSame(1.0, $calibrationTransfer->getScoreMin());
-        $this->assertSame(9.0, $calibrationTransfer->getScoreMax());
-        $this->assertSame(5.0, $calibrationTransfer->getScoreMean());
-        $this->assertSame(3.0, $calibrationTransfer->getScoreP25());
-        $this->assertSame(7.0, $calibrationTransfer->getScoreP75());
+        $this->assertSame(1.0, $calibrationTransfer->getValueMin());
+        $this->assertSame(9.0, $calibrationTransfer->getValueMax());
+        $this->assertSame(5.0, $calibrationTransfer->getValueMean());
+        $this->assertSame(3.0, $calibrationTransfer->getValueP25());
+        $this->assertSame(7.0, $calibrationTransfer->getValueP75());
         $this->assertSame(20, $calibrationTransfer->getSampleCount());
         $this->assertStringStartsWith('2026-01-15T10:00:00', (string)$calibrationTransfer->getCalculatedAt());
         $this->assertSame(12, $calibrationTransfer->getTotalCount());
@@ -89,13 +88,11 @@ class SearchRankingOptimizerMapperTest extends Unit
     /**
      * `calculatedAt`/`createdAt` are nullable (e.g. a calibration that hasn't finished running yet) — the
      * nullsafe `?->format()` call must not throw.
-     *
-     * @return void
      */
     public function testMapsCalibrationEntityWithNoTimestampsToNullDates(): void
     {
         // Arrange
-        $calibrationEntity = new SpySearchRankingCalibration();
+        $calibrationEntity = new SpySearchRankingSaturationPointCalibration();
         $calibrationEntity->setStoreName('DE');
         $calibrationEntity->setLocaleName('de_DE');
         $calibrationEntity->setStatus('running');
@@ -104,7 +101,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Act
         $calibrationTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationEntityToTransfer(
             $calibrationEntity,
-            new SearchRankingCalibrationTransfer(),
+            new SearchRankingSaturationPointCalibrationTransfer(),
         );
 
         // Assert
@@ -112,87 +109,74 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertNull($calibrationTransfer->getCreatedAt());
     }
 
-    /**
-     * @return void
-     */
-    public function testMapsCalibrationSearchTermEntityFieldsOntoTheTransferIncludingExplodedScores(): void
+    public function testMapsCalibrationSearchTermEntityFieldsOntoTheTransferIncludingExplodedValues(): void
     {
         // Arrange
-        $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
-        $searchTermEntity->setIdSearchRankingCalibrationSearchTerm(9);
-        $searchTermEntity->setFkSearchRankingCalibration(4);
+        $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
+        $searchTermEntity->setIdSearchRankingSaturationPointCalibrationSearchTerm(9);
+        $searchTermEntity->setFkSearchRankingSaturationPointCalibration(4);
         $searchTermEntity->setSearchTerm('cable tie');
         $searchTermEntity->setProductsFound(12);
-        $searchTermEntity->setScores('1.5,2.5,3.5');
+        $searchTermEntity->setValues('1.5,2.5,3.5');
 
         // Act
         $searchTermTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationSearchTermEntityToTransfer(
             $searchTermEntity,
-            new SearchRankingCalibrationSearchTermTransfer(),
+            new SearchRankingSaturationPointCalibrationSearchTermTransfer(),
         );
 
         // Assert
-        $this->assertSame(9, $searchTermTransfer->getIdSearchRankingCalibrationSearchTerm());
-        $this->assertSame(4, $searchTermTransfer->getFkSearchRankingCalibration());
+        $this->assertSame(9, $searchTermTransfer->getIdSearchRankingSaturationPointCalibrationSearchTerm());
+        $this->assertSame(4, $searchTermTransfer->getFkSearchRankingSaturationPointCalibration());
         $this->assertSame('cable tie', $searchTermTransfer->getSearchTerm());
         $this->assertSame(12, $searchTermTransfer->getProductsFound());
-        $this->assertSame([1.5, 2.5, 3.5], $searchTermTransfer->getScores());
+        $this->assertSame([1.5, 2.5, 3.5], $searchTermTransfer->getValues());
     }
 
     /**
-     * A search term with no scores yet must map to an empty array rather than `[0.0]` (which is what a
+     * A search term with no values yet must map to an empty array rather than `[0.0]` (which is what a
      * naive `explode(',', '')` would produce).
-     *
-     * @return void
      */
-    public function testMapsACalibrationSearchTermWithNoScoresToAnEmptyArray(): void
+    public function testMapsACalibrationSearchTermWithNoValuesToAnEmptyArray(): void
     {
         // Arrange
-        $searchTermEntity = new SpySearchRankingCalibrationSearchTerm();
+        $searchTermEntity = new SpySearchRankingSaturationPointCalibrationSearchTerm();
         $searchTermEntity->setSearchTerm('no results yet');
         $searchTermEntity->setProductsFound(0);
-        $searchTermEntity->setScores(null);
+        $searchTermEntity->setValues(null);
 
         // Act
         $searchTermTransfer = (new SearchRankingOptimizerMapper())->mapCalibrationSearchTermEntityToTransfer(
             $searchTermEntity,
-            new SearchRankingCalibrationSearchTermTransfer(),
+            new SearchRankingSaturationPointCalibrationSearchTermTransfer(),
         );
 
         // Assert
-        $this->assertSame([], $searchTermTransfer->getScores());
+        $this->assertSame([], $searchTermTransfer->getValues());
     }
 
-    /**
-     * @return void
-     */
-    public function testImplodeScoresJoinsScoresWithACommaSeparator(): void
+    public function testImplodeValuesJoinsValuesWithACommaSeparator(): void
     {
         // Act
-        $scores = (new SearchRankingOptimizerMapper())->implodeScores([1.5, 2.5, 3.5]);
+        $values = (new SearchRankingOptimizerMapper())->implodeValues([1.5, 2.5, 3.5]);
 
         // Assert
-        $this->assertSame('1.5,2.5,3.5', $scores);
+        $this->assertSame('1.5,2.5,3.5', $values);
     }
 
     /**
-     * An empty scores array must become a genuine NULL, not an empty string, so "no scores recorded"
+     * An empty values array must become a genuine NULL, not an empty string, so "no values recorded"
      * stays distinguishable from a calibration search term that scored everything at zero.
-     *
-     * @return void
      */
-    public function testImplodeScoresReturnsNullForAnEmptyArray(): void
+    public function testImplodeValuesReturnsNullForAnEmptyArray(): void
     {
         // Act
-        $scores = (new SearchRankingOptimizerMapper())->implodeScores([]);
+        $values = (new SearchRankingOptimizerMapper())->implodeValues([]);
 
         // Assert
-        $this->assertNull($scores);
+        $this->assertNull($values);
     }
 
-    /**
-     * @return void
-     */
     public function testMapsEvaluationEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
@@ -217,15 +201,14 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(12, $evaluationTransfer->getQueryCount());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAutoTuneMetricConfigEntityFieldsOntoTheTransfer(): void
     {
         // Arrange
         $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
         $autoTuneMetricConfigEntity->setIdSearchRankingAutoTuneMetricConfig(3);
         $autoTuneMetricConfigEntity->setFkSearchRankingMetric(7);
+        $autoTuneMetricConfigEntity->setStoreName('DE');
+        $autoTuneMetricConfigEntity->setLocaleName('de_DE');
         $autoTuneMetricConfigEntity->setAutoTuneThreshold(0.8);
         $autoTuneMetricConfigEntity->setIsAutoUpdateEnabled(true);
         $autoTuneMetricConfigEntity->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY);
@@ -240,20 +223,21 @@ class SearchRankingOptimizerMapperTest extends Unit
         // Assert
         $this->assertSame(3, $autoTuneMetricConfigTransfer->getIdSearchRankingAutoTuneMetricConfig());
         $this->assertSame(7, $autoTuneMetricConfigTransfer->getIdSearchRankingMetric());
+        $this->assertSame('DE', $autoTuneMetricConfigTransfer->getStoreName());
+        $this->assertSame('de_DE', $autoTuneMetricConfigTransfer->getLocaleName());
         $this->assertSame(0.8, $autoTuneMetricConfigTransfer->getAutoTuneThreshold());
         $this->assertTrue($autoTuneMetricConfigTransfer->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigTransfer->getAutoUpdateScope());
         $this->assertFalse($autoTuneMetricConfigTransfer->getIsNotifyEnabled());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAutoTuneMetricConfigTransferFieldsOntoTheEntity(): void
     {
         // Arrange
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric(7)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setAutoTuneThreshold(0.8)
             ->setIsAutoUpdateEnabled(true)
             ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY)
@@ -267,6 +251,8 @@ class SearchRankingOptimizerMapperTest extends Unit
 
         // Assert
         $this->assertSame(7, $autoTuneMetricConfigEntity->getFkSearchRankingMetric());
+        $this->assertSame('DE', $autoTuneMetricConfigEntity->getStoreName());
+        $this->assertSame('de_DE', $autoTuneMetricConfigEntity->getLocaleName());
         $this->assertSame(0.8, $autoTuneMetricConfigEntity->getAutoTuneThreshold());
         $this->assertTrue($autoTuneMetricConfigEntity->getIsAutoUpdateEnabled());
         $this->assertSame(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PARAMETERS_ONLY, $autoTuneMetricConfigEntity->getAutoUpdateScope());
@@ -275,14 +261,14 @@ class SearchRankingOptimizerMapperTest extends Unit
 
     /**
      * A NULL threshold (opted-out metric) must map through as NULL, not silently coerced to 0.0.
-     *
-     * @return void
      */
     public function testMapsANullAutoTuneThresholdAsNullNotZero(): void
     {
         // Arrange
         $autoTuneMetricConfigTransfer = (new SearchRankingAutoTuneMetricConfigTransfer())
             ->setIdSearchRankingMetric(7)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setAutoTuneThreshold(null)
             ->setIsAutoUpdateEnabled(false)
             ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
@@ -298,9 +284,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertNull($autoTuneMetricConfigEntity->getAutoTuneThreshold());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsOptimizerRunEntityFieldsOntoTheTransferIncludingDecodedBestMetricWeights(): void
     {
         // Arrange
@@ -309,16 +292,19 @@ class SearchRankingOptimizerMapperTest extends Unit
         $optimizerRunEntity->setStoreName('DE');
         $optimizerRunEntity->setLocaleName('en_US');
         $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
+        $optimizerRunEntity->setIsTerminationCriteriaTrusted(true);
+        $optimizerRunEntity->setWarmStartFraction(0.5);
         $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
         $optimizerRunEntity->setTotalCount(400);
         $optimizerRunEntity->setProcessedCount(400);
+        $optimizerRunEntity->setGenerationsUsed(189);
         $optimizerRunEntity->setBaselineScore(0.65);
         $optimizerRunEntity->setBestRelevanceWeight(0.8);
         $optimizerRunEntity->setBestMetricWeights('[{"idSearchRankingMetric":1,"name":"top_seller","weight":0.6}]');
         $optimizerRunEntity->setBestScore(0.91);
-        $optimizerRunEntity->setBestEntropyWeightExponent(1.2);
-        $optimizerRunEntity->setBestEntropyWeightShiftMagnitude(0.25);
-        $optimizerRunEntity->setBestEntropyProbeResultSize(12);
+        $optimizerRunEntity->setBestSpecificityBlendWeight(0.75);
+        $optimizerRunEntity->setBestSpecificityWeightExponent(1.2);
+        $optimizerRunEntity->setBestSpecificityWeightShiftMagnitude(0.25);
         $optimizerRunEntity->setAppliedAt('2026-07-29 12:00:00');
 
         // Act
@@ -332,15 +318,18 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame('DE', $optimizerRunTransfer->getStoreName());
         $this->assertSame('en_US', $optimizerRunTransfer->getLocaleName());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, $optimizerRunTransfer->getAlgorithm());
+        $this->assertTrue($optimizerRunTransfer->getIsTerminationCriteriaTrusted());
+        $this->assertSame(0.5, $optimizerRunTransfer->getWarmStartFraction());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $optimizerRunTransfer->getStatus());
         $this->assertSame(400, $optimizerRunTransfer->getTotalCount());
         $this->assertSame(400, $optimizerRunTransfer->getProcessedCount());
+        $this->assertSame(189, $optimizerRunTransfer->getGenerationsUsed());
         $this->assertSame(0.65, $optimizerRunTransfer->getBaselineScore());
         $this->assertSame(0.8, $optimizerRunTransfer->getBestRelevanceWeight());
         $this->assertSame(0.91, $optimizerRunTransfer->getBestScore());
-        $this->assertSame(1.2, $optimizerRunTransfer->getBestEntropyWeightExponent());
-        $this->assertSame(0.25, $optimizerRunTransfer->getBestEntropyWeightShiftMagnitude());
-        $this->assertSame(12, $optimizerRunTransfer->getBestEntropyProbeResultSize());
+        $this->assertSame(0.75, $optimizerRunTransfer->getBestSpecificityBlendWeight());
+        $this->assertSame(1.2, $optimizerRunTransfer->getBestSpecificityWeightExponent());
+        $this->assertSame(0.25, $optimizerRunTransfer->getBestSpecificityWeightShiftMagnitude());
         $this->assertNotNull($optimizerRunTransfer->getAppliedAt());
 
         $bestMetricWeights = iterator_to_array($optimizerRunTransfer->getBestMetricWeights());
@@ -349,9 +338,6 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame(0.6, $bestMetricWeights[0]->getWeight());
     }
 
-    /**
-     * @return void
-     */
     public function testMapsAnOptimizerRunWithNoBestMetricWeightsYetToAnEmptyCollection(): void
     {
         // Arrange

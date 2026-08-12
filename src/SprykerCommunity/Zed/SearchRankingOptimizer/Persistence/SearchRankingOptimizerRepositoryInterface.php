@@ -10,10 +10,10 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
-use Generated\Shared\Transfer\SearchRankingCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 
 interface SearchRankingOptimizerRepositoryInterface
@@ -22,31 +22,33 @@ interface SearchRankingOptimizerRepositoryInterface
      * Returns every calibration run with status=uploaded, newest first (by id) — search terms are NOT
      * loaded (use {@see findCalibrationWithSearchTerms()} for that).
      *
-     * @return array<\Generated\Shared\Transfer\SearchRankingCalibrationTransfer>
+     * @return array<\Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer>
      */
     public function getUploadedCalibrations(): array;
 
     /**
-     * @param int $idSearchRankingCalibration
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     * @param int $idSearchRankingSaturationPointCalibration
      */
-    public function findCalibrationWithSearchTerms(int $idSearchRankingCalibration): ?SearchRankingCalibrationTransfer;
+    public function findCalibrationWithSearchTerms(int $idSearchRankingSaturationPointCalibration): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * The most recent calibration run with status=calculated, or null when none has ever finished.
+     * The most recent calibration run with status=calculated for this (store, locale), or null when none
+     * has ever finished there.
      *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findLatestCalculatedCalibration(): ?SearchRankingCalibrationTransfer;
+    public function findLatestCalculatedCalibration(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
-     * The run currently in status=calculating, if any — at most one at a time by design. Backs the
-     * Calibration page's live progress counter.
+     * The run for this (store, locale) currently in status=calculating, if any — at most one SYSTEM-WIDE
+     * at a time by design, but that one run may be for a different scope than the one asked about here.
+     * Backs the Calibration page's live progress counter.
      *
-     * @return \Generated\Shared\Transfer\SearchRankingCalibrationTransfer|null
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findCalibrationInProgress(): ?SearchRankingCalibrationTransfer;
+    public function findCalibrationInProgress(string $storeName, string $localeName): ?SearchRankingSaturationPointCalibrationTransfer;
 
     /**
      * Looks up a query by its exact canonical (searchTerm, storeName, localeName) key — the same key
@@ -55,8 +57,6 @@ interface SearchRankingOptimizerRepositoryInterface
      * @param string $searchTerm
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryByTermStoreLocale(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryTransfer;
 
@@ -70,15 +70,13 @@ interface SearchRankingOptimizerRepositoryInterface
 
     /**
      * @param int $idSearchRankingQuery
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer|null
      */
     public function findQueryById(int $idSearchRankingQuery): ?SearchRankingQueryTransfer;
 
     /**
      * The distinct, already-canonical search terms organically collected via the SRP rating widget for a
      * given store/locale — the default calibration term source once real ratings exist (see
-     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface::createCalibration()}).
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\SaturationPointCalibrationUploadHandlerInterface::createCalibration()}).
      *
      * @param string $storeName
      * @param string $localeName
@@ -113,63 +111,93 @@ interface SearchRankingOptimizerRepositoryInterface
     public function findRatingsByStoreLocale(string $storeName, string $localeName): array;
 
     /**
+     * One customer's own ratings for a given query, restricted to the given product-abstract ids — the
+     * batched read backing the SRP widget's "show me what I already rated" pre-fill, one call per page
+     * render covering every product on it rather than one call per tile.
+     *
+     * @param int $idSearchRankingQuery
+     * @param string $customerReference
+     * @param array<int> $idProductAbstracts
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingQueryRatingTransfer>
+     */
+    public function findRatingsByQueryCustomerAndProducts(int $idSearchRankingQuery, string $customerReference, array $idProductAbstracts): array;
+
+    /**
      * The most recently persisted rank_eval evaluation run for a given store/locale, or null when none has
      * ever run.
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationTransfer|null
      */
     public function findLatestEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
 
     /**
-     * Every persisted evaluation run for a given store/locale, newest first — backs a simple score-over-
-     * time history list on the Zed Evaluation page.
+     * Every persisted evaluation run, newest first — backs the Zed Evaluation page's history list. Null
+     * $storeName/$localeName means "no filter" (show every store/locale); a non-null value narrows to
+     * that scope only.
      *
-     * @param string $storeName
-     * @param string $localeName
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingEvaluationTransfer>
      */
-    public function findEvaluationHistoryByStoreLocale(string $storeName, string $localeName): array;
+    public function findEvaluationHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
-     * Every persisted weight checkpoint, newest first — backs the Zed Checkpoint page's history list.
+     * Every persisted weight checkpoint, newest first — backs the Zed Checkpoint page's history list. Null
+     * $storeName/$localeName means "no filter" (show every store/locale); a non-null value narrows to
+     * that scope only.
+     *
+     * @param string|null $storeName
+     * @param string|null $localeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer>
      */
-    public function findWeightCheckpointHistory(): array;
+    public function findWeightCheckpointHistory(?string $storeName = null, ?string $localeName = null): array;
 
     /**
      * @param int $idSearchRankingWeightCheckpoint
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer|null
      */
     public function findWeightCheckpointById(int $idSearchRankingWeightCheckpoint): ?SearchRankingWeightCheckpointTransfer;
 
     /**
-     * Returns null when the metric has no auto-tune config yet (has never had a threshold set) — a
-     * safe, expected state for most metrics, not an error.
+     * Returns null when the metric has no auto-tune config yet for this (store, locale) — a safe,
+     * expected state for most metric+store+locale combinations, not an error.
      *
      * @param int $idSearchRankingMetric
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer|null
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function findAutoTuneMetricConfigByMetricId(int $idSearchRankingMetric): ?SearchRankingAutoTuneMetricConfigTransfer;
+    public function findAutoTuneMetricConfigByMetricId(
+        int $idSearchRankingMetric,
+        string $storeName,
+        string $localeName,
+    ): ?SearchRankingAutoTuneMetricConfigTransfer;
 
     /**
-     * Only configs with a real threshold set — a metric with no config row, or an explicit NULL
-     * threshold, has opted out of auto-tune entirely and is simply absent here.
+     * Only configs with a real threshold set for THIS store — a metric with no config row for a given
+     * (store, locale), or an explicit NULL threshold, has opted out of auto-tune entirely for that scope
+     * and is simply absent here. Store-scoped only, NOT locale-filtered — can return several rows for the
+     * same metric (one per locale it's been configured at).
+     *
+     * @param string $storeName
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer>
      */
-    public function findAutoTuneMetricConfigsWithThresholdSet(): array;
+    public function findAutoTuneMetricConfigsWithThresholdSet(string $storeName): array;
+
+    /**
+     * Whether ANY metric, in any store/locale, has "notify by email" turned on — the one thing that makes
+     * the auto-tune notification ACL role actually required. Deliberately unscoped and threshold-agnostic:
+     * this answers "could this shop ever need to email an admin", not "will it email one tonight", so a
+     * config that has notify enabled but no threshold yet still counts (a threshold is one form save away,
+     * and a diagnostic that stayed quiet until then would go quiet exactly when it was about to matter).
+     */
+    public function hasAutoTuneMetricConfigWithNotifyEnabled(): bool;
 
     /**
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunById(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer;
 
@@ -178,16 +206,12 @@ interface SearchRankingOptimizerRepositoryInterface
      * `search-ranking-optimizer:optimize` invocation, same "at most one at a time" discipline as
      * Calibration (though Calibration instead always picks the NEWEST upload, since there only the latest
      * search-term list matters; here every queued run is a distinct, equally-valid request).
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOldestQueuedOptimizerRun(): ?SearchRankingOptimizerRunTransfer;
 
     /**
      * The run currently being worked, if any — backs the Zed page's live progress counter. Deliberately
      * cheap (a single indexed lookup by status), safe to poll.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findOptimizerRunInProgress(): ?SearchRankingOptimizerRunTransfer;
 
@@ -197,8 +221,6 @@ interface SearchRankingOptimizerRepositoryInterface
      *
      * @param string $storeName
      * @param string $localeName
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function findLatestOptimizerRunByStoreLocale(string $storeName, string $localeName): ?SearchRankingOptimizerRunTransfer;
 }

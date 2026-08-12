@@ -10,6 +10,26 @@
                 What <code>search-ranking</code> is using for ranking right now — take a checkpoint before
                 changing anything by hand, so there's always a way back.
             </p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% if selectedHistoryStoreName %}<input type="hidden" name="historyStoreName" value="{{ selectedHistoryStoreName }}">{% endif %}
+                {% if selectedHistoryLocaleName %}<input type="hidden" name="historyLocaleName" value="{{ selectedHistoryLocaleName }}">{% endif %}
+            </form>
             <table class="table">
                 <tbody>
                     <tr>
@@ -17,26 +37,30 @@
                         <td><strong>{{ relevanceWeight }}</strong></td>
                     </tr>
                     <tr>
-                        <th>Entropy weighting enabled?</th>
+                        <th>Specificity weighting enabled?</th>
                         <td>
-                            {% if isEntropyWeightingEnabled %}
+                            {% if isSpecificityWeightingEnabled %}
                                 <span class="label label-success">Yes</span>
                             {% else %}
-                                <span class="label label-default">No</span>
+                                No
                             {% endif %}
                         </td>
                     </tr>
                     <tr>
-                        <th>Entropy probe result size</th>
-                        <td>{{ entropyProbeResultSize }}</td>
+                        <th>Specificity blend weight</th>
+                        <td>{{ specificityBlendWeight }}</td>
                     </tr>
                     <tr>
-                        <th>Entropy weight exponent</th>
-                        <td>{{ entropyWeightExponent }}</td>
+                        <th>Specificity curve exponent</th>
+                        <td>{{ specificityCurveExponent }}</td>
                     </tr>
                     <tr>
-                        <th>Entropy weight shift magnitude</th>
-                        <td>{{ entropyWeightShiftMagnitude }}</td>
+                        <th>Specificity weight exponent</th>
+                        <td>{{ specificityWeightExponent }}</td>
+                    </tr>
+                    <tr>
+                        <th>Specificity weight shift magnitude</th>
+                        <td>{{ specificityWeightShiftMagnitude }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -62,7 +86,7 @@
                 <p>No metrics configured yet.</p>
             {% endif %}
 
-            {{ form_start(recordForm, { action: url('/search-ranking-optimizer/checkpoint/record'), method: 'POST' }) }}
+            {{ form_start(recordForm, { action: recordFormAction, method: 'POST' }) }}
             {{ form_widget(recordForm) }}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{{ 'Take checkpoint now' | trans }}</button>
@@ -73,35 +97,80 @@
 
     {% embed '@Gui/Partials/widget.twig' with { widget_title: 'History' } %}
         {% block widget_content %}
+            <p>Every recorded checkpoint, independent of the Current State scope above — a cross-scope audit trail.</p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="historyStoreName">{{ 'Store' | trans }}</label>
+                <select name="historyStoreName" id="historyStoreName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if not selectedHistoryStoreName %}selected="selected"{% endif %}>{{ 'All stores' | trans }}</option>
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedHistoryStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="historyLocaleName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="historyLocaleName" id="historyLocaleName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if not selectedHistoryLocaleName %}selected="selected"{% endif %}>{{ 'All locales' | trans }}</option>
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedHistoryLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="storeName" value="{{ selectedStoreName }}">
+                <input type="hidden" name="localeName" value="{{ selectedLocaleName }}">
+            </form>
             {% if weightCheckpointHistory %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Recorded at</th>
-                            <th>Source</th>
-                            <th>Relevance weight</th>
-                            <th>Entropy enabled?</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for weightCheckpoint in weightCheckpointHistory %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <td>{{ weightCheckpoint.createdAt }}</td>
-                                <td>{{ weightCheckpoint.source }}</td>
-                                <td>{{ weightCheckpoint.relevanceWeight }}</td>
-                                <td>{{ weightCheckpoint.isEntropyWeightingEnabled ? 'Yes' : 'No' }}</td>
-                                <td>
-                                    {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
-                                    {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
-                                    {{ form_widget(restoreForm) }}
-                                    <button type="submit" class="btn btn-xs btn-outline-primary">{{ 'Restore' | trans }}</button>
-                                    {{ form_end(restoreForm) }}
-                                </td>
+                                <th>Recorded at</th>
+                                <th>Store</th>
+                                <th>Actions</th>
+                                <th>Locale</th>
+                                <th>Source</th>
+                                <th>Relevance weight</th>
+                                <th>Specificity enabled?</th>
+                                {% for metricName in metricNames %}
+                                    <th>{{ metricName }}</th>
+                                {% endfor %}
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for weightCheckpoint in weightCheckpointHistory %}
+                                <tr>
+                                    <td>{{ weightCheckpoint.createdAt }}</td>
+                                    <td>{{ weightCheckpoint.storeName }}</td>
+                                    <td>
+                                        {% set restoreForm = restoreForms[weightCheckpoint.idSearchRankingWeightCheckpoint] %}
+                                        {% set siblingLocalesByMetric = restoreSiblingLocalesByCheckpointId[weightCheckpoint.idSearchRankingWeightCheckpoint] ?? [] %}
+                                        {{ form_start(restoreForm, { action: url('/search-ranking-optimizer/checkpoint/restore'), method: 'POST' }) }}
+                                        {{ form_widget(restoreForm) }}
+                                        <button type="submit" class="btn btn-xs btn-outline-primary"
+                                            {% if siblingLocalesByMetric %}
+                                                onclick="return confirm('Restoring this will also overwrite the store-wide weight of {% for metricName, siblingLocales in siblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %} for {{ selectedStoreName }} -- not just {{ selectedLocaleName }}. Continue?');"
+                                            {% endif %}
+                                        >{{ 'Restore' | trans }}</button>
+                                        {{ form_end(restoreForm) }}
+                                        {% if siblingLocalesByMetric %}
+                                            <div class="text-warning" style="font-size: 11px;">
+                                                Also overwrites: {% for metricName, siblingLocales in siblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ weightCheckpoint.localeName }}</td>
+                                    <td>{{ weightCheckpoint.source }}</td>
+                                    <td>{{ weightCheckpoint.relevanceWeight }}</td>
+                                    <td>{{ weightCheckpoint.isSpecificityWeightingEnabled ? 'Yes' : 'No' }}</td>
+                                    {% for metricName in metricNames %}
+                                        <td>{{ metricWeightsByCheckpointId[weightCheckpoint.idSearchRankingWeightCheckpoint][metricName] ?? '—' }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
                 <p>No checkpoint has been recorded yet.</p>
             {% endif %}

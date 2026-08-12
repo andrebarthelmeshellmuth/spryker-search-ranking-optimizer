@@ -11,6 +11,34 @@
                 nothing runs against it until one is set. Auto-update and notify are independent toggles:
                 you can get a proposal email without anything changing automatically, or the reverse.
             </p>
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            <p class="text-muted">
+                <strong>Current fit (R²)</strong> below is always for the exact store+locale selected
+                above. The settings you save follow search-ranking's own per-metric scoping: for most
+                metrics (store-wide — the default) saving here fans the same threshold/auto-update/notify
+                settings out to every real locale of the selected store, so it doesn't matter which one you
+                had picked when you saved. For a metric explicitly flagged locale-scoped, saving only
+                touches the one locale selected above — switch locale to configure another independently,
+                and a locale never explicitly saved simply stays opted out of auto-tune for itself, even if
+                the metric is opted in elsewhere in the same store.
+            </p>
             {% if rows %}
                 <table class="table">
                     <thead>
@@ -29,7 +57,7 @@
                                     {# A whole per-metric form must live inside ONE <td> - a <form> spanning
                                        multiple <td> siblings inside a <tr> is invalid HTML and gets silently
                                        relocated/dropped by browsers, breaking submission. #}
-                                    {{ form_start(row.form, { action: url('/search-ranking-optimizer/auto-tune/save'), method: 'POST', attr: { class: 'search-ranking-optimizer-auto-tune-row-form' } }) }}
+                                    {{ form_start(row.form, { action: url('/search-ranking-optimizer/auto-tune/save') ~ '?storeName=' ~ selectedStoreName ~ '&localeName=' ~ selectedLocaleName, method: 'POST', attr: { class: 'search-ranking-optimizer-auto-tune-row-form' } }) }}
                                     {{ form_row(row.form.autoTuneThreshold) }}
                                     {{ form_row(row.form.isAutoUpdateEnabled) }}
                                     {{ form_row(row.form.autoUpdateScope) }}

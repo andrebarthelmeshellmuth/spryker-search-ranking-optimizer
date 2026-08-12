@@ -18,7 +18,7 @@ use Spryker\Client\SearchElasticsearch\Plugin\QueryExpander\IsActiveInDateRangeQ
 use Spryker\Client\SearchElasticsearch\Plugin\QueryExpander\IsActiveQueryExpanderPlugin;
 
 /**
- * Extracted from {@see CalibrationSearcher}'s own original `buildQuery()` — see
+ * Extracted from {@see SaturationPointCalibrationSearcher}'s own original `buildQuery()` — see
  * {@see LiveCatalogSearchQueryBuilderInterface} for why this exists as its own component (shared by
  * Calibration and rank_eval evaluation) rather than living on one or the other, and for why this is a
  * deliberate SUBSET of the real live query (store/locale/is_active/is_active_in_date_range only), not a
@@ -33,8 +33,6 @@ class LiveCatalogSearchQueryBuilder implements LiveCatalogSearchQueryBuilderInte
      * @param string $storeName
      * @param string $localeName
      * @param int|null $limit
-     *
-     * @return \Elastica\Query
      */
     public function build(string $searchTerm, string $storeName, string $localeName, ?int $limit = null): Query
     {
@@ -63,8 +61,6 @@ class LiveCatalogSearchQueryBuilder implements LiveCatalogSearchQueryBuilderInte
      * @param \Elastica\Query\BoolQuery $boolQuery
      * @param string $field
      * @param string $value
-     *
-     * @return void
      */
     protected function addMatchFilter(BoolQuery $boolQuery, string $field, string $value): void
     {

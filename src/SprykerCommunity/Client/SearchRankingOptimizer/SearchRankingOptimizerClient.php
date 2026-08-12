@@ -11,6 +11,8 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
+use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer;
 use Spryker\Client\Kernel\AbstractClient;
@@ -44,9 +46,23 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      *
      * @api
      *
-     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param float $blendWeight
+     */
+    public function getCalibrationSpecificity(string $searchTerm, string $storeName, float $blendWeight): float
+    {
+        return $this->getFactory()
+            ->createSpecificitySearcher()
+            ->calculateRawSpecificity($searchTerm, $storeName, $blendWeight);
+    }
+
+    /**
+     * {@inheritDoc}
      *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
      */
     public function submitProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -62,8 +78,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentResponseTransfer
      */
     public function clearProductRelevanceJudgment(
         SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer,
@@ -78,9 +92,22 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      *
      * @api
      *
-     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer
+     */
+    public function getProductRelevanceJudgments(
+        SearchRankingProductRelevanceJudgmentBatchRequestTransfer $requestTransfer,
+    ): SearchRankingProductRelevanceJudgmentBatchResponseTransfer {
+        return $this->getFactory()
+            ->createProductRelevanceJudgmentStub()
+            ->getProductRelevanceJudgments($requestTransfer);
+    }
+
+    /**
+     * {@inheritDoc}
      *
-     * @return \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer
+     * @api
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $requestTransfer
      */
     public function evaluateRankings(SearchRankingEvaluationRequestTransfer $requestTransfer): SearchRankingEvaluationResponseTransfer
     {
@@ -98,8 +125,6 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
     {

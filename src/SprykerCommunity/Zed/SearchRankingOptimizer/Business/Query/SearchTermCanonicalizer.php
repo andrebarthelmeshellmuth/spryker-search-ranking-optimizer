@@ -13,8 +13,6 @@ class SearchTermCanonicalizer implements SearchTermCanonicalizerInterface
 {
     /**
      * @param string $rawSearchTerm
-     *
-     * @return string
      */
     public function canonicalize(string $rawSearchTerm): string
     {

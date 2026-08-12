@@ -22,8 +22,6 @@ interface ProductSearchMatchVerifierInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function matches(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
 }

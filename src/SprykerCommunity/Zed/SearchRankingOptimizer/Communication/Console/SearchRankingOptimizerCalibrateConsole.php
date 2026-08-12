@@ -28,11 +28,8 @@ class SearchRankingOptimizerCalibrateConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Picks up the newest uploaded calibration run (skipping any older uploads), fires the live catalog search-string query for each of its search terms, and pools the resulting raw text-relevance scores into a suggested relevanceSaturationPoint (k) value for spryker-community/search-ranking.';
+    public const COMMAND_DESCRIPTION = 'Picks up the newest uploaded calibration run (skipping any older uploads for that same store, locale and calibration type; uploads for another scope or type stay queued for a later tick) and, depending on its calibrationType, either fires the live catalog search-string query for each of its search terms (relevance_score) or a lightweight per-term probe with no catalog query at all (specificity), pooling the resulting raw values into a suggested relevanceSaturationPoint/specificitySaturationPoint (k) value for spryker-community/search-ranking.';
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME);
@@ -42,12 +39,9 @@ class SearchRankingOptimizerCalibrateConsole extends Console
     }
 
     // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the Console base class.
-
     /**
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -67,8 +61,8 @@ class SearchRankingOptimizerCalibrateConsole extends Console
         }
 
         $output->writeln(sprintf(
-            'Calibration #%d done: sampled %d score(s) across %d search term(s), computed k = %.4f.',
-            $calibrationTransfer->getIdSearchRankingCalibrationOrFail(),
+            'Calibration #%d done: sampled %d value(s) across %d search term(s), computed k = %.4f.',
+            $calibrationTransfer->getIdSearchRankingSaturationPointCalibrationOrFail(),
             $calibrationTransfer->getSampleCountOrFail(),
             count($calibrationTransfer->getSearchTerms()),
             $calibrationTransfer->getComputedKOrFail(),

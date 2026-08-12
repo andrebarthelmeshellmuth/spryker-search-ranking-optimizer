@@ -10,18 +10,14 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business;
 
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriter;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneMetricConfigWriterInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationDiagnoser;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationDiagnoserInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolver;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandler;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParser;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParserInterface;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibrator;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculator;
-use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorder;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
@@ -32,19 +28,34 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJud
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterLister;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterListerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReader;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReaderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdater;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdaterInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\CsvSearchTermParser;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\CsvSearchTermParserInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\SaturationPointCalibrationUploadHandler;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\SaturationPointCalibrationUploadHandlerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\ScoreCalibrator;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\ScoreCalibratorInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\StatisticsCalculator;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibration\StatisticsCalculatorInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependencyProvider;
@@ -56,37 +67,25 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\SearchRankingOptimizerDependency
  */
 class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
 {
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CsvSearchTermParserInterface
-     */
     public function createCsvSearchTermParser(): CsvSearchTermParserInterface
     {
         return new CsvSearchTermParser();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\StatisticsCalculatorInterface
-     */
     public function createStatisticsCalculator(): StatisticsCalculatorInterface
     {
         return new StatisticsCalculator();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\CalibrationUploadHandlerInterface
-     */
-    public function createCalibrationUploadHandler(): CalibrationUploadHandlerInterface
+    public function createCalibrationUploadHandler(): SaturationPointCalibrationUploadHandlerInterface
     {
-        return new CalibrationUploadHandler(
+        return new SaturationPointCalibrationUploadHandler(
             $this->createCsvSearchTermParser(),
             $this->getRepository(),
             $this->getEntityManager(),
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Calibration\ScoreCalibratorInterface
-     */
     public function createScoreCalibrator(): ScoreCalibratorInterface
     {
         return new ScoreCalibrator(
@@ -94,28 +93,20 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getEntityManager(),
             $this->getSearchRankingClient(),
             $this->createStatisticsCalculator(),
+            $this->getSearchRankingFacade(),
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface
-     */
     public function getSearchRankingClient(): SearchRankingOptimizerToSearchRankingClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_OPTIMIZER);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonicalizerInterface
-     */
     public function createSearchTermCanonicalizer(): SearchTermCanonicalizerInterface
     {
         return new SearchTermCanonicalizer();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriterInterface
-     */
     public function createProductRelevanceJudgmentWriter(): ProductRelevanceJudgmentWriterInterface
     {
         return new ProductRelevanceJudgmentWriter(
@@ -126,25 +117,24 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\QueryImportanceWeightUpdaterInterface
-     */
     public function createQueryImportanceWeightUpdater(): QueryImportanceWeightUpdaterInterface
     {
         return new QueryImportanceWeightUpdater($this->getEntityManager());
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface
-     */
+    public function createProductRelevanceJudgmentReader(): ProductRelevanceJudgmentReaderInterface
+    {
+        return new ProductRelevanceJudgmentReader(
+            $this->createSearchTermCanonicalizer(),
+            $this->getRepository(),
+        );
+    }
+
     public function createRelevanceJudgmentGainMapper(): RelevanceJudgmentGainMapperInterface
     {
         return new RelevanceJudgmentGainMapper();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface
-     */
     public function createRankEvaluationRunner(): RankEvaluationRunnerInterface
     {
         return new RankEvaluationRunner(
@@ -155,9 +145,6 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
-     */
     public function createWeightCheckpointRecorder(): WeightCheckpointRecorderInterface
     {
         return new WeightCheckpointRecorder(
@@ -166,9 +153,6 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorerInterface
-     */
     public function createWeightCheckpointRestorer(): WeightCheckpointRestorerInterface
     {
         return new WeightCheckpointRestorer(
@@ -178,41 +162,31 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     public function getSearchRankingFacade(): SearchRankingOptimizerToSearchRankingFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SEARCH_RANKING);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface
-     */
+    public function getStoreFacade(): SearchRankingOptimizerToStoreFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_STORE);
+    }
+
     public function getAclFacade(): SearchRankingOptimizerToAclFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_ACL);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\SearchRankingOptimizerToAclQueryContainerInterface
-     */
     public function getAclQueryContainer(): SearchRankingOptimizerToAclQueryContainerInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::QUERY_CONTAINER_ACL);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface
-     */
     public function getSymfonyMailerFacade(): SearchRankingOptimizerToSymfonyMailerFacadeInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_SYMFONY_MAILER);
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface
-     */
     public function createAutoTuneNotificationRecipientResolver(): AutoTuneNotificationRecipientResolverInterface
     {
         return new AutoTuneNotificationRecipientResolver(
@@ -221,31 +195,40 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunnerInterface
-     */
+    public function createAutoTuneNotificationDiagnoser(): AutoTuneNotificationDiagnoserInterface
+    {
+        return new AutoTuneNotificationDiagnoser(
+            $this->createAutoTuneNotificationRecipientResolver(),
+            $this->getAclFacade(),
+            $this->getRepository(),
+        );
+    }
+
     public function createAutoTuneRunner(): AutoTuneRunnerInterface
     {
         return new AutoTuneRunner(
             $this->getRepository(),
             $this->getSearchRankingFacade(),
+            $this->getStoreFacade(),
             $this->createAutoTuneNotificationRecipientResolver(),
             $this->getSymfonyMailerFacade(),
             $this->createFormulaDeterminismChecker(),
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface
-     */
     public function createFormulaDeterminismChecker(): FormulaDeterminismCheckerInterface
     {
         return new FormulaDeterminismChecker();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface
-     */
+    public function createAutoTuneMetricConfigWriter(): AutoTuneMetricConfigWriterInterface
+    {
+        return new AutoTuneMetricConfigWriter(
+            $this->getEntityManager(),
+            $this->getSearchRankingFacade(),
+        );
+    }
+
     public function createOptimizationRunner(): OptimizationRunnerInterface
     {
         return new OptimizationRunner(
@@ -254,12 +237,23 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingFacade(),
             $this->createRankEvaluationRunner(),
             $this->createFormulaDeterminismChecker(),
+            $this->createAlgorithmFactory(),
         );
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface
-     */
+    public function createAlgorithmFactory(): AlgorithmFactoryInterface
+    {
+        return new AlgorithmFactory();
+    }
+
+    public function createOptimizableParameterLister(): OptimizableParameterListerInterface
+    {
+        return new OptimizableParameterLister(
+            $this->getSearchRankingFacade(),
+            $this->createFormulaDeterminismChecker(),
+        );
+    }
+
     public function createOptimizationApplier(): OptimizationApplierInterface
     {
         return new OptimizationApplier(

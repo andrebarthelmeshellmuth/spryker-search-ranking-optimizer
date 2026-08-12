@@ -9,13 +9,15 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use Generated\Shared\Transfer\PermissionCollectionTransfer;
+
 interface SearchRankingOptimizerToPermissionFacadeInterface
 {
     /**
      * @param string $permissionKey
      * @param string|int $identifier
-     *
-     * @return bool
      */
     public function can(string $permissionKey, $identifier): bool;
+
+    public function findMergedRegisteredNonInfrastructuralPermissions(): PermissionCollectionTransfer;
 }

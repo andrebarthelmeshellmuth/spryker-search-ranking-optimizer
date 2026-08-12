@@ -1,0 +1,407 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Automated Weight Optimization' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% if inProgressOptimizerRun %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Run In Progress' } %}
+            {% block widget_content %}
+                {# Polled by the script at the bottom of this page — the counts printed here are only the
+                   first paint; every update after that comes from progressAction()'s JSON, not a page
+                   reload. #}
+                <div class="search-ranking-optimizer-optimization-progress" data-role="optimization-progress">
+                    <p>
+                        Run #{{ inProgressOptimizerRun.idSearchRankingOptimizerRun }} ({{ inProgressOptimizerRun.algorithm }}):
+                        <span data-role="processed">{{ inProgressOptimizerRun.processedCount }}</span>
+                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
+                            {{ 'of up to' | trans }}
+                        {% else %}
+                            /
+                        {% endif %}
+                        <span data-role="total">{{ inProgressOptimizerRun.totalCount }}</span>
+                        {{ 'candidates evaluated' | trans }}
+                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
+                            <span class="text-muted" style="font-size: 11px;">(trusting termination criteria — likely to stop well short of this ceiling)</span>
+                        {% endif %}
+                    </p>
+                    <progress data-role="progress-bar" value="{{ inProgressOptimizerRun.processedCount }}" max="{{ inProgressOptimizerRun.totalCount|default(1) }}" style="width: 100%;"></progress>
+                </div>
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+
+    {% if latestOptimizerRun %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Latest Run — ' ~ storeName ~ ' / ' ~ localeName } %}
+            {% block widget_content %}
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>Run</th>
+                            <td>#{{ latestOptimizerRun.idSearchRankingOptimizerRun }} ({{ latestOptimizerRun.algorithm }})</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td>
+                                {% if latestOptimizerRun.status == 'done' %}
+                                    <span class="label label-success">Done</span>
+                                {% elseif latestOptimizerRun.status == 'failed' %}
+                                    <span class="label label-danger">Failed</span>
+                                {% else %}
+                                    {{ latestOptimizerRun.status }}
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {% if latestOptimizerRun.status == 'failed' %}
+                            <tr>
+                                <th>Error</th>
+                                <td>{{ latestOptimizerRun.errorMessage }}</td>
+                            </tr>
+                        {% endif %}
+
+                        {% if latestOptimizerRun.status == 'done' %}
+                            <tr>
+                                <th>Generations used</th>
+                                <td>
+                                    {# The "/budget" denominator is deliberately omitted for a trusted-termination
+                                       run: that run was never capped at optimizationMaxGenerations at all, but
+                                       at the algorithm's own far higher safety ceiling, so printing this budget
+                                       next to it would read as a nonsensical over-100% figure. #}
+                                    {{ latestOptimizerRun.generationsUsed }}{% if not latestOptimizerRun.isTerminationCriteriaTrusted %}/{{ optimizationMaxGenerations }}{% endif %}
+                                    {% if latestOptimizerRun.isTerminationCriteriaTrusted %}
+                                        <span class="text-muted" style="font-size: 11px;">(trusted termination criteria — stopped on convergence/divergence/plateau, not a fixed budget)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Baseline weighted nDCG@10 (live configuration)</th>
+                                <td>{{ latestOptimizerRun.baselineScore }}</td>
+                            </tr>
+                            <tr>
+                                <th>Winning candidate weighted nDCG@10</th>
+                                <td>
+                                    <strong>{{ latestOptimizerRun.bestScore }}</strong>
+                                    {% if latestOptimizerRun.bestScore > latestOptimizerRun.baselineScore %}
+                                        <span class="label label-success">improved</span>
+                                    {% else %}
+                                        no improvement
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Winning relevanceWeight</th>
+                                <td>{{ latestOptimizerRun.bestRelevanceWeight }} (live was {{ currentRelevanceWeight }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning specificityCurveExponent</th>
+                                <td>{{ latestOptimizerRun.bestSpecificityCurveExponent }} (live was {{ currentSpecificityCurveExponent }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning specificityWeightExponent</th>
+                                <td>{{ latestOptimizerRun.bestSpecificityWeightExponent }} (live was {{ currentSpecificityWeightExponent }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning specificityWeightShiftMagnitude</th>
+                                <td>{{ latestOptimizerRun.bestSpecificityWeightShiftMagnitude }} (live was {{ currentSpecificityWeightShiftMagnitude }})</td>
+                            </tr>
+                            <tr>
+                                <th>Winning specificityBlendWeight</th>
+                                <td>{{ latestOptimizerRun.bestSpecificityBlendWeight }} (live was {{ currentSpecificityBlendWeight }})</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+                {% if latestOptimizerRun.status == 'done' and latestOptimizerRun.bestMetricWeights %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Winning weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for metricWeight in latestOptimizerRun.bestMetricWeights %}
+                                <tr>
+                                    <td>
+                                        {{ metricWeight.name }}
+                                        {% if metricWeight.name == 'random' %}
+                                            <div class="text-muted" style="font-size: 11px;">
+                                                Shown only so the weights below visibly sum to 1 — random's own formula is non-deterministic, so this run never searched it; it's held fixed at its live weight.
+                                            </div>
+                                        {% endif %}
+                                        {% if applySiblingLocalesByMetric[metricWeight.name] is defined %}
+                                            <div class="text-warning" style="font-size: 11px;">
+                                                Store-wide — also applies to {{ applySiblingLocalesByMetric[metricWeight.name] | join(', ') }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ metricWeight.weight }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    {% if latestOptimizerRun.appliedAt %}
+                        <p>Applied at {{ latestOptimizerRun.appliedAt }}.</p>
+                    {% elseif applyForm %}
+                        <p>Always propose-only — nothing here is ever applied automatically. Review it, then
+                           decide.</p>
+                        {{ form_start(applyForm, { action: url('/search-ranking-optimizer/automated-weight-optimization-apply'), method: 'POST' }) }}
+                        {{ form_widget(applyForm) }}
+                        <button type="submit" class="btn btn-primary"
+                            {% if applySiblingLocalesByMetric %}
+                                onclick="return confirm('Applying will also overwrite the store-wide weight of {% for metricName, siblingLocales in applySiblingLocalesByMetric %}{{ metricName }} ({{ siblingLocales | join(', ') }}){% if not loop.last %}, {% endif %}{% endfor %} for {{ storeName }} -- not just {{ localeName }}. Continue?');"
+                            {% endif %}
+                        >{{ 'Apply' | trans }}</button>
+                        {{ form_end(applyForm) }}
+                    {% endif %}
+                {% endif %}
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Start New Optimization Run' } %}
+        {% block widget_content %}
+            <p>
+                Scores the LIVE configuration as a baseline (never persisted as a real evaluation), then
+                searches the metric-weight simplex + a relevanceWeight trust region for a better-scoring
+                candidate. The next <code>search-ranking-optimizer:optimize</code> cron tick picks up the
+                oldest queued run and processes it fully — this can take anywhere from several seconds to a
+                few minutes depending on how many active metrics there are.
+            </p>
+            {{ form_start(optimizeRunForm, { action: url('/search-ranking-optimizer/automated-weight-optimization'), method: 'POST' }) }}
+            {{ form_row(optimizeRunForm.storeName) }}
+            {{ form_row(optimizeRunForm.localeName) }}
+            {{ form_row(optimizeRunForm.algorithm) }}
+            {{ form_row(optimizeRunForm.isTerminationCriteriaTrusted) }}
+            {{ form_row(optimizeRunForm.warmStartFractionPercent) }}
+
+            <h4>{{ 'Parameters' | trans }}</h4>
+            <div data-role="parameter-checklist">
+                <p class="text-muted">{{ 'Loading...' | trans }}</p>
+            </div>
+
+            <div class="alert alert-warning" data-role="no-free-parameters-warning" style="display: none;">
+                {{ 'Every parameter is pinned -- there would be nothing left to search. Leave at least one checked.' | trans }}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" data-role="run-now-button">{{ 'Run now' | trans }}</button>
+            </div>
+            {{ form_end(optimizeRunForm) }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}
+
+{% block footer_js %}
+    {{ parent() }}
+    <script>
+        (function () {
+            'use strict';
+
+            // Populates the run form's own parameter checklist whenever store/locale change, via
+            // parametersAction() -- see AutomatedWeightOptimizationController. Unrelated to (and not
+            // gated by) the progress-polling script below.
+            var storeSelect = document.getElementById('search_ranking_optimizer_automated_weight_optimization_run_storeName');
+            var localeSelect = document.getElementById('search_ranking_optimizer_automated_weight_optimization_run_localeName');
+            var container = document.querySelector('[data-role="parameter-checklist"]');
+            var runButton = document.querySelector('[data-role="run-now-button"]');
+            var noFreeParametersWarning = document.querySelector('[data-role="no-free-parameters-warning"]');
+
+            if (!storeSelect || !localeSelect || !container || !runButton || !noFreeParametersWarning) {
+                return;
+            }
+
+            var SPECIFICITY_KEYS = [
+                'specificityCurveExponent',
+                'specificityWeightExponent',
+                'specificityWeightShiftMagnitude',
+                'specificityBlendWeight',
+            ];
+
+            function escapeHtml(value) {
+                var div = document.createElement('div');
+                div.textContent = String(value);
+
+                return div.innerHTML;
+            }
+
+            function renderScalarRow(key, value) {
+                return '<tr>'
+                    + '<td><label><input type="checkbox" name="optimizeScalar[' + key + ']" checked data-role="optimize-checkbox"> ' + escapeHtml(key) + '</label></td>'
+                    + '<td><input type="number" step="any" class="form-control" name="fixedScalarValue[' + key + ']" value="' + value + '" disabled></td>'
+                    + '</tr>';
+            }
+
+            function renderMetricRow(metric) {
+                return '<tr>'
+                    + '<td><label><input type="checkbox" name="optimizeMetric[' + metric.idSearchRankingMetric + ']" checked data-role="optimize-checkbox"> ' + escapeHtml(metric.name) + '</label>'
+                    + '<input type="hidden" name="metricName[' + metric.idSearchRankingMetric + ']" value="' + escapeHtml(metric.name) + '"></td>'
+                    + '<td><input type="number" step="any" class="form-control" data-role="fixed-metric-input" name="fixedMetricValue[' + metric.idSearchRankingMetric + ']" value="' + metric.weight + '" disabled></td>'
+                    + '</tr>';
+            }
+
+            function updateOverbudgetWarning() {
+                var warningElement = container.querySelector('[data-role="fixed-weight-warning"]');
+
+                if (!warningElement) {
+                    return;
+                }
+
+                var total = 0;
+
+                Array.prototype.forEach.call(container.querySelectorAll('[data-role="fixed-metric-input"]:not([disabled])'), function (input) {
+                    total += parseFloat(input.value) || 0;
+                });
+
+                warningElement.style.display = total > 1.0 ? '' : 'none';
+            }
+
+            // A run with nothing left free reaches blackbox-optimizer with a zero-dimension problem and
+            // fails outright ("A problem must declare at least one parameter.") after already consuming a
+            // queue slot -- disabling the button here is a courtesy, not the real enforcement; the
+            // controller rejects this same case server-side regardless of whether JS ran at all.
+            function updateRunButtonState() {
+                var checkboxes = container.querySelectorAll('[data-role="optimize-checkbox"]');
+
+                if (checkboxes.length === 0) {
+                    return;
+                }
+
+                var checkedCount = container.querySelectorAll('[data-role="optimize-checkbox"]:checked').length;
+
+                runButton.disabled = checkedCount === 0;
+                noFreeParametersWarning.style.display = checkedCount === 0 ? '' : 'none';
+            }
+
+            function bindRow(row) {
+                var checkbox = row.querySelector('input[type="checkbox"]');
+                var input = row.querySelector('input[type="number"]');
+
+                if (!checkbox || !input) {
+                    return;
+                }
+
+                checkbox.addEventListener('change', function () {
+                    input.disabled = checkbox.checked;
+                    updateOverbudgetWarning();
+                    updateRunButtonState();
+                });
+
+                input.addEventListener('input', updateOverbudgetWarning);
+            }
+
+            function render(parameters) {
+                var rows = renderScalarRow('relevanceWeight', parameters.relevanceWeight);
+
+                if (parameters.isSpecificityWeightingEnabled) {
+                    SPECIFICITY_KEYS.forEach(function (key) {
+                        rows += renderScalarRow(key, parameters[key]);
+                    });
+                }
+
+                rows += parameters.metrics.map(renderMetricRow).join('');
+
+                container.innerHTML = '<p class="text-muted" style="font-size: 12px;">'
+                    + 'Unchecking a row pins it at the value you enter instead of searching it — checked (the default) searches it exactly as before.'
+                    + '</p>'
+                    + '<div class="alert alert-warning" data-role="fixed-weight-warning" style="display: none;">'
+                    + 'The pinned metric weights above sum to more than 1.0 — they will be rescaled down proportionally when this run is applied.'
+                    + '</div>'
+                    + '<table class="table"><thead><tr><th>' + 'Parameter' + '</th><th>' + 'Value' + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+                Array.prototype.forEach.call(container.querySelectorAll('tbody tr'), bindRow);
+                updateOverbudgetWarning();
+                updateRunButtonState();
+            }
+
+            // Fails open (button stays enabled) whenever the checklist itself couldn't be shown -- this
+            // JS-side disabling is a courtesy on top of the real, always-on server-side rejection, not the
+            // only guard, so there's nothing unsafe about leaving it enabled when the checklist is absent.
+            function resetRunButtonState() {
+                runButton.disabled = false;
+                noFreeParametersWarning.style.display = 'none';
+            }
+
+            function fetchParameters() {
+                var storeName = storeSelect.value;
+                var localeName = localeSelect.value;
+
+                if (!storeName || !localeName) {
+                    container.innerHTML = '<p class="text-muted">Pick a store and locale above to see the parameters this run would search.</p>';
+                    resetRunButtonState();
+
+                    return;
+                }
+
+                fetch(
+                    '/search-ranking-optimizer/automated-weight-optimization/parameters'
+                        + '?storeName=' + encodeURIComponent(storeName)
+                        + '&localeName=' + encodeURIComponent(localeName),
+                    { headers: { Accept: 'application/json' } },
+                )
+                    .then(function (response) { return response.json(); })
+                    .then(function (parameters) {
+                        if (parameters.error) {
+                            container.innerHTML = '<p class="text-danger">' + escapeHtml(parameters.error) + '</p>';
+                            resetRunButtonState();
+
+                            return;
+                        }
+
+                        render(parameters);
+                    })
+                    .catch(function () {
+                        container.innerHTML = '<p class="text-danger">Could not load parameters — try changing store/locale again.</p>';
+                        resetRunButtonState();
+                    });
+            }
+
+            storeSelect.addEventListener('change', fetchParameters);
+            localeSelect.addEventListener('change', fetchParameters);
+
+            fetchParameters();
+        }());
+    </script>
+    {% if inProgressOptimizerRun %}
+        <script>
+            (function () {
+                'use strict';
+
+                // Polls until status stops being "running" (done, failed, or picked up as a fresh
+                // "queued" run again), then reloads once to show the finished widgets (Apply form, or the
+                // error) instead of trying to fade this progress panel out client-side.
+                var processedElement = document.querySelector('[data-role="optimization-progress"] [data-role="processed"]');
+                var totalElement = document.querySelector('[data-role="optimization-progress"] [data-role="total"]');
+                var progressBarElement = document.querySelector('[data-role="optimization-progress"] [data-role="progress-bar"]');
+
+                function poll() {
+                    fetch('/search-ranking-optimizer/automated-weight-optimization/progress', { headers: { Accept: 'application/json' } })
+                        .then(function (response) { return response.json(); })
+                        .then(function (progress) {
+                            if (progress.status !== 'running') {
+                                window.location.reload();
+
+                                return;
+                            }
+
+                            processedElement.textContent = progress.processedCount;
+                            totalElement.textContent = progress.totalCount;
+                            progressBarElement.setAttribute('value', progress.processedCount);
+                            progressBarElement.setAttribute('max', progress.totalCount || 1);
+
+                            window.setTimeout(poll, 1000);
+                        })
+                        .catch(function () {
+                            // A transient failure (e.g. one dropped request) shouldn't stop polling —
+                            // just try again on the same cadence.
+                            window.setTimeout(poll, 1000);
+                        });
+                }
+
+                window.setTimeout(poll, 1000);
+            }());
+        </script>
+    {% endif %}
+{% endblock %}

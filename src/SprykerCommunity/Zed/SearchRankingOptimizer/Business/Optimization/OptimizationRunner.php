@@ -9,9 +9,6 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 
-use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
-use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
-use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
 use BlackboxOptimizer\Problem\CallableProblem;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -26,34 +23,18 @@ use Throwable;
 
 class OptimizationRunner implements OptimizationRunnerInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface
-     */
     protected RankEvaluationRunnerInterface $rankEvaluationRunner;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface
-     */
     protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker;
 
-    /**
-     * @var int|null
-     */
+    protected AlgorithmFactoryInterface $algorithmFactory;
+
     protected ?int $maxGenerations;
 
     /**
@@ -62,6 +43,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface $rankEvaluationRunner
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface $algorithmFactory
      * @param int|null $maxGenerations Null uses SearchRankingOptimizerConfig::getOptimizationMaxGenerations() --
      *   overridable only to keep tests fast (a real run doesn't need hundreds of generations to verify this
      *   class's own orchestration logic), never exposed via SearchRankingOptimizerBusinessFactory.
@@ -72,6 +54,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         RankEvaluationRunnerInterface $rankEvaluationRunner,
         FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
+        AlgorithmFactoryInterface $algorithmFactory,
         ?int $maxGenerations = null,
     ) {
         $this->repository = $repository;
@@ -79,13 +62,12 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $this->searchRankingFacade = $searchRankingFacade;
         $this->rankEvaluationRunner = $rankEvaluationRunner;
         $this->formulaDeterminismChecker = $formulaDeterminismChecker;
+        $this->algorithmFactory = $algorithmFactory;
         $this->maxGenerations = $maxGenerations;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function runNext(): ?SearchRankingOptimizerRunTransfer
     {
@@ -108,8 +90,6 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
     /**
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
-     *
-     * @return void
      */
     protected function process(SearchRankingOptimizerRunTransfer $queuedRunTransfer): void
     {
@@ -117,7 +97,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $storeName = $queuedRunTransfer->getStoreNameOrFail();
         $localeName = $queuedRunTransfer->getLocaleNameOrFail();
 
-        $activeMetrics = $this->searchRankingFacade->getActiveMetrics();
+        $activeMetrics = $this->searchRankingFacade->getActiveMetrics($storeName, $localeName);
 
         if ($activeMetrics === []) {
             $this->entityManager->failOptimizerRun($idOptimizerRun, 'No active metrics exist -- nothing to optimize.');
@@ -125,7 +105,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        $liveConfigurationTransfer = $this->buildLiveConfiguration();
+        $liveConfigurationTransfer = $this->buildLiveConfiguration($storeName, $localeName);
         $baselineScore = $this->rankEvaluationRunner->evaluateCandidate($storeName, $localeName, $liveConfigurationTransfer);
 
         if ($baselineScore === null) {
@@ -137,41 +117,76 @@ class OptimizationRunner implements OptimizationRunnerInterface
             return;
         }
 
-        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism($activeMetrics, $liveConfigurationTransfer);
+        $userFixedMetricWeights = $this->buildUserFixedMetricWeights($queuedRunTransfer, $liveConfigurationTransfer);
+        [$optimizableMetrics, $fixedMetricWeights] = $this->splitMetricsByDeterminism(
+            $activeMetrics,
+            $liveConfigurationTransfer,
+            $storeName,
+            $localeName,
+            $userFixedMetricWeights,
+        );
         $mapper = new ParameterVectorMapper(
             $optimizableMetrics,
             $fixedMetricWeights,
             $liveConfigurationTransfer->getRelevanceWeightOrFail(),
-            $liveConfigurationTransfer->getEntropyWeightExponentOrFail(),
-            $liveConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
-            $liveConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
-            $this->searchRankingFacade->isEntropyWeightingEnabled(),
+            $liveConfigurationTransfer->getSpecificityCurveExponentOrFail(),
+            $liveConfigurationTransfer->getSpecificityWeightExponentOrFail(),
+            $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $this->searchRankingFacade->isSpecificityWeightingEnabled(),
+            $queuedRunTransfer->getFixedRelevanceWeight(),
+            $queuedRunTransfer->getFixedSpecificityCurveExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightShiftMagnitude(),
+            $queuedRunTransfer->getFixedSpecificityBlendWeight(),
         );
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
+        $warmStartFraction = $queuedRunTransfer->getWarmStartFraction() ?? 0.0;
+        $warmStartVector = $warmStartFraction > 0.0 ? $mapper->mapConfigurationToVector($liveConfigurationTransfer) : null;
+        $algorithm = $this->algorithmFactory->create(
+            $algorithmName,
+            $populationSize,
+            $maxGenerations,
+            $queuedRunTransfer->getIsTerminationCriteriaTrusted() ?? false,
+            $warmStartVector,
+            $warmStartFraction,
+        );
 
         $this->entityManager->startOptimizerRun(
             $idOptimizerRun,
-            $this->computeTotalEvaluationCount($algorithmName, $populationSize, $maxGenerations),
+            $algorithm->estimateEvaluationCount(),
             $baselineScore,
         );
 
-        $algorithm = $this->buildAlgorithm($algorithmName, $populationSize, $maxGenerations);
-        $objectiveFunction = $this->buildObjectiveFunction($mapper, $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(), $storeName, $localeName, $idOptimizerRun);
+        $objectiveFunction = $this->buildObjectiveFunction(
+            $mapper,
+            $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(),
+            $liveConfigurationTransfer->getSpecificitySaturationPointOrFail(),
+            $storeName,
+            $localeName,
+            $idOptimizerRun,
+        );
         $problem = new CallableProblem($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
         $result = $algorithm->optimize($problem);
 
-        $bestConfigurationTransfer = $mapper->mapVectorToConfiguration($result->getBestVector(), $liveConfigurationTransfer->getRelevanceSaturationPointOrFail());
+        $bestConfigurationTransfer = $mapper->mapVectorToConfiguration(
+            $result->getBestVector(),
+            $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(),
+            $liveConfigurationTransfer->getSpecificitySaturationPointOrFail(),
+        );
 
         $this->entityManager->completeOptimizerRun(
             $idOptimizerRun,
             $bestConfigurationTransfer->getRelevanceWeightOrFail(),
             $this->buildBestMetricWeightTransfers($activeMetrics, $bestConfigurationTransfer),
             -$result->getBestValue(),
-            $bestConfigurationTransfer->getEntropyWeightExponentOrFail(),
-            $bestConfigurationTransfer->getEntropyWeightShiftMagnitudeOrFail(),
-            $bestConfigurationTransfer->getEntropyProbeResultSizeOrFail(),
+            $bestConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $bestConfigurationTransfer->getSpecificityCurveExponentOrFail(),
+            $bestConfigurationTransfer->getSpecificityWeightExponentOrFail(),
+            $bestConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            count($result->getBestValueHistory()),
         );
     }
 
@@ -179,47 +194,84 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * Reads the LIVE configuration straight from search-ranking's own Zed-side facade (never the synced
      * key-value storage copy the storefront reads at request time) — this package's optimizer works
      * against what a Query Curator actually configured in Zed, not a possibly-stale-or-never-published
-     * snapshot. Includes EVERY metric's weight (not just active ones), same as the real live formula does.
+     * snapshot. Carries the weights of this scope's ACTIVE metrics, the same set the real live formula
+     * scores with, raw rather than normalized: {@see ParameterVectorMapper} owns the [0;1] budget and
+     * already handles live weights that never summed to 1.
      *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
+     * @param string $storeName
+     * @param string $localeName
      */
-    protected function buildLiveConfiguration(): SearchRankingConfigurationStorageTransfer
+    protected function buildLiveConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
-        $metricWeightsByName = [];
-
-        foreach ($this->searchRankingFacade->getMetricWeights() as $metricWeight) {
-            $metricWeightsByName[$metricWeight['name']] = $metricWeight['weight'];
-        }
-
-        return (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
-            ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint())
-            ->setMetricWeights($metricWeightsByName)
-            ->setEntropyWeightExponent($this->searchRankingFacade->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($this->searchRankingFacade->getEntropyWeightShiftMagnitude())
-            ->setEntropyProbeResultSize($this->searchRankingFacade->getEntropyProbeResultSize());
+        return $this->searchRankingFacade->getConfiguration($storeName, $localeName);
     }
 
     /**
-     * Splits the active metrics into the ones this run actually searches (a deterministic formula — the
-     * normal case) and the ones it holds fixed at their current live weight instead (a non-deterministic
-     * formula, e.g. a placeholder/noise metric — searching a weight against pure noise is meaningless, and
-     * a metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
-     * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run).
+     * A human's own parameter-checklist choice at queue time (see `AutomatedWeightOptimizationController`),
+     * keyed by metric name -- entirely independent of (and checked BEFORE) the determinism-based exclusion
+     * {@see splitMetricsByDeterminism()} applies next. A metric can end up fixed for either reason, or both
+     * at once; either way it's held constant for the whole run.
      *
-     * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
      *
-     * @return array{0: array<int, array{idSearchRankingMetric: int, name: string}>, 1: array<string, float>}
+     * @return array<string, float>
      */
-    protected function splitMetricsByDeterminism(array $activeMetrics, SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer): array
-    {
+    protected function buildUserFixedMetricWeights(
+        SearchRankingOptimizerRunTransfer $queuedRunTransfer,
+        SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
+    ): array {
+        $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
+        $userFixedMetricWeights = [];
+
+        foreach ($queuedRunTransfer->getFixedMetricWeights() as $fixedMetricWeightTransfer) {
+            $name = $fixedMetricWeightTransfer->getNameOrFail();
+            $userFixedMetricWeights[$name] = $fixedMetricWeightTransfer->getWeight() ?? (float)($liveMetricWeightsByName[$name] ?? 0.0);
+        }
+
+        return $userFixedMetricWeights;
+    }
+
+    /**
+     * Splits the active metrics into the ones this run actually searches (a deterministic formula the
+     * human did not choose to pin — the normal case) and the ones it holds fixed instead, because either
+     * searching a weight against a non-deterministic formula (e.g. a placeholder/noise metric) is
+     * meaningless, or a human explicitly chose to pin this metric on the run form's own checklist. A
+     * metric missing its own `findMetricDetail()` row is treated as deterministic rather than silently
+     * dropped, the same fail-open posture the rest of this class takes toward a metric deleted mid-run.
+     * A store-wide metric (`isLocaleScoped=false`) is searched exactly like any other — its Apply write
+     * goes through `search-ranking`'s own `saveMetricWeight()`, which already fans the write out to every
+     * real locale of the store, the same as a human editing it manually from the Metrics page in any one
+     * locale already does today.
+     *
+     * @param array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}> $activeMetrics
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
+     * @param string $storeName
+     * @param string $localeName
+     * @param array<string, float> $userFixedMetricWeights Name => the value a human chose to pin it at, see
+     *   {@see buildUserFixedMetricWeights()}.
+     *
+     * @return array{0: array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}>, 1: array<string, float>}
+     */
+    protected function splitMetricsByDeterminism(
+        array $activeMetrics,
+        SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
+        string $storeName,
+        string $localeName,
+        array $userFixedMetricWeights = [],
+    ): array {
         $optimizableMetrics = [];
         $fixedMetricWeights = [];
         $liveMetricWeightsByName = $liveConfigurationTransfer->getMetricWeights();
 
         foreach ($activeMetrics as $metric) {
-            $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric']);
+            if (array_key_exists($metric['name'], $userFixedMetricWeights)) {
+                $fixedMetricWeights[$metric['name']] = $userFixedMetricWeights[$metric['name']];
+
+                continue;
+            }
+
+            $metricDetail = $this->searchRankingFacade->findMetricDetail($metric['idSearchRankingMetric'], $storeName, $localeName);
             $isDeterministic = $metricDetail === null || $this->formulaDeterminismChecker->isDeterministic($metricDetail['formula']);
 
             if ($isDeterministic) {
@@ -240,52 +292,10 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * this run picked, and so the total evaluation count is knowable before the run actually starts.
      *
      * @param int $dimensionCount
-     *
-     * @return int
      */
     protected function computePopulationSize(int $dimensionCount): int
     {
         return max(4, (int)(4 + floor(3 * log(max($dimensionCount, 2)))));
-    }
-
-    /**
-     * @param string $algorithmName
-     * @param int $populationSize
-     * @param int $maxGenerations
-     *
-     * @return int
-     */
-    protected function computeTotalEvaluationCount(string $algorithmName, int $populationSize, int $maxGenerations): int
-    {
-        // DifferentialEvolutionAlgorithm evaluates one extra initial-population batch before its
-        // generation loop starts; CmaEsAlgorithm's first generation IS the initial sample.
-        $generationBatches = $algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION
-            ? $maxGenerations + 1
-            : $maxGenerations;
-
-        return $populationSize * $generationBatches;
-    }
-
-    /**
-     * @param string $algorithmName
-     * @param int $populationSize
-     * @param int $maxGenerations
-     *
-     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
-     */
-    protected function buildAlgorithm(string $algorithmName, int $populationSize, int $maxGenerations): OptimizerAlgorithmInterface
-    {
-        if ($algorithmName === SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION) {
-            $algorithm = new DifferentialEvolutionAlgorithm();
-            $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-            return $algorithm;
-        }
-
-        $cmaEsAlgorithm = new CmaEsAlgorithm();
-        $cmaEsAlgorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-        return $cmaEsAlgorithm;
     }
 
     /**
@@ -299,23 +309,23 @@ class OptimizationRunner implements OptimizationRunnerInterface
      *
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperInterface $mapper
      * @param float $relevanceSaturationPoint
+     * @param float $specificitySaturationPoint
      * @param string $storeName
      * @param string $localeName
      * @param int $idOptimizerRun
-     *
-     * @return callable
      */
     protected function buildObjectiveFunction(
         ParameterVectorMapperInterface $mapper,
         float $relevanceSaturationPoint,
+        float $specificitySaturationPoint,
         string $storeName,
         string $localeName,
         int $idOptimizerRun,
     ): callable {
         $evaluationsSoFar = 0;
 
-        return function (array $vector) use ($mapper, $relevanceSaturationPoint, $storeName, $localeName, $idOptimizerRun, &$evaluationsSoFar): float {
-            $candidateConfigurationTransfer = $mapper->mapVectorToConfiguration($vector, $relevanceSaturationPoint);
+        return function (array $vector) use ($mapper, $relevanceSaturationPoint, $specificitySaturationPoint, $storeName, $localeName, $idOptimizerRun, &$evaluationsSoFar): float {
+            $candidateConfigurationTransfer = $mapper->mapVectorToConfiguration($vector, $relevanceSaturationPoint, $specificitySaturationPoint);
             $score = $this->rankEvaluationRunner->evaluateCandidate($storeName, $localeName, $candidateConfigurationTransfer);
 
             $evaluationsSoFar++;
@@ -326,7 +336,12 @@ class OptimizationRunner implements OptimizationRunnerInterface
     }
 
     /**
-     * @param array<int, array{idSearchRankingMetric: int, name: string}> $activeMetrics
+     * Every metric this run searched (see {@see splitMetricsByDeterminism()}) gets a proposed transfer
+     * here, including a store-wide (`isLocaleScoped=false`) one — {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier}
+     * writes each one back through `search-ranking`'s own `saveMetricWeight()`, which fans a store-wide
+     * metric's write out to every real locale of the store, same as a manual edit from the Metrics page.
+     *
+     * @param array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}> $activeMetrics
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $bestConfigurationTransfer
      *
      * @return array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer>

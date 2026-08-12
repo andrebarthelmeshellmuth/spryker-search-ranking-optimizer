@@ -1,0 +1,17 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Ratings' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Ratings' } %}
+        {% block widget_content %}
+            <p>
+                One row per admin's individual heart/check/X input from the storefront's Relevance Rater
+                widget, newest activity first — the raw, per-input audit trail behind the aggregated view on
+                the Queries page.
+            </p>
+            {{ ratingTable | raw }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

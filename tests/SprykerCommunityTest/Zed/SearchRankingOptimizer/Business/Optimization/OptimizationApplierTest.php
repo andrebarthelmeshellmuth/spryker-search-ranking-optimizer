@@ -15,6 +15,7 @@ use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
@@ -32,9 +33,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class OptimizationApplierTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testApplyReturnsNullWhenTheRunDoesNotExist(): void
     {
         // Arrange
@@ -56,9 +54,6 @@ class OptimizationApplierTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testApplyReturnsNullWhenTheRunIsNotDoneYet(): void
     {
         // Arrange
@@ -81,19 +76,19 @@ class OptimizationApplierTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testApplyWritesTheWinningCandidateThroughTheFacadeRecordsAnOptimizerSourcedCheckpointAndMarksTheRunApplied(): void
     {
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12)
+            ->setBestSpecificityCurveExponent(1.3)
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7)
             ->addBestMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(1)
@@ -119,21 +114,22 @@ class OptimizationApplierTest extends Unit
             ->willReturnOnConsecutiveCalls($doneRunTransfer, $appliedRunTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with(0.85);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightExponent')->with(1.2);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyWeightShiftMagnitude')->with(0.25);
-        $searchRankingFacadeMock->expects($this->once())->method('saveEntropyProbeResultSize')->with(12);
+        $searchRankingFacadeMock->expects($this->once())->method('saveRelevanceWeight')->with('DE', 'de_DE', 0.85);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityCurveExponent')->with('DE', 'de_DE', 1.3);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightExponent')->with('DE', 'de_DE', 1.2);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityWeightShiftMagnitude')->with('DE', 'de_DE', 0.25);
+        $searchRankingFacadeMock->expects($this->once())->method('saveSpecificityBlendWeight')->with('DE', 'de_DE', 0.7);
         $searchRankingFacadeMock->expects($this->exactly(2))
             ->method('saveMetricWeight')
             ->willReturnMap([
-                [1, 0.6, true],
-                [2, 0.4, true],
+                [1, 'DE', 'de_DE', 0.6, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY, true],
+                [2, 'DE', 'de_DE', 0.4, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY, true],
             ]);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->expects($this->once())
             ->method('record')
-            ->with(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER)
+            ->with(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, 'DE', 'de_DE')
             ->willReturn(new SearchRankingWeightCheckpointTransfer());
 
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
@@ -152,21 +148,22 @@ class OptimizationApplierTest extends Unit
     /**
      * A metric a winning candidate wants to write can be deleted between when its optimization run
      * finished and when an admin clicks Apply. Proves the whole apply rolls back rather than leaving
-     * relevanceWeight/entropy settings live with only some metric weights applied (which would silently
+     * relevanceWeight/specificity settings live with only some metric weights applied (which would silently
      * leave the live metric weights summing to less than 1, with the run still marked applied).
-     *
-     * @return void
      */
     public function testApplyRollsBackEverythingAndReturnsNullWhenAMetricNoLongerExists(): void
     {
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12)
+            ->setBestSpecificityCurveExponent(1.3)
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7)
             ->addBestMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric(404)
@@ -181,7 +178,7 @@ class OptimizationApplierTest extends Unit
             ->willReturn($doneRunTransfer);
 
         $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
-        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 1.0)->willReturn(false);
+        $searchRankingFacadeMock->method('saveMetricWeight')->with(404, 'DE', 'de_DE', 1.0, SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY)->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->method('record')->willReturn(new SearchRankingWeightCheckpointTransfer());
@@ -202,19 +199,20 @@ class OptimizationApplierTest extends Unit
     /**
      * The checkpoint must snapshot the state BEFORE this run's values are written — recording it after
      * would checkpoint the just-applied state itself, useless as a way back.
-     *
-     * @return void
      */
     public function testApplyRecordsTheCheckpointBeforeWritingAnyWeights(): void
     {
         // Arrange
         $doneRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setIdSearchRankingOptimizerRun(1)
+            ->setStoreName('DE')
+            ->setLocaleName('de_DE')
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE)
             ->setBestRelevanceWeight(0.85)
-            ->setBestEntropyWeightExponent(1.2)
-            ->setBestEntropyWeightShiftMagnitude(0.25)
-            ->setBestEntropyProbeResultSize(12);
+            ->setBestSpecificityCurveExponent(1.3)
+            ->setBestSpecificityWeightExponent(1.2)
+            ->setBestSpecificityWeightShiftMagnitude(0.25)
+            ->setBestSpecificityBlendWeight(0.7);
 
         $appliedRunTransfer = (new SearchRankingOptimizerRunTransfer())->setIdSearchRankingOptimizerRun(1);
 
@@ -252,8 +250,6 @@ class OptimizationApplierTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface|null $recorder
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier
      */
     protected function createApplier(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -279,16 +275,12 @@ class OptimizationApplierTest extends Unit
      * just invokes the callback directly (no real transaction), which is all `OptimizationApplier` needs
      * from it: the callback runs, and any exception it throws propagates same as the real handler would
      * after its own rollback.
-     *
-     * @return \Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface
      */
     protected function createPassThroughTransactionHandler(): TransactionHandlerInterface
     {
         return new class implements TransactionHandlerInterface {
             /**
              * @param \Closure $callback
-             *
-             * @return mixed
              */
             public function handleTransaction(Closure $callback): mixed
             {

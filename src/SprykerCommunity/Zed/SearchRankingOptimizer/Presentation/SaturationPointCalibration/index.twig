@@ -1,0 +1,204 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Search Ranking Saturation Point Calibration' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Viewing' } %}
+        {% block widget_content %}
+            <form method="get" class="form-inline">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        {% endblock %}
+    {% endembed %}
+
+    {% if inProgressCalibration %}
+        {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Saturation Point Calibration In Progress (' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName ~ ')' } %}
+            {% block widget_content %}
+                {# Polled by the script at the bottom of this page — the counts printed here are only the
+                   first paint; every update after that comes from progressAction()'s JSON, not a page
+                   reload. #}
+                <div class="search-ranking-optimizer-saturation-point-calibration-progress" data-role="calibration-progress">
+                    <p>
+                        <span data-role="processed">{{ inProgressCalibration.processedCount }}</span> /
+                        <span data-role="total">{{ inProgressCalibration.totalCount }}</span>
+                        {{ 'search terms processed' | trans }}
+                    </p>
+                    <progress data-role="progress-bar" value="{{ inProgressCalibration.processedCount }}" max="{{ inProgressCalibration.totalCount|default(1) }}" style="width: 100%;"></progress>
+                </div>
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Current Saturation Point (k) — ' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName } %}
+        {% block widget_content %}
+            <p>Live relevance-score value: <strong>{{ currentRelevanceSaturationPoint }}</strong></p>
+            <p>Live specificity value: <strong>{{ currentSpecificitySaturationPoint }}</strong></p>
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Latest Calibration Run — ' ~ selectedStoreName ~ ' / ' ~ selectedLocaleName } %}
+        {% block widget_content %}
+            {% if latestCalibration %}
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>Calibration type</th>
+                            <td>{{ latestCalibration.calibrationType }}</td>
+                        </tr>
+                        <tr>
+                            <th>Last calculated</th>
+                            <td>{{ latestCalibration.calculatedAt }}</td>
+                        </tr>
+                        <tr>
+                            <th>Relevant products per search (X)</th>
+                            <td>{{ latestCalibration.relevantProductCount }}</td>
+                        </tr>
+                        <tr>
+                            <th>Store / Locale</th>
+                            <td>{{ latestCalibration.storeName }} / {{ latestCalibration.localeName }}</td>
+                        </tr>
+                        <tr>
+                            <th>Sampled values</th>
+                            <td>{{ latestCalibration.sampleCount }}</td>
+                        </tr>
+                        <tr>
+                            <th>Computed k (mean)</th>
+                            <td><strong>{{ latestCalibration.computedK }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th>Min / p25 / median / p75 / Max</th>
+                            <td>
+                                {{ latestCalibration.valueMin }} /
+                                {{ latestCalibration.valueP25 }} /
+                                {{ latestCalibration.valueMedian }} /
+                                {{ latestCalibration.valueP75 }} /
+                                {{ latestCalibration.valueMax }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {{ form_start(applyForm, { action: url('/search-ranking-optimizer/saturation-point-calibration-apply') }) }}
+                {{ form_widget(applyForm) }}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">{{ 'Apply' | trans }}</button>
+                </div>
+                {{ form_end(applyForm) }}
+            {% else %}
+                <p>No calibration run has finished yet for {{ selectedStoreName }} / {{ selectedLocaleName }} — upload one below, or switch scope above if you expected to see one here.</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Start New Saturation Point Calibration Run' } %}
+        {% block widget_content %}
+            <p>
+                By default, sources search terms from the distinct queries already organically rated via
+                the SRP relevance-rating widget for the chosen store/locale — no upload needed. The next
+                <code>search-ranking-optimizer:calibrate</code> cron tick then either (relevance score type)
+                fires the live catalog search-string query for each term, sampling the raw text-relevance
+                score of the top-ranked products (up to X per term), or (specificity type) fires a single
+                lightweight probe per term with no catalog query at all — either way, pooling every sampled
+                value into a suggested k value for spryker-community/search-ranking's ranking formula.
+            </p>
+            {{ form_start(uploadForm, { action: url('/search-ranking-optimizer/saturation-point-calibration') }) }}
+            {{ form_row(uploadForm.calibrationType) }}
+            {{ form_row(uploadForm.relevantProductCount) }}
+            {{ form_row(uploadForm.storeName) }}
+            {{ form_row(uploadForm.localeName) }}
+            {{ form_row(uploadForm.useCsvUpload) }}
+            <div id="search-ranking-optimizer-saturation-point-calibration-csv-file-row" data-role="csv-file-row" hidden>
+                {{ form_row(uploadForm.file) }}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Start' | trans }}</button>
+            </div>
+            {{ form_end(uploadForm) }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}
+
+{% block footer_js %}
+    {{ parent() }}
+    <script>
+        (function () {
+            'use strict';
+
+            // Progressive enhancement only: the checkbox/file-row pairing is still fully valid without
+            // JS (the form-level validation still requires a file when the checkbox is checked either
+            // way) — this just avoids showing the file input before it's relevant.
+            var checkbox = document.getElementById('search_ranking_saturation_point_calibration_upload_useCsvUpload');
+            var fileRow = document.getElementById('search-ranking-optimizer-saturation-point-calibration-csv-file-row');
+
+            if (!checkbox || !fileRow) {
+                return;
+            }
+
+            function sync() {
+                fileRow.hidden = !checkbox.checked;
+            }
+
+            checkbox.addEventListener('change', sync);
+            sync();
+        }());
+    </script>
+    {% if inProgressCalibration %}
+        <script>
+            (function () {
+                'use strict';
+
+                // Polls until status stops being "calculating" (finished, failed, or — extremely
+                // unlikely mid-poll — picked up as a fresh "uploaded" run again), then reloads once to
+                // show the finished widgets (Apply form, or the error) instead of trying to fade this
+                // progress panel out client-side.
+                var processedElement = document.querySelector('[data-role="calibration-progress"] [data-role="processed"]');
+                var totalElement = document.querySelector('[data-role="calibration-progress"] [data-role="total"]');
+                var progressBarElement = document.querySelector('[data-role="calibration-progress"] [data-role="progress-bar"]');
+
+                function poll() {
+                    // Same scope this page itself was rendered with — a run for a different store/locale
+                    // must never be reported as this page's own progress.
+                    fetch('/search-ranking-optimizer/saturation-point-calibration/progress?storeName={{ selectedStoreName }}&localeName={{ selectedLocaleName }}', { headers: { Accept: 'application/json' } })
+                        .then(function (response) { return response.json(); })
+                        .then(function (progress) {
+                            if (progress.status !== 'calculating') {
+                                window.location.reload();
+
+                                return;
+                            }
+
+                            processedElement.textContent = progress.processedCount;
+                            totalElement.textContent = progress.totalCount;
+                            progressBarElement.setAttribute('value', progress.processedCount);
+                            progressBarElement.setAttribute('max', progress.totalCount || 1);
+
+                            window.setTimeout(poll, 1000);
+                        })
+                        .catch(function () {
+                            // A transient failure (e.g. one dropped request) shouldn't stop polling —
+                            // just try again on the same cadence.
+                            window.setTimeout(poll, 1000);
+                        });
+                }
+
+                window.setTimeout(poll, 1000);
+            }());
+        </script>
+    {% endif %}
+{% endblock %}

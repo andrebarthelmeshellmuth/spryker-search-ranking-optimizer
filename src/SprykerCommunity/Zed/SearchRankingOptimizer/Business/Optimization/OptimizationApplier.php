@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization;
 
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
+use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\MetricNoLongerExistsException;
@@ -19,24 +20,12 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class OptimizationApplier implements OptimizationApplierInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface
-     */
     protected SearchRankingOptimizerRepositoryInterface $repository;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface
-     */
     protected WeightCheckpointRecorderInterface $recorder;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
     /**
@@ -61,8 +50,6 @@ class OptimizationApplier implements OptimizationApplierInterface
      * {@inheritDoc}
      *
      * @param int $idSearchRankingOptimizerRun
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer|null
      */
     public function apply(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
     {
@@ -94,25 +81,33 @@ class OptimizationApplier implements OptimizationApplierInterface
      * @param int $idSearchRankingOptimizerRun
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\MetricNoLongerExistsException
-     *
-     * @return void
      */
     protected function applyWithinTransaction(
         SearchRankingOptimizerRunTransfer $optimizerRunTransfer,
         int $idSearchRankingOptimizerRun,
     ): void {
-        $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER);
+        $storeName = $optimizerRunTransfer->getStoreNameOrFail();
+        $localeName = $optimizerRunTransfer->getLocaleNameOrFail();
 
-        $this->searchRankingFacade->saveRelevanceWeight($optimizerRunTransfer->getBestRelevanceWeightOrFail());
-        $this->searchRankingFacade->saveEntropyWeightExponent($optimizerRunTransfer->getBestEntropyWeightExponentOrFail());
-        $this->searchRankingFacade->saveEntropyWeightShiftMagnitude($optimizerRunTransfer->getBestEntropyWeightShiftMagnitudeOrFail());
-        $this->searchRankingFacade->saveEntropyProbeResultSize($optimizerRunTransfer->getBestEntropyProbeResultSizeOrFail());
+        $this->recorder->record(SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_OPTIMIZER, $storeName, $localeName);
 
+        $this->searchRankingFacade->saveRelevanceWeight($storeName, $localeName, $optimizerRunTransfer->getBestRelevanceWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityBlendWeight($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityBlendWeightOrFail());
+        $this->searchRankingFacade->saveSpecificityCurveExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityCurveExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightExponent($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightExponentOrFail());
+        $this->searchRankingFacade->saveSpecificityWeightShiftMagnitude($storeName, $localeName, $optimizerRunTransfer->getBestSpecificityWeightShiftMagnitudeOrFail());
+
+        // A store-wide (isLocaleScoped=false) metric can appear here like any other -- search-ranking's
+        // own saveMetricWeight() already fans that write out to every real locale of the store, the same
+        // as a human editing it manually from the Metrics page in any one locale already does today.
         foreach ($optimizerRunTransfer->getBestMetricWeights() as $metricWeightTransfer) {
             $idSearchRankingMetric = $metricWeightTransfer->getIdSearchRankingMetricOrFail();
             $wasSaved = $this->searchRankingFacade->saveMetricWeight(
                 $idSearchRankingMetric,
+                $storeName,
+                $localeName,
                 $metricWeightTransfer->getWeightOrFail(),
+                SharedSearchRankingConfig::CHANGE_SOURCE_OPTIMIZER_APPLY,
             );
 
             if (!$wasSaved) {

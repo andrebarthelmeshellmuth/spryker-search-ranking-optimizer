@@ -21,8 +21,6 @@ interface RelevanceJudgmentGainMapperInterface
      *   default for old/foreign data, not a path expected to trigger in practice.
      *
      * @param string $ratingType
-     *
-     * @return float
      */
     public function mapRatingType(string $ratingType): float;
 }

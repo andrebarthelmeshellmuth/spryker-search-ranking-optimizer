@@ -26,9 +26,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class QueryImportanceWeightUpdaterTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testUpdatePassesTheIdAndWeightThroughToTheEntityManagerUnchanged(): void
     {
         // Arrange

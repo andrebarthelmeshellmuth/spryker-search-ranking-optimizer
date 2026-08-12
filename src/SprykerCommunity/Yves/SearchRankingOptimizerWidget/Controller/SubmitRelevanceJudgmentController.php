@@ -54,8 +54,6 @@ class SubmitRelevanceJudgmentController extends AbstractController
      * customer actually click this button").
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return bool
      */
     protected function isCsrfTokenValid(Request $request): bool
     {
@@ -69,13 +67,11 @@ class SubmitRelevanceJudgmentController extends AbstractController
     /**
      * UX-level gate only — the real, unbypassable check happens server-side in Zed's GatewayController,
      * which independently re-resolves the customer's permission rather than trusting anything asserted
-     * here (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\RelevanceJudgmentAuthorizer}).
+     * here (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer}).
      * This check only avoids a pointless round-trip for a customer the widget should never have rendered
      * the buttons for in the first place.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function submitAction(Request $request): JsonResponse
     {
@@ -116,8 +112,6 @@ class SubmitRelevanceJudgmentController extends AbstractController
      * submitting one does.
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
-     *
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function clearAction(Request $request): JsonResponse
     {

@@ -16,14 +16,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
 
 class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
 {
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface
-     */
     protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
 
-    /**
-     * @var \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface
-     */
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
     /**
@@ -42,25 +36,29 @@ class WeightCheckpointRecorder implements WeightCheckpointRecorderInterface
      * {@inheritDoc}
      *
      * @param string $source
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer
+     * @param string $storeName
+     * @param string $localeName
      */
-    public function record(string $source): SearchRankingWeightCheckpointTransfer
+    public function record(string $source, string $storeName, string $localeName): SearchRankingWeightCheckpointTransfer
     {
         $weightCheckpointTransfer = (new SearchRankingWeightCheckpointTransfer())
             ->setSource($source)
-            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight())
-            ->setEntropyProbeResultSize($this->searchRankingFacade->getEntropyProbeResultSize())
-            ->setEntropyWeightExponent($this->searchRankingFacade->getEntropyWeightExponent())
-            ->setEntropyWeightShiftMagnitude($this->searchRankingFacade->getEntropyWeightShiftMagnitude())
-            ->setIsEntropyWeightingEnabled($this->searchRankingFacade->isEntropyWeightingEnabled());
+            ->setStoreName($storeName)
+            ->setLocaleName($localeName)
+            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
+            ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName))
+            ->setSpecificityCurveExponent($this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName))
+            ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
+            ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
+            ->setIsSpecificityWeightingEnabled($this->searchRankingFacade->isSpecificityWeightingEnabled());
 
-        foreach ($this->searchRankingFacade->getMetricWeights() as $metricWeight) {
+        foreach ($this->searchRankingFacade->getMetricWeights($storeName, $localeName) as $metricWeight) {
             $weightCheckpointTransfer->addMetricWeight(
                 (new SearchRankingWeightCheckpointMetricWeightTransfer())
                     ->setIdSearchRankingMetric($metricWeight['idSearchRankingMetric'])
                     ->setName($metricWeight['name'])
-                    ->setWeight($metricWeight['weight']),
+                    ->setWeight($metricWeight['weight'])
+                    ->setIsLocaleScoped($metricWeight['isLocaleScoped']),
             );
         }
 

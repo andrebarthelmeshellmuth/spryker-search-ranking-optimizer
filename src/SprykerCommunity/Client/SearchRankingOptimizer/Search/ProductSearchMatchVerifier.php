@@ -16,7 +16,7 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 /**
- * Same raw-Elastica-bypass reasoning as {@see CalibrationSearcher}/{@see RankEvalRunner} -- fires directly
+ * Same raw-Elastica-bypass reasoning as {@see SaturationPointCalibrationSearcher}/{@see RankEvalRunner} -- fires directly
  * against Elasticsearch with an explicit index name, no `Client\Catalog`/`Client\Search`/Store-singleton
  * involved, so this is safe to call from Zed (via the bridge) as well as from Yves.
  */
@@ -41,8 +41,6 @@ class ProductSearchMatchVerifier implements ProductSearchMatchVerifierInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return bool
      */
     public function matches(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool
     {
@@ -69,8 +67,6 @@ class ProductSearchMatchVerifier implements ProductSearchMatchVerifierInterface
      * @param string $storeName
      * @param string $localeName
      * @param int $idProductAbstract
-     *
-     * @return string
      */
     protected function buildProductDocumentId(string $storeName, string $localeName, int $idProductAbstract): string
     {

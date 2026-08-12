@@ -36,9 +36,6 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  */
 class RankEvaluationRunnerTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenNoQueriesExistForStoreLocale(): void
     {
         // Arrange
@@ -58,9 +55,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenNoRatingsExistForStoreLocale(): void
     {
         // Arrange
@@ -80,9 +74,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateReturnsNullWhenTheBridgeReturnsNoScores(): void
     {
         // Arrange
@@ -105,9 +96,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNull($result);
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluatePersistsAQueryImportanceWeightedAggregateAcrossMultipleQueries(): void
     {
         // Arrange — query 1 (weight 2) scores 0.8, query 2 (weight 1) scores 0.2:
@@ -125,11 +113,9 @@ class RankEvaluationRunnerTest extends Unit
         $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
         $searchRankingClientMock->expects($this->once())
             ->method('evaluateRankings')
-            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer): bool {
-                return count($requestTransfer->getQueries()) === 2
-                    && $requestTransfer->getStoreNameOrFail() === 'DE'
-                    && $requestTransfer->getLocaleNameOrFail() === 'en_US';
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationRequestTransfer $requestTransfer): bool => count($requestTransfer->getQueries()) === 2
+                && $requestTransfer->getStoreNameOrFail() === 'DE'
+                && $requestTransfer->getLocaleNameOrFail() === 'en_US'))
             ->willReturn(
                 (new SearchRankingEvaluationResponseTransfer())
                     ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.8))
@@ -139,12 +125,10 @@ class RankEvaluationRunnerTest extends Unit
         $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
         $entityManagerMock->expects($this->once())
             ->method('createEvaluation')
-            ->with($this->callback(function (SearchRankingEvaluationTransfer $evaluationTransfer): bool {
-                return $evaluationTransfer->getStoreNameOrFail() === 'DE'
-                    && $evaluationTransfer->getLocaleNameOrFail() === 'en_US'
-                    && $evaluationTransfer->getQueryCountOrFail() === 2
-                    && abs($evaluationTransfer->getMetricScoreOrFail() - 0.6) < 0.0001;
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationTransfer $evaluationTransfer): bool => $evaluationTransfer->getStoreNameOrFail() === 'DE'
+                && $evaluationTransfer->getLocaleNameOrFail() === 'en_US'
+                && $evaluationTransfer->getQueryCountOrFail() === 2
+                && abs($evaluationTransfer->getMetricScoreOrFail() - 0.6) < 0.0001))
             ->willReturnArgument(0);
 
         $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingClientMock);
@@ -157,9 +141,6 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertSame(2, $result->getQueryCount());
     }
 
-    /**
-     * @return void
-     */
     public function testEvaluateCandidateReturnsNullWhenNoQueriesExistForStoreLocale(): void
     {
         // Arrange
@@ -183,8 +164,6 @@ class RankEvaluationRunnerTest extends Unit
      * The whole point of this method: it must NEVER call createEvaluation, no matter how many times it's
      * called or how successful the evaluation is -- an optimizer loop calling this hundreds of times per
      * run must not flood spy_search_ranking_evaluation with candidate-scoring noise.
-     *
-     * @return void
      */
     public function testEvaluateCandidateNeverPersistsAnEvaluation(): void
     {
@@ -215,8 +194,6 @@ class RankEvaluationRunnerTest extends Unit
      * The other half of the point: the candidate configuration must actually reach the fired query, not
      * be silently dropped -- otherwise every candidate an optimizer proposes would score identically,
      * exactly the original bug this method exists to avoid re-introducing.
-     *
-     * @return void
      */
     public function testEvaluateCandidatePassesTheGivenConfigurationThroughToTheRequest(): void
     {
@@ -233,9 +210,7 @@ class RankEvaluationRunnerTest extends Unit
         $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
         $searchRankingClientMock->expects($this->once())
             ->method('evaluateRankings')
-            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer) use ($candidateConfigurationTransfer): bool {
-                return $requestTransfer->getRankingConfiguration() === $candidateConfigurationTransfer;
-            }))
+            ->with($this->callback(fn (SearchRankingEvaluationRequestTransfer $requestTransfer): bool => $requestTransfer->getRankingConfiguration() === $candidateConfigurationTransfer))
             ->willReturn(
                 (new SearchRankingEvaluationResponseTransfer())
                     ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.5)),
@@ -256,8 +231,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
-     *
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
@@ -283,8 +256,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param int $idSearchRankingQuery
      * @param string $searchTerm
      * @param float $importanceWeight
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     protected function createQueryTransfer(int $idSearchRankingQuery, string $searchTerm, float $importanceWeight): SearchRankingQueryTransfer
     {
@@ -300,8 +271,6 @@ class RankEvaluationRunnerTest extends Unit
      * @param int $fkSearchRankingQuery
      * @param int $fkProductAbstract
      * @param string $ratingType
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     protected function createRatingTransfer(int $fkSearchRankingQuery, int $fkProductAbstract, string $ratingType): SearchRankingQueryRatingTransfer
     {

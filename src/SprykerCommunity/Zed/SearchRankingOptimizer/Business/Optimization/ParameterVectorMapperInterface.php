@@ -15,16 +15,14 @@ use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
  * The adapter between {@see \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface}'s
  * generic, Spryker-agnostic vectors and this package's own real domain: a `relevanceWeight` scalar, a
  * simplex of metric weights (summing to 1, together with any fixed-weight metrics excluded from the
- * search — see the constructor), and 3 independent entropy-aware relevance weighting parameters
- * (`entropyWeightExponent`, `entropyWeightShiftMagnitude`, `entropyProbeResultSize`). One mapper instance
+ * search — see the constructor), and 4 independent specificity-aware relevance weighting parameters
+ * (`specificityCurveExponent`, `specificityWeightExponent`, `specificityWeightShiftMagnitude`,
+ * `specificityBlendWeight`). One mapper instance
  * is scoped to a single optimization run's fixed set of active metrics — build a fresh one per run, never
  * share one across runs with a different metric set.
  */
 interface ParameterVectorMapperInterface
 {
-    /**
-     * @return int
-     */
     public function getDimensionCount(): int;
 
     /**
@@ -40,13 +38,19 @@ interface ParameterVectorMapperInterface
     /**
      * @param array<int, float> $vector A vector of {@see getDimensionCount()} values, as an
      *   OptimizerAlgorithmInterface implementation would produce it.
-     * @param float $relevanceSaturationPoint Passed through unchanged — Phase O6 never touches this
-     *   (Calibration's own concern), but the resulting configuration transfer needs a real value to be
-     *   usable as a rank_eval override.
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer
+     * @param float $relevanceSaturationPoint Passed through unchanged — the optimizer loop never touches
+     *   this (Calibration's own concern), but the resulting configuration transfer needs a real value to
+     *   be usable as a rank_eval override.
+     * @param float $specificitySaturationPoint Passed through unchanged for the same reason, and for the
+     *   same Calibration-only-tunable reason it isn't searched: without it every candidate would be
+     *   evaluated against a normalization constant of 0 while the live baseline uses the configured one,
+     *   so the two would not be comparable.
      */
-    public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer;
+    public function mapVectorToConfiguration(
+        array $vector,
+        float $relevanceSaturationPoint,
+        float $specificitySaturationPoint,
+    ): SearchRankingConfigurationStorageTransfer;
 
     /**
      * The inverse of {@see mapVectorToConfiguration()} — only needed to SEED an optimizer run's initial

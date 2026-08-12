@@ -15,7 +15,7 @@ use Spryker\Client\SearchElasticsearch\Dependency\Client\SearchElasticsearchToSt
 
 /**
  * `IndexNameResolver` requires a store client dependency, but its `getCurrentStore()` fallback is only
- * ever invoked when `resolve()` is called WITHOUT an explicit store name — {@see CalibrationSearcher}
+ * ever invoked when `resolve()` is called WITHOUT an explicit store name — {@see SaturationPointCalibrationSearcher}
  * always passes one explicitly (the admin-picked store, since Zed has no "current store" of its own), so
  * this dependency is structurally required but never actually exercised. A real `Client\Store` bridge
  * would be misleading here — it would imply calibration depends on `Client\Store::getCurrentStore()`,
@@ -25,13 +25,11 @@ class NeverInvokedStoreClient implements SearchElasticsearchToStoreClientInterfa
 {
     /**
      * @throws \LogicException
-     *
-     * @return \Generated\Shared\Transfer\StoreTransfer
      */
     public function getCurrentStore(): StoreTransfer
     {
         throw new LogicException(
-            'NeverInvokedStoreClient::getCurrentStore() was called — CalibrationSearcher must always ' .
+            'NeverInvokedStoreClient::getCurrentStore() was called — SaturationPointCalibrationSearcher must always ' .
             'pass an explicit store name to IndexNameResolver::resolve() instead of relying on this fallback.',
         );
     }

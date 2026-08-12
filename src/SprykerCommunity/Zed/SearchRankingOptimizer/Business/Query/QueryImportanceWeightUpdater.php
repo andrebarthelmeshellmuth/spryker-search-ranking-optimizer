@@ -23,8 +23,6 @@ class QueryImportanceWeightUpdater implements QueryImportanceWeightUpdaterInterf
     /**
      * @param int $idSearchRankingQuery
      * @param float $importanceWeight
-     *
-     * @return void
      */
     public function update(int $idSearchRankingQuery, float $importanceWeight): void
     {

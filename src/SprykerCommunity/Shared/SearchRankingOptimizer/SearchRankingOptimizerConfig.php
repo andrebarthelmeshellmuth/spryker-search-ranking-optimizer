@@ -13,9 +13,35 @@ class SearchRankingOptimizerConfig
 {
     /**
      * Specification:
+     * - Calibration type: samples real per-product raw text-relevance scores from a live catalog query
+     *   (BEFORE any function_score wrapper) — the ORIGINAL calibration path, suggesting
+     *   `relevanceSaturationPoint`.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CALIBRATION_TYPE_RELEVANCE_SCORE = 'relevance_score';
+
+    /**
+     * Specification:
+     * - Calibration type: samples one raw specificity value per uploaded search term — no real catalog
+     *   query at all, just a `_termvectors` probe against the term itself — suggesting
+     *   `specificitySaturationPoint`.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const CALIBRATION_TYPE_SPECIFICITY = 'specificity';
+
+    /**
+     * Specification:
      * - A calibration run just uploaded, queued for the next `search-ranking-optimizer:calibrate` cron
-     *   tick. At most one uploaded row is ever picked up per tick — the newest — the rest move straight to
-     *   {@see CALIBRATION_STATUS_SKIPPED}.
+     *   tick. At most one uploaded row is ever picked up per tick — the newest. Of the rest, only those
+     *   targeting the SAME (storeName, localeName, calibrationType) move straight to
+     *   {@see CALIBRATION_STATUS_SKIPPED}; uploads for another scope or type stay queued here for a later
+     *   tick.
      *
      * @api
      *
@@ -25,8 +51,10 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - A superseded upload: a newer one existed by the time the cron ran, so this one was never
-     *   calculated.
+     * - A superseded upload: by the time the cron ran, a newer upload existed for the SAME
+     *   (storeName, localeName, calibrationType), so this one was never calculated. Only a newer upload
+     *   for that same target supersedes — one for another scope or another calibration type computes a
+     *   different constant and leaves this row queued.
      *
      * @api
      *
@@ -70,7 +98,7 @@ class SearchRankingOptimizerConfig
      * Specification:
      * - Elasticsearch page-index source identifier passed to `IndexNameResolver::resolve()` when
      *   calibration resolves an index name directly (bypassing Client\Catalog/Client\Search — see
-     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\CalibrationSearcher}). A local copy
+     *   {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcher}). A local copy
      *   of the base package's identically-valued constant, kept here so this package resolves the page
      *   index without a compile-time reference back into spryker-community/search-ranking's config.
      *
@@ -137,8 +165,6 @@ class SearchRankingOptimizerConfig
      *   of cutoff (also used by spryker-community/search-ranking's own rank_eval capability probe).
      *
      * @api
-     *
-     * @return int
      */
     public static function getRankEvalCutoff(): int
     {
@@ -149,9 +175,8 @@ class SearchRankingOptimizerConfig
      * Specification:
      * - A weight checkpoint taken directly by a Query Curator — either an explicit "take checkpoint now",
      *   or the checkpoint a restore itself writes to record the resulting state (restore is "apply",
-     *   same as any other weight change).
-     * - Later phases add further values here as new checkpoint producers get built (a monthly auto-tune
-     *   job, an eventual automated weight optimizer) — "one harness, three producers," per the roadmap.
+     *   same as any other weight change). Distinct from `CHECKPOINT_SOURCE_OPTIMIZER`, which records
+     *   checkpoints for automated optimizer runs instead.
      *
      * @api
      *
@@ -162,7 +187,7 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - The checkpoint recorded automatically when a human clicks Apply on an automated optimization
-     *   run's (Phase O6) winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
+     *   run's winning candidate — distinct from `CHECKPOINT_SOURCE_MANUAL` so checkpoint
      *   history honestly shows which changes came from an optimizer run rather than a direct manual edit
      *   or restore.
      *
@@ -214,7 +239,7 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - How far a single automated weight-optimization run (Phase O6) may push relevanceWeight away from
+     * - How far a single automated weight-optimization run may push relevanceWeight away from
      *   its OWN value at the moment the run started, in either direction, before clipping back to [0;1]
      *   at either edge -- a trust-region safety limit, not a general-purpose bound on relevanceWeight
      *   itself (which is always [0;1] regardless of this setting). Deliberately conservative by default:
@@ -223,8 +248,6 @@ class SearchRankingOptimizerConfig
      *   all the way to on its own.
      *
      * @api
-     *
-     * @return float
      */
     public static function getRelevanceWeightTrustRegionMaxDistance(): float
     {
@@ -234,46 +257,40 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyWeightExponent` instead — how far a single run may push it away from its own value at the
-     *   moment the run started, before clipping to the absolute bounds
-     *   {@see getEntropyWeightExponentLowerBound()}/{@see getEntropyWeightExponentUpperBound()}.
+     *   `specificityWeightExponent` instead — how far a single run may push it away from its own value at
+     *   the moment the run started, before clipping to the absolute bounds
+     *   {@see getSpecificityWeightExponentLowerBound()}/{@see getSpecificityWeightExponentUpperBound()}.
      *
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightExponentTrustRegionMaxDistance(): float
+    public static function getSpecificityWeightExponentTrustRegionMaxDistance(): float
     {
         return 0.5;
     }
 
     /**
      * Specification:
-     * - Absolute lower bound on `entropyWeightExponent` regardless of trust region — an exponent must stay
-     *   strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0` is
-     *   always 1 regardless of `x`, discarding the entropy signal entirely; a negative exponent inverts it
-     *   in an unintended way).
+     * - Absolute lower bound on `specificityWeightExponent` regardless of trust region — an exponent must
+     *   stay strictly positive (0 or negative would make the shaped-deviation formula degenerate: `x ** 0`
+     *   is always 1 regardless of `x`, discarding the specificity signal entirely; a negative exponent
+     *   inverts it in an unintended way).
      *
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightExponentLowerBound(): float
+    public static function getSpecificityWeightExponentLowerBound(): float
     {
         return 0.1;
     }
 
     /**
      * Specification:
-     * - Absolute upper bound on `entropyWeightExponent` — deliberately generous (an exponent this high
-     *   makes the shift's response to entropy extremely steep/near-binary, a real if aggressive choice a
-     *   run should be allowed to reach, not artificially capped tighter than that).
+     * - Absolute upper bound on `specificityWeightExponent` — deliberately generous (an exponent this high
+     *   makes the shift's response to specificity extremely steep/near-binary, a real if aggressive choice
+     *   a run should be allowed to reach, not artificially capped tighter than that).
      *
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightExponentUpperBound(): float
+    public static function getSpecificityWeightExponentUpperBound(): float
     {
         return 5.0;
     }
@@ -281,39 +298,75 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyWeightShiftMagnitude` instead.
+     *   `specificityCurveExponent` instead — how far a single run may push it away from its own value at
+     *   the moment the run started, before clipping to the absolute bounds
+     *   {@see getSpecificityCurveExponentLowerBound()}/{@see getSpecificityCurveExponentUpperBound()}.
      *
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeTrustRegionMaxDistance(): float
+    public static function getSpecificityCurveExponentTrustRegionMaxDistance(): float
+    {
+        return 0.5;
+    }
+
+    /**
+     * Specification:
+     * - Absolute lower bound on `specificityCurveExponent` regardless of trust region — same reasoning as
+     *   {@see getSpecificityWeightExponentLowerBound()}: the Hill-equation curve `raw^p / (raw^p + k^p)`
+     *   degenerates at `p <= 0` (0 collapses every input to the constant 0.5, discarding the specificity
+     *   signal entirely; negative values invert the curve's monotonicity in an unintended way).
+     *
+     * @api
+     */
+    public static function getSpecificityCurveExponentLowerBound(): float
     {
         return 0.1;
     }
 
     /**
      * Specification:
-     * - Absolute bounds on `entropyWeightShiftMagnitude` regardless of trust region — a shift can never
-     *   usefully exceed the [0;1] range `relevanceWeight` itself lives in (the calculated relevanceWeight
-     *   is clamped to [0;1] regardless, so anything past 1.0 would only ever be reached by an
-     *   already-maximal entropy deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
+     * - Absolute upper bound on `specificityCurveExponent` — same magnitude as
+     *   {@see getSpecificityWeightExponentUpperBound()}, deliberately generous (a value this high makes the
+     *   normalized-specificity curve extremely steep/near-binary around the saturation point, a real if
+     *   aggressive choice a run should be allowed to reach, not artificially capped tighter than that).
      *
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeLowerBound(): float
+    public static function getSpecificityCurveExponentUpperBound(): float
+    {
+        return 5.0;
+    }
+
+    /**
+     * Specification:
+     * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
+     *   `specificityWeightShiftMagnitude` instead.
+     *
+     * @api
+     */
+    public static function getSpecificityWeightShiftMagnitudeTrustRegionMaxDistance(): float
+    {
+        return 0.1;
+    }
+
+    /**
+     * Specification:
+     * - Absolute bounds on `specificityWeightShiftMagnitude` regardless of trust region — a shift can never
+     *   usefully exceed the [0;1] range `relevanceWeight` itself lives in (the calculated relevanceWeight
+     *   is clamped to [0;1] regardless, so anything past 1.0 would only ever be reached by an
+     *   already-maximal specificity deviation, making values beyond 1.0 indistinguishable from 1.0 itself).
+     *
+     * @api
+     */
+    public static function getSpecificityWeightShiftMagnitudeLowerBound(): float
     {
         return 0.0;
     }
 
     /**
      * @api
-     *
-     * @return float
      */
-    public static function getEntropyWeightShiftMagnitudeUpperBound(): float
+    public static function getSpecificityWeightShiftMagnitudeUpperBound(): float
     {
         return 1.0;
     }
@@ -321,49 +374,34 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - Same trust-region safety limit as {@see getRelevanceWeightTrustRegionMaxDistance()}, applied to
-     *   `entropyProbeResultSize` instead (rounded to the nearest integer when read back off the optimizer's
-     *   own continuous vector — see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper}).
+     *   `specificityBlendWeight` instead.
      *
      * @api
-     *
-     * @return int
      */
-    public static function getEntropyProbeResultSizeTrustRegionMaxDistance(): int
+    public static function getSpecificityBlendWeightTrustRegionMaxDistance(): float
     {
-        return 10;
+        return 0.2;
     }
 
     /**
      * Specification:
-     * - Absolute lower bound on `entropyProbeResultSize` — {@see \SprykerCommunity\Client\SearchRanking\Search\ShannonEntropyCalculator}
-     *   itself defines entropy as 0 for fewer than 2 scores, so anything below that has no real signal to
-     *   search over at all.
+     * - Absolute bounds on `specificityBlendWeight` (alpha) regardless of trust region — it's a blend
+     *   weight between `max(idf)` and `harmonicMean(idf)`, so it must stay within [0;1] by definition (0 =
+     *   pure harmonic mean, 1 = pure max).
      *
      * @api
-     *
-     * @return int
      */
-    public static function getEntropyProbeResultSizeLowerBound(): int
+    public static function getSpecificityBlendWeightLowerBound(): float
     {
-        return 2;
+        return 0.0;
     }
 
     /**
-     * Specification:
-     * - Absolute upper bound on `entropyProbeResultSize`, and the actual number of raw `_score` values
-     *   fetched ONCE per query at the start of an optimization run (every candidate evaluation then
-     *   truncates that same cached list to its own proposed size instead of firing a fresh probe query per
-     *   candidate — the probe's raw scores don't depend on relevanceWeight/metric weights/exponent/shift at
-     *   all, only on which raw scores exist for that search term, so re-fetching per candidate would be
-     *   pure waste at the scale a real optimization run evaluates candidates).
-     *
      * @api
-     *
-     * @return int
      */
-    public static function getMaxEntropyProbeResultSize(): int
+    public static function getSpecificityBlendWeightUpperBound(): float
     {
-        return 50;
+        return 1.0;
     }
 
     /**
@@ -375,8 +413,6 @@ class SearchRankingOptimizerConfig
      *   counter's denominator before a run actually starts.
      *
      * @api
-     *
-     * @return int
      */
     public static function getOptimizationMaxGenerations(): int
     {
@@ -390,13 +426,11 @@ class SearchRankingOptimizerConfig
      *   alone would allow. Both CmaEsAlgorithm (needs a finite midpoint to default its initial mean to) and
      *   DifferentialEvolutionAlgorithm (samples its initial population uniformly WITHIN the given bounds,
      *   which is undefined arithmetic against an infinite range) need real, finite bounds to even start a
-     *   run — confirmed live, not a hypothetical. 10.0 is already an extreme corner of the simplex (a
+     *   run — a real constraint, not a hypothetical one. 10.0 is already an extreme corner of the simplex (a
      *   softmax ratio of e^10 =~ 22000:1 against the other metrics), so this is not a meaningful
      *   restriction on what the optimizer can actually reach in practice.
      *
      * @api
-     *
-     * @return float
      */
     public static function getMetricWeightZSpaceBound(): float
     {
@@ -425,6 +459,43 @@ class SearchRankingOptimizerConfig
     public static function getNonDeterministicFormulaFunctionNames(): array
     {
         return ['random'];
+    }
+
+    /**
+     * Specification:
+     * - Shown only as the Auto-Tune Settings form field's greyed `placeholder` — never written as an
+     *   actual value. A metric with no threshold set is deliberately opted OUT of auto-tune entirely (see
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutoTuneMetricConfigForm}), so
+     *   this must never be auto-filled into a real, saved value: that would silently opt every existing
+     *   metric in the moment this constant shipped. 0.85 is a reasonable general-purpose starting point
+     *   for "this fit is good enough, don't bother refitting" — adjust per metric based on its own
+     *   Current fit (R²) column once real data is in.
+     *
+     * @api
+     */
+    public static function getAutoTuneThresholdSuggestedDefault(): float
+    {
+        return 0.85;
+    }
+
+    /**
+     * Specification:
+     * - Minimum spread (max R² − min R²) across a metric's real locales, within one store, before
+     *   `search-ranking-optimizer:auto-tune`'s own console report flags it as a real per-locale fit
+     *   divergence worth a human's attention. Purely informational today — Auto-Tune itself still only
+     *   checks/refits each store's default locale (see {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner}'s
+     *   own docblock), so nothing here acts on a flagged divergence automatically; it exists so a curator
+     *   can see when a store-wide formula is quietly a much worse fit for one locale than another — the
+     *   evidence `search-ranking`'s own `isLocaleScoped` flag asks for before a metric should be flipped
+     *   to genuinely per-locale. 0.1 is a coarse "this is probably not just noise" starting point, not a
+     *   validated statistical threshold — adjust per project once real multi-locale data exists to judge
+     *   it against.
+     *
+     * @api
+     */
+    public static function getLocaleFitDivergenceWarningThreshold(): float
+    {
+        return 0.1;
     }
 
     /**
@@ -490,4 +561,14 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION = 'differential_evolution';
+
+    /**
+     * Specification:
+     * - {@see \BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES = 'rechenberg_schwefel_es';
 }

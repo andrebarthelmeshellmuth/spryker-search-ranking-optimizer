@@ -25,9 +25,6 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrizatio
  */
 class SimplexSoftmaxReparametrizationTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testToSimplexAlwaysSumsToOne(): void
     {
         // Arrange
@@ -41,9 +38,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
         $this->assertCount(4, $weights, 'n-1 free z values must produce n weights (the pinned z_0 adds one).');
     }
 
-    /**
-     * @return void
-     */
     public function testToSimplexAlwaysProducesStrictlyPositiveWeights(): void
     {
         // Arrange
@@ -66,9 +60,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
         $this->assertEqualsWithDelta(1.0, array_sum($weights), 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testAllZeroZProducesUniformWeights(): void
     {
         // Arrange
@@ -83,9 +74,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
     public function testToFreeZIsTheInverseOfToSimplex(): void
     {
         // Arrange
@@ -101,9 +89,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
         $this->assertEqualsWithDelta($originalWeights, $roundTrippedWeights, 1e-9);
     }
 
-    /**
-     * @return void
-     */
     public function testToFreeZHandlesAZeroWeightWithoutBlowingUp(): void
     {
         // Arrange -- a metric configured with zero weight is a real, valid state (an active-but-currently-
@@ -125,8 +110,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
 
     /**
      * A single metric has no real degrees of freedom at all -- its weight must always be exactly 1.
-     *
-     * @return void
      */
     public function testASingleWeightWithNoFreeZAlwaysProducesWeightOne(): void
     {
@@ -140,9 +123,6 @@ class SimplexSoftmaxReparametrizationTest extends Unit
         $this->assertSame([1.0], $weights);
     }
 
-    /**
-     * @return void
-     */
     public function testToFreeZThrowsForAnEmptyWeightsArray(): void
     {
         // Arrange

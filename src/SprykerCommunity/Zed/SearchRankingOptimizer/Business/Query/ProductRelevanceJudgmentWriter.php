@@ -52,8 +52,6 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
      *
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\InvalidRatingTypeException
      * @throws \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\ProductNotInSearchResultsException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryRatingTransfer
      */
     public function submitJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): SearchRankingQueryRatingTransfer
     {
@@ -116,8 +114,6 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
      * @param string $localeName
      *
      * @throws \Propel\Runtime\Exception\PropelException
-     *
-     * @return \Generated\Shared\Transfer\SearchRankingQueryTransfer
      */
     protected function createQueryHandlingConcurrentInsert(
         string $canonicalSearchTerm,
@@ -146,8 +142,6 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
      * {@inheritDoc}
      *
      * @param \Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer
-     *
-     * @return void
      */
     public function clearJudgment(SearchRankingProductRelevanceJudgmentRequestTransfer $requestTransfer): void
     {

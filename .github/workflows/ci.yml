@@ -33,6 +33,28 @@ jobs:
       - run: composer install --prefer-dist --no-interaction --no-progress
       - run: vendor/bin/phpcs
 
+  rector:
+    # Dry run only, never writes to the working tree — guards against regressions on rules already
+    # vetted for this codebase (see rector.php's own comments for what's skipped and why).
+    name: rector (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          # opcache.enable_cli must be off: when on, Rector's BetterReflection-based autoloading
+          # silently fails to parse EVERY file in this project (confirmed empirically) instead of
+          # erroring cleanly — explicit here rather than trusting the runner's PHP build default.
+          ini-values: opcache.enable_cli=0
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - run: composer rector-dry-run
+
   floors:
     # The check that matters most for this package. Its dependency floors are claims about which
     # versions of search-ranking (and Spryker itself) an adopter may install; a shop leaner than the
@@ -54,10 +76,10 @@ jobs:
       - run: composer check-floors
 
   complexity:
-    # Two SEPARATE phpmd runs, not one combined ruleset: PHPMD merges every loaded ruleset's
-    # exclude-pattern into one global file-ignore list for a single invocation, so keeping
-    # TooManyPublicMethods' Facade/Factory exemption in its own ruleset (run on its own) is the only
-    # way to exempt just that one rule without also hiding Facades/Factories from the rules below.
+    # Three SEPARATE phpmd runs, not one combined ruleset: PHPMD merges every loaded ruleset's
+    # exclude-pattern into one global file-ignore list for a single invocation, so keeping each rule's
+    # own Facade/Factory/Mapper exemption in its own ruleset (run on its own) is the only way to exempt
+    # just that one rule without also hiding those files from the rules in the other rulesets.
     name: phpmd (codesize)
     runs-on: ubuntu-latest
     steps:
@@ -70,3 +92,5 @@ jobs:
       - run: vendor/bin/phpmd src github phpmd.xml
       - name: Public method count (Facades/Factories exempt)
         run: vendor/bin/phpmd src github phpmd-public-methods.xml
+      - name: Parameter count (Facades/Mappers exempt)
+        run: vendor/bin/phpmd src github phpmd-parameter-list.xml

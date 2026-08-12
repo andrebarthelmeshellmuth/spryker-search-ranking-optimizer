@@ -13,8 +13,5 @@ use Generated\Shared\Transfer\StoreTransfer;
 
 interface SearchRankingOptimizerWidgetToStoreClientInterface
 {
-    /**
-     * @return \Generated\Shared\Transfer\StoreTransfer
-     */
     public function getCurrentStore(): StoreTransfer;
 }

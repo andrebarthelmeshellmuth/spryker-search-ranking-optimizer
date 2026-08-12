@@ -10,85 +10,58 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence;
 
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
+use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use Spryker\Zed\Kernel\Persistence\AbstractPersistenceFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper;
 
 class SearchRankingOptimizerPersistenceFactory extends AbstractPersistenceFactory
 {
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationQuery
-     */
-    public function createSearchRankingCalibrationQuery(): SpySearchRankingCalibrationQuery
+    public function createSearchRankingSaturationPointCalibrationQuery(): SpySearchRankingSaturationPointCalibrationQuery
     {
-        return SpySearchRankingCalibrationQuery::create();
+        return SpySearchRankingSaturationPointCalibrationQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingCalibrationSearchTermQuery
-     */
-    public function createSearchRankingCalibrationSearchTermQuery(): SpySearchRankingCalibrationSearchTermQuery
+    public function createSearchRankingSaturationPointCalibrationSearchTermQuery(): SpySearchRankingSaturationPointCalibrationSearchTermQuery
     {
-        return SpySearchRankingCalibrationSearchTermQuery::create();
+        return SpySearchRankingSaturationPointCalibrationSearchTermQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery
-     */
     public function createSearchRankingQueryQuery(): SpySearchRankingQueryQuery
     {
         return SpySearchRankingQueryQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery
-     */
     public function createSearchRankingQueryRatingQuery(): SpySearchRankingQueryRatingQuery
     {
         return SpySearchRankingQueryRatingQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery
-     */
     public function createSearchRankingEvaluationQuery(): SpySearchRankingEvaluationQuery
     {
         return SpySearchRankingEvaluationQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery
-     */
     public function createSearchRankingWeightCheckpointQuery(): SpySearchRankingWeightCheckpointQuery
     {
         return SpySearchRankingWeightCheckpointQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery
-     */
     public function createSearchRankingAutoTuneMetricConfigQuery(): SpySearchRankingAutoTuneMetricConfigQuery
     {
         return SpySearchRankingAutoTuneMetricConfigQuery::create();
     }
 
-    /**
-     * @return \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery
-     */
     public function createSearchRankingOptimizerRunQuery(): SpySearchRankingOptimizerRunQuery
     {
         return SpySearchRankingOptimizerRunQuery::create();
     }
 
-    /**
-     * @return \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\SearchRankingOptimizerMapper
-     */
     public function createSearchRankingOptimizerMapper(): SearchRankingOptimizerMapper
     {
         return new SearchRankingOptimizerMapper();
