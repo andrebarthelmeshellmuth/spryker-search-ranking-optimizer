@@ -15,9 +15,15 @@ interface ScoreCalibratorInterface
 {
     /**
      * Specification:
-     * - Looks up every calibration run in status=uploaded. Returns null when there is none.
-     * - Marks every one of them EXCEPT the newest (highest id) as status=skipped, without ever firing a
-     *   search query for them.
+     * - Looks up every calibration run in status=uploaded. Returns null when there is none. Exactly one
+     *   of them runs per tick, system-wide: the newest (highest id).
+     * - Marks as status=skipped, without ever firing a search query for them, only those OTHER uploaded
+     *   runs that share the newest one's (storeName, localeName, calibrationType) — the ones it genuinely
+     *   supersedes, because they would compute the same constant for the same scope. Uploads for any
+     *   other store, locale or calibrationType are left in status=uploaded for a later tick to run: a
+     *   DE/de_DE upload says nothing about what AT/en_US's constant should be, and a `relevance_score`
+     *   upload tunes `relevanceSaturationPoint` while a `specificity` one tunes
+     *   `specificitySaturationPoint`.
      * - Runs the newest one, branching on its `calibrationType`:
      *   - `relevance_score` (the default): for each search term, fires the real, fully-wired catalog
      *     search-string query with `explain: true` and the term's own top-N limit (the run's

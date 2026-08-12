@@ -72,8 +72,13 @@ class ScoreCalibrator implements ScoreCalibratorInterface
         }
 
         $newestCalibration = array_shift($uploadedCalibrations);
+        $supersededTargetKey = $this->buildTargetKey($newestCalibration);
 
         foreach ($uploadedCalibrations as $staleCalibrationTransfer) {
+            if ($this->buildTargetKey($staleCalibrationTransfer) !== $supersededTargetKey) {
+                continue;
+            }
+
             $this->entityManager->updateCalibrationStatus(
                 $staleCalibrationTransfer->getIdSearchRankingSaturationPointCalibrationOrFail(),
                 SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED,
@@ -81,6 +86,25 @@ class ScoreCalibrator implements ScoreCalibratorInterface
         }
 
         return $this->calculate($newestCalibration->getIdSearchRankingSaturationPointCalibrationOrFail());
+    }
+
+    /**
+     * What makes two uploads supersede each other: they compute the same constant, for the same scope.
+     * A `relevance_score` upload and a `specificity` upload tune two DIFFERENT settings
+     * (`relevanceSaturationPoint` vs `specificitySaturationPoint`), and a DE/de_DE upload says nothing
+     * about what AT/en_US's constant should be — neither obsoletes the other, so neither may skip the
+     * other. `calibrationType` is normalized the same way {@see calculate()} normalizes it, so rows
+     * predating that column (null) group with the explicit `relevance_score` they behave as.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer
+     */
+    protected function buildTargetKey(SearchRankingSaturationPointCalibrationTransfer $calibrationTransfer): string
+    {
+        return implode("\0", [
+            $calibrationTransfer->getStoreNameOrFail(),
+            $calibrationTransfer->getLocaleNameOrFail(),
+            $calibrationTransfer->getCalibrationType() ?? SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE,
+        ]);
     }
 
     /**

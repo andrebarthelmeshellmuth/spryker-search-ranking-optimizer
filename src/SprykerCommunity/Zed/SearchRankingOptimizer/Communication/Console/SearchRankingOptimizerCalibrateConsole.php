@@ -28,7 +28,7 @@ class SearchRankingOptimizerCalibrateConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Picks up the newest uploaded calibration run (skipping any older uploads) and, depending on its calibrationType, either fires the live catalog search-string query for each of its search terms (relevance_score) or a lightweight per-term probe with no catalog query at all (specificity), pooling the resulting raw values into a suggested relevanceSaturationPoint/specificitySaturationPoint (k) value for spryker-community/search-ranking.';
+    public const COMMAND_DESCRIPTION = 'Picks up the newest uploaded calibration run (skipping any older uploads for that same store, locale and calibration type; uploads for another scope or type stay queued for a later tick) and, depending on its calibrationType, either fires the live catalog search-string query for each of its search terms (relevance_score) or a lightweight per-term probe with no catalog query at all (specificity), pooling the resulting raw values into a suggested relevanceSaturationPoint/specificitySaturationPoint (k) value for spryker-community/search-ranking.';
 
     protected function configure(): void
     {

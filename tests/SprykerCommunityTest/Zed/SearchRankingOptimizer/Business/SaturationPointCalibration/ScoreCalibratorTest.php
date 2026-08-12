@@ -59,7 +59,7 @@ class ScoreCalibratorTest extends Unit
         $this->assertNull($result);
     }
 
-    public function testSkipsEveryUploadedCalibrationExceptTheNewestWithoutCallingTheSearchClientForThem(): void
+    public function testSkipsEveryOlderUploadForTheSameTargetWithoutCallingTheSearchClientForThem(): void
     {
         // Arrange
         $newest = $this->createCalibrationTransfer(3, []);
@@ -98,6 +98,90 @@ class ScoreCalibratorTest extends Unit
 
         // Assert
         $this->assertSame([2, 1], $skippedIds);
+    }
+
+    /**
+     * A DE/en_US upload says nothing about what AT/de_DE's own saturation point should be, so it must not
+     * obsolete it — the other scope's upload stays queued for a later tick instead of being silently
+     * marked skipped without a single query ever firing for it.
+     */
+    public function testLeavesAnUploadForAnotherScopeQueuedInsteadOfSkippingIt(): void
+    {
+        // Arrange
+        $newest = $this->createCalibrationTransfer(3, []);
+        $otherScope = $this->createCalibrationTransfer(2, [])->setStoreName('AT')->setLocaleName('de_DE');
+        $otherLocaleOnly = $this->createCalibrationTransfer(1, [])->setLocaleName('de_DE');
+
+        // Act
+        $skippedIds = $this->grabSkippedIdsForRunNextCalibration([$newest, $otherScope, $otherLocaleOnly], 3);
+
+        // Assert
+        $this->assertSame([], $skippedIds);
+    }
+
+    /**
+     * The two calibration types tune two DIFFERENT settings — `relevance_score` produces
+     * `relevanceSaturationPoint`, `specificity` produces `specificitySaturationPoint` — so neither can
+     * supersede the other even within one scope.
+     */
+    public function testLeavesAnUploadOfTheOtherCalibrationTypeQueuedInsteadOfSkippingIt(): void
+    {
+        // Arrange -- id 3 has no explicit type, which normalizes to relevance_score, the same target id 1
+        // states explicitly; id 2 is the other type entirely.
+        $newest = $this->createCalibrationTransfer(3, []);
+        $otherType = $this->createCalibrationTransfer(2, [])
+            ->setCalibrationType(SearchRankingOptimizerConfig::CALIBRATION_TYPE_SPECIFICITY);
+        $sameTargetSpelledOut = $this->createCalibrationTransfer(1, [])
+            ->setCalibrationType(SearchRankingOptimizerConfig::CALIBRATION_TYPE_RELEVANCE_SCORE);
+
+        // Act
+        $skippedIds = $this->grabSkippedIdsForRunNextCalibration([$newest, $otherType, $sameTargetSpelledOut], 3);
+
+        // Assert
+        $this->assertSame([1], $skippedIds);
+    }
+
+    /**
+     * Runs `runNextCalibration()` against $uploadedCalibrations and returns the ids it moved to
+     * status=skipped, in the order it skipped them. The newest run itself always reaches `calculate()`
+     * with no search terms, so it fails harmlessly — this helper is only about the skip decision.
+     *
+     * @param array<\Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer> $uploadedCalibrations
+     * @param int $idNewestCalibration
+     *
+     * @return array<int>
+     */
+    protected function grabSkippedIdsForRunNextCalibration(array $uploadedCalibrations, int $idNewestCalibration): array
+    {
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('getUploadedCalibrations')->willReturn($uploadedCalibrations);
+        $repositoryMock->method('findCalibrationWithSearchTerms')->with($idNewestCalibration)->willReturn($uploadedCalibrations[0]);
+
+        $skippedIds = [];
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->method('updateCalibrationStatus')
+            ->willReturnCallback(function (int $id, string $status) use (&$skippedIds): void {
+                if ($status !== SearchRankingOptimizerConfig::CALIBRATION_STATUS_SKIPPED) {
+                    return;
+                }
+
+                $skippedIds[] = $id;
+            });
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->expects($this->never())->method('getCalibrationScores');
+
+        $calibrator = new ScoreCalibrator(
+            $repositoryMock,
+            $entityManagerMock,
+            $searchRankingClientMock,
+            $this->createMock(StatisticsCalculatorInterface::class),
+            $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
+        );
+
+        $calibrator->runNextCalibration();
+
+        return $skippedIds;
     }
 
     /**

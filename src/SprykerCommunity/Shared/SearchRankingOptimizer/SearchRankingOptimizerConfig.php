@@ -38,8 +38,10 @@ class SearchRankingOptimizerConfig
     /**
      * Specification:
      * - A calibration run just uploaded, queued for the next `search-ranking-optimizer:calibrate` cron
-     *   tick. At most one uploaded row is ever picked up per tick — the newest — the rest move straight to
-     *   {@see CALIBRATION_STATUS_SKIPPED}.
+     *   tick. At most one uploaded row is ever picked up per tick — the newest. Of the rest, only those
+     *   targeting the SAME (storeName, localeName, calibrationType) move straight to
+     *   {@see CALIBRATION_STATUS_SKIPPED}; uploads for another scope or type stay queued here for a later
+     *   tick.
      *
      * @api
      *
@@ -49,8 +51,10 @@ class SearchRankingOptimizerConfig
 
     /**
      * Specification:
-     * - A superseded upload: a newer one existed by the time the cron ran, so this one was never
-     *   calculated.
+     * - A superseded upload: by the time the cron ran, a newer upload existed for the SAME
+     *   (storeName, localeName, calibrationType), so this one was never calculated. Only a newer upload
+     *   for that same target supersedes — one for another scope or another calibration type computes a
+     *   different constant and leaves this row queued.
      *
      * @api
      *

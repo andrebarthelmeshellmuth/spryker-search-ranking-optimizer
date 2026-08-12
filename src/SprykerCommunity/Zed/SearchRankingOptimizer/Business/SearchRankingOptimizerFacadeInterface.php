@@ -53,10 +53,11 @@ interface SearchRankingOptimizerFacadeInterface
 
     /**
      * Specification:
-     * - Picks the newest calibration run in status=uploaded (if any), marks every OTHER uploaded run as
-     *   status=skipped, fires the calibration query per search term, pools the scores and persists the
-     *   statistics (status=calculated), or status=failed when no score could be collected. Returns null
-     *   when there is nothing to run.
+     * - Picks the newest calibration run in status=uploaded (if any), marks as status=skipped every
+     *   OTHER uploaded run for that same (storeName, localeName, calibrationType) — and only those,
+     *   leaving uploads for any other scope or type queued for a later tick — fires the calibration query
+     *   per search term, pools the scores and persists the statistics (status=calculated), or
+     *   status=failed when no score could be collected. Returns null when there is nothing to run.
      *
      * @api
      */
