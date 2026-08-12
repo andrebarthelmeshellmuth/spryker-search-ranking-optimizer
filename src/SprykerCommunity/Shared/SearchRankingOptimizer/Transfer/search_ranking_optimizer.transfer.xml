@@ -388,4 +388,28 @@
         <property name="updatedAt" type="string"/>
     </transfer>
 
+    <!-- How much of the back office can actually reach this package's Zed pages, for
+         `search-ranking-optimizer:check-installation` to report on. Zed access is deny-by-default outside a matching
+         ACL rule, and a nav entry the current user has no rule for is filtered out of the sidebar entirely
+         (see Spryker's own AclNavigationItemFilterPlugin) rather than 403ing — so "the adopter never
+         adjusted ACL" looks exactly like "the package was never installed".
+
+         The split that matters is unrestrictedRoleCount vs restrictedRoleCount. A default Spryker install
+         gives root_role a total wildcard and puts every installer user in root_group, so these pages are
+         reachable out of the box and nothing needs doing — that is the unrestricted count. Roles carrying
+         explicit per-module rules instead are the restricted count, and they reach nothing here until
+         somebody adds a rule. restrictedRoleWithAccessCount separates "the adopter pointed a restricted
+         role at this feature" from "no restricted role can see it", which is the only state worth
+         mentioning — and even then only as something to confirm, never as a failure: restricting these
+         pages to root-style admins is a perfectly ordinary choice.
+
+         Counts rather than names deliberately: this is a yes/no/how-many signal about the shape of an
+         installation, and printing an adopter's internal role names into console output buys nothing. -->
+    <transfer name="SearchRankingOptimizerBackOfficeAccessDiagnosis" strict="true">
+        <property name="moduleNames" type="string[]" singular="moduleName"/>
+        <property name="unrestrictedRoleCount" type="int"/>
+        <property name="restrictedRoleCount" type="int"/>
+        <property name="restrictedRoleWithAccessCount" type="int"/>
+    </transfer>
+
 </transfers>

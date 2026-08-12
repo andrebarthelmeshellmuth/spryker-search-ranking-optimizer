@@ -176,6 +176,8 @@ class SearchRankingOptimizerDependencyProvider extends AbstractBundleDependencyP
         $container = $this->addGlossaryFacade($container);
         $container = $this->addTranslatorFacade($container);
 
+        $container = $this->addAclFacade($container);
+
         return $container;
     }
 

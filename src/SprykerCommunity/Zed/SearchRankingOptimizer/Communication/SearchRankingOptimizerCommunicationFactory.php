@@ -13,6 +13,8 @@ use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Acl\BackOfficeAccessAnalyzer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Acl\BackOfficeAccessAnalyzerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Authorization\CompanyUserPermissionAuthorizerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationApplyForm;
@@ -27,6 +29,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\TestCurrentEv
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\AssessRatedQueryTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Table\RatingTable;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToPermissionClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToAclFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToCustomerFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToGlossaryFacadeInterface;
@@ -266,5 +269,15 @@ class SearchRankingOptimizerCommunicationFactory extends AbstractCommunicationFa
         return $this->getFormFactory()->create(AutomatedWeightOptimizationApplyForm::class, [
             AutomatedWeightOptimizationApplyForm::FIELD_ID_SEARCH_RANKING_OPTIMIZER_RUN => $idSearchRankingOptimizerRun,
         ]);
+    }
+
+    public function getAclFacade(): SearchRankingOptimizerToAclFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::FACADE_ACL);
+    }
+
+    public function createBackOfficeAccessAnalyzer(): BackOfficeAccessAnalyzerInterface
+    {
+        return new BackOfficeAccessAnalyzer($this->getAclFacade());
     }
 }

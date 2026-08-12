@@ -202,6 +202,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         $this->checkCronJobsRegistered($output);
         $this->checkAutoTuneNotificationRoleStaffed($output);
         $this->checkNavigationRegistered($output);
+        $this->checkBackOfficeAccess($output);
         $this->checkZedTranslationCatalogComplete($output);
 
         $output->writeln('');
@@ -584,6 +585,91 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
             $sourceLabel,
             implode(', ', $missingPageKeys),
         );
+    }
+
+    /**
+     * Zed access is deny-by-default outside a matching ACL rule, and this package ships no ACL fixture data
+     * — so who can reach its pages is entirely up to the adopter. Two very different installations land
+     * here:
+     *
+     * A default Spryker install needs nothing done: `root_role` carries a total wildcard and every
+     * installer user sits in `root_group`, so the pages work the moment the package is installed. An
+     * installation running real restricted back-office roles is the opposite — those roles reach nothing
+     * here until somebody adds a rule, and the failure is quiet, because
+     * {@see \Spryker\Zed\Acl\Communication\Plugin\Navigation\AclNavigationItemFilterPlugin} filters the
+     * entry out of the sidebar rather than 403ing. To that user the feature is simply absent, which looks
+     * identical to the package never having been installed.
+     *
+     * A WARNING at most, and worded as something to confirm rather than fix: keeping these pages to
+     * root-style admins is a perfectly ordinary choice, and this command cannot know which roles an adopter
+     * MEANT to grant. It only reports the one state worth a second look — restricted roles exist, and not
+     * one of them has a rule for this package's modules.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkBackOfficeAccess(OutputInterface $output): void
+    {
+        $moduleNames = $this->readOwnNavigationModuleNames();
+
+        if ($moduleNames === []) {
+            $this->warnings[] = 'Could not read this package\'s own navigation.xml, so back-office access could not be checked. Confirm by hand that the Zed roles which should see the Search Ranking Optimizer pages can actually reach them.';
+
+            return;
+        }
+
+        $diagnosisTransfer = $this->getFactory()->createBackOfficeAccessAnalyzer()->analyze($moduleNames);
+        $restrictedRoleCount = $diagnosisTransfer->getRestrictedRoleCountOrFail();
+
+        if ($restrictedRoleCount === 0) {
+            $output->writeln(sprintf(
+                '<info>✓</info> all %d back-office role(s) have unrestricted access, so this package\'s Zed pages need no ACL rule',
+                $diagnosisTransfer->getUnrestrictedRoleCountOrFail(),
+            ));
+
+            return;
+        }
+
+        $restrictedRoleWithAccessCount = $diagnosisTransfer->getRestrictedRoleWithAccessCountOrFail();
+
+        if ($restrictedRoleWithAccessCount > 0) {
+            $output->writeln(sprintf(
+                '<info>✓</info> %d of %d restricted back-office role(s) have an ACL rule for %s',
+                $restrictedRoleWithAccessCount,
+                $restrictedRoleCount,
+                implode('/', $moduleNames),
+            ));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'This project has %d restricted back-office role(s) and none of them has an ACL rule for %s, so only unrestricted (root-style) admins can reach this package\'s Zed pages — for everybody else the sidebar entry is filtered out entirely, which looks the same as the package not being installed. If that is intended, nothing to do. If a restricted role should see Search Ranking Optimizer, add a rule for it in the Zed ACL Gui (Maintenance > Users & Rights > Roles).',
+            $restrictedRoleCount,
+            implode('/', $moduleNames),
+        );
+    }
+
+    /**
+     * Read from this package's OWN navigation.xml rather than hardcoded, same as the page-key check
+     * alongside it, so a module added by a later version cannot silently fall out of this check.
+     *
+     * @return array<string>
+     */
+    protected function readOwnNavigationModuleNames(): array
+    {
+        $ownNavigationXml = $this->loadXml(__DIR__ . static::OWN_NAVIGATION_XML_RELATIVE_PATH);
+
+        if ($ownNavigationXml === null) {
+            return [];
+        }
+
+        $moduleNames = [];
+
+        foreach ($ownNavigationXml->xpath('//bundle') ?: [] as $bundleElement) {
+            $moduleNames[(string)$bundleElement] = true;
+        }
+
+        return array_keys($moduleNames);
     }
 
     /**

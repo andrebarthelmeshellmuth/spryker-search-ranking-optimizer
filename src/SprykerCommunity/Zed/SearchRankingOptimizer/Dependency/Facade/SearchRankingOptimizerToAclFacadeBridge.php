@@ -9,7 +9,10 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use Generated\Shared\Transfer\GroupsTransfer;
+use Generated\Shared\Transfer\RolesTransfer;
 use Generated\Shared\Transfer\RoleTransfer;
+use Generated\Shared\Transfer\RulesTransfer;
 
 class SearchRankingOptimizerToAclFacadeBridge implements SearchRankingOptimizerToAclFacadeInterface
 {
@@ -40,5 +43,26 @@ class SearchRankingOptimizerToAclFacadeBridge implements SearchRankingOptimizerT
     public function getRoleByName(string $name): RoleTransfer
     {
         return $this->aclFacade->getRoleByName($name);
+    }
+
+    public function getAllGroups(): GroupsTransfer
+    {
+        return $this->aclFacade->getAllGroups();
+    }
+
+    /**
+     * @param int $idGroup
+     */
+    public function getGroupRoles(int $idGroup): RolesTransfer
+    {
+        return $this->aclFacade->getGroupRoles($idGroup);
+    }
+
+    /**
+     * @param int $idRole
+     */
+    public function getRoleRules(int $idRole): RulesTransfer
+    {
+        return $this->aclFacade->getRoleRules($idRole);
     }
 }

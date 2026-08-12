@@ -1009,6 +1009,15 @@ only when at least one metric actually has "notify by email" enabled — the rol
 shop that never turned notifications on, and the two unstaffed cases are distinguished from the
 missing-role case because the remedy differs (staff the role vs. create it).
 
+It also reports whether anybody other than a root-style admin can reach this package's Zed pages. Zed
+access is deny-by-default outside a matching ACL rule, and a nav entry the current user has no rule for is
+filtered out of the sidebar entirely rather than 403ing — so on a shop with real restricted back-office
+roles, "nobody adjusted ACL" looks exactly like "the package was never installed". A default Spryker
+install needs nothing done here (`root_role` holds a total wildcard), which is why this is a **warning at
+most, never a failure**, and only when restricted roles exist and not one of them has a rule for this
+package's module. Restricting these pages to root-style admins is a perfectly ordinary choice; the command
+cannot know which roles you meant to grant, so it asks you to confirm rather than telling you to fix.
+
 It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
 and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below
 product tiles and submits successfully on a live storefront page — those need a real browser request, not
