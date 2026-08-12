@@ -205,13 +205,9 @@ class OptimizationRunnerTest extends Unit
             ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
             ['idSearchRankingMetric' => 3, 'name' => 'random', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.4, 'isLocaleScoped' => true],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4, 'isLocaleScoped' => true],
-            ['idSearchRankingMetric' => 3, 'name' => 'random', 'weight' => 0.2, 'isLocaleScoped' => true],
-        ]);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
-        $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createLiveConfigurationTransfer(['top_seller' => 0.4, 'pdp_impressions' => 0.4, 'random' => 0.2]),
+        );
         $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
             [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
             [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
@@ -264,12 +260,9 @@ class OptimizationRunnerTest extends Unit
             ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => false],
             ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.3, 'isLocaleScoped' => false],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.7, 'isLocaleScoped' => true],
-        ]);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
-        $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createLiveConfigurationTransfer(['top_seller' => 0.3, 'pdp_impressions' => 0.7]),
+        );
         // Now called for BOTH metrics -- a store-wide metric goes through the same determinism check.
         $searchRankingFacadeMock->expects($this->exactly(2))->method('findMetricDetail')->willReturnMap([
             [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
@@ -656,18 +649,33 @@ class OptimizationRunnerTest extends Unit
             ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
             ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.6, 'isLocaleScoped' => true],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4, 'isLocaleScoped' => true],
-        ]);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
-        $searchRankingFacadeMock->method('getRelevanceSaturationPoint')->willReturn(12.0);
-        $searchRankingFacadeMock->method('getSpecificityWeightExponent')->willReturn(1.5);
-        $searchRankingFacadeMock->method('getSpecificityWeightShiftMagnitude')->willReturn(0.25);
-        $searchRankingFacadeMock->method('getSpecificityBlendWeight')->willReturn(0.7);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createLiveConfigurationTransfer(['top_seller' => 0.6, 'pdp_impressions' => 0.4]),
+        );
         $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(true);
 
         return $searchRankingFacadeMock;
+    }
+
+    /**
+     * The one live configuration `search-ranking`'s own facade hands back per (store, locale) — the single
+     * read {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner}
+     * builds its whole baseline from.
+     *
+     * @param array<string, float> $metricWeights
+     */
+    protected function createLiveConfigurationTransfer(array $metricWeights): SearchRankingConfigurationStorageTransfer
+    {
+        return (new SearchRankingConfigurationStorageTransfer())
+            ->setMetricWeights($metricWeights)
+            ->setRelevanceWeight(0.75)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setSpecificitySaturationPoint(3.0)
+            ->setSpecificityCurveExponent(1.0)
+            ->setSpecificityWeightExponent(1.5)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setSpecificityBlendWeight(0.7)
+            ->setRandomMetricName('random');
     }
 
     /**

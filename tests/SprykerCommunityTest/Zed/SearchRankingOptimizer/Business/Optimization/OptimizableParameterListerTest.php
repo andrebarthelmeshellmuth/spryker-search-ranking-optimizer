@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizableParameterLister;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
@@ -76,15 +77,13 @@ class OptimizableParameterListerTest extends Unit
             ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
             ['idSearchRankingMetric' => 2, 'name' => 'random', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.8, 'isLocaleScoped' => true],
-            ['idSearchRankingMetric' => 2, 'name' => 'random', 'weight' => 0.2, 'isLocaleScoped' => true],
-        ]);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createConfigurationTransfer(['top_seller' => 0.8, 'random' => 0.2]),
+        );
         $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
             [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
             [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'random', 'formula' => 'random()', 'isHigherBetter' => true, 'shape' => null]],
         ]);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(false);
 
         $lister = new OptimizableParameterLister($searchRankingFacadeMock, new FormulaDeterminismChecker());
@@ -107,11 +106,10 @@ class OptimizableParameterListerTest extends Unit
         $searchRankingFacadeMock->method('getActiveMetrics')->willReturn([
             ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 1.0, 'isLocaleScoped' => true],
-        ]);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createConfigurationTransfer(['top_seller' => 1.0]),
+        );
         $searchRankingFacadeMock->method('findMetricDetail')->willReturn(null);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(false);
 
         $lister = new OptimizableParameterLister($searchRankingFacadeMock, new FormulaDeterminismChecker());
@@ -130,21 +128,32 @@ class OptimizableParameterListerTest extends Unit
             ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'isLocaleScoped' => true],
             ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'isLocaleScoped' => true],
         ]);
-        $searchRankingFacadeMock->method('getMetricWeights')->willReturn([
-            ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 0.6, 'isLocaleScoped' => true],
-            ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'weight' => 0.4, 'isLocaleScoped' => true],
-        ]);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(
+            $this->createConfigurationTransfer(['top_seller' => 0.6, 'pdp_impressions' => 0.4]),
+        );
         $searchRankingFacadeMock->method('findMetricDetail')->willReturnMap([
             [1, 'DE', 'en_US', ['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'formula' => 'x / max', 'isHigherBetter' => true, 'shape' => 'linear']],
             [2, 'DE', 'en_US', ['idSearchRankingMetric' => 2, 'name' => 'pdp_impressions', 'formula' => 'atan(x / avg)', 'isHigherBetter' => true, 'shape' => 'atan']],
         ]);
-        $searchRankingFacadeMock->method('getRelevanceWeight')->willReturn(0.75);
         $searchRankingFacadeMock->method('isSpecificityWeightingEnabled')->willReturn(true);
-        $searchRankingFacadeMock->method('getSpecificityCurveExponent')->willReturn(1.5);
-        $searchRankingFacadeMock->method('getSpecificityWeightExponent')->willReturn(1.2);
-        $searchRankingFacadeMock->method('getSpecificityWeightShiftMagnitude')->willReturn(0.25);
-        $searchRankingFacadeMock->method('getSpecificityBlendWeight')->willReturn(0.7);
 
         return $searchRankingFacadeMock;
+    }
+
+    /**
+     * @param array<string, float> $metricWeights
+     */
+    protected function createConfigurationTransfer(array $metricWeights): SearchRankingConfigurationStorageTransfer
+    {
+        return (new SearchRankingConfigurationStorageTransfer())
+            ->setMetricWeights($metricWeights)
+            ->setRelevanceWeight(0.75)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setSpecificitySaturationPoint(3.0)
+            ->setSpecificityCurveExponent(1.5)
+            ->setSpecificityWeightExponent(1.2)
+            ->setSpecificityWeightShiftMagnitude(0.25)
+            ->setSpecificityBlendWeight(0.7)
+            ->setRandomMetricName('random');
     }
 }

@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\GroundTruth\SearchRankingOptimizer;
 
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 
@@ -28,6 +29,15 @@ class SpecificityForcedEnabledFacadeDecorator implements SearchRankingOptimizerT
     public function __construct(SearchRankingOptimizerToSearchRankingFacadeInterface $realFacade)
     {
         $this->realFacade = $realFacade;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
+    {
+        return $this->realFacade->getConfiguration($storeName, $localeName);
     }
 
     /**

@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 
 class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRankingOptimizerToSearchRankingFacadeInterface
@@ -24,6 +25,15 @@ class SearchRankingOptimizerToSearchRankingFacadeBridge implements SearchRanking
     public function __construct($searchRankingFacade)
     {
         $this->searchRankingFacade = $searchRankingFacade;
+    }
+
+    /**
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
+    {
+        return $this->searchRankingFacade->getConfiguration($storeName, $localeName);
     }
 
     /**

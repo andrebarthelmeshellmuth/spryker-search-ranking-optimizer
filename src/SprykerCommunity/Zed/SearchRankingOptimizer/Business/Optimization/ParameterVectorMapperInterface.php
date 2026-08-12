@@ -41,8 +41,16 @@ interface ParameterVectorMapperInterface
      * @param float $relevanceSaturationPoint Passed through unchanged — the optimizer loop never touches
      *   this (Calibration's own concern), but the resulting configuration transfer needs a real value to
      *   be usable as a rank_eval override.
+     * @param float $specificitySaturationPoint Passed through unchanged for the same reason, and for the
+     *   same Calibration-only-tunable reason it isn't searched: without it every candidate would be
+     *   evaluated against a normalization constant of 0 while the live baseline uses the configured one,
+     *   so the two would not be comparable.
      */
-    public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer;
+    public function mapVectorToConfiguration(
+        array $vector,
+        float $relevanceSaturationPoint,
+        float $specificitySaturationPoint,
+    ): SearchRankingConfigurationStorageTransfer;
 
     /**
      * The inverse of {@see mapVectorToConfiguration()} — only needed to SEED an optimizer run's initial

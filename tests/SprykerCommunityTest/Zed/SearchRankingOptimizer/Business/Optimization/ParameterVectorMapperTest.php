@@ -141,7 +141,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($this->buildThreeMetrics(), [], 0.75, false);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5], 12.0, 3.0);
 
         // Assert -- exactly the constants passed into buildMapper() as the "at run start" values.
         $this->assertSame(static::SPECIFICITY_CURVE_EXPONENT_AT_RUN_START, $configurationTransfer->getSpecificityCurveExponent());
@@ -176,7 +176,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($this->buildThreeMetrics());
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.6, 1.2, -0.5, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.6, $configurationTransfer->getRelevanceWeight());
@@ -204,8 +204,8 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 100.0], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, -100.0], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 100.0], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, -100.0], 12.0, 3.0);
 
         // Assert
         $this->assertEqualsWithDelta(0.9, $clampedHigh->getSpecificityBlendWeight(), 1e-9, 'clamped to this run\'s own trust-region upper bound of 0.7 + 0.2');
@@ -222,8 +222,8 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([5.0, 1.0, 1.0, 0.2, 0.7], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([-5.0, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([5.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([-5.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.9, $clampedHigh->getRelevanceWeight());
@@ -239,8 +239,8 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 99.0, 1.0, 0.2, 0.7], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([0.75, -99.0, 1.0, 0.2, 0.7], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 99.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, -99.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertEqualsWithDelta(1.5, $clampedHigh->getSpecificityCurveExponent(), 1e-9);
@@ -258,8 +258,8 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 99.0, 99.0, 0.7], 12.0);
-        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, -99.0, -99.0, 0.7], 12.0);
+        $clampedHigh = $mapper->mapVectorToConfiguration([0.75, 1.0, 99.0, 99.0, 0.7], 12.0, 3.0);
+        $clampedLow = $mapper->mapVectorToConfiguration([0.75, 1.0, -99.0, -99.0, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertEqualsWithDelta(1.5, $clampedHigh->getSpecificityWeightExponent(), 1e-9);
@@ -274,10 +274,29 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([['idSearchRankingMetric' => 1, 'name' => 'top_seller']]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['top_seller' => 1.0], $configurationTransfer->getMetricWeights());
+    }
+
+    /**
+     * Neither saturation point is searched (both are Calibration's own concern), but both have to reach
+     * the candidate transfer unchanged: the evaluation path reads them straight off it, so a candidate
+     * missing one would be scored under a different normalization constant than the live baseline it is
+     * being compared against.
+     */
+    public function testMapVectorToConfigurationPassesBothSaturationPointsThroughUnchanged(): void
+    {
+        // Arrange
+        $mapper = $this->buildMapper($this->buildThreeMetrics());
+
+        // Act
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, -1.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
+
+        // Assert
+        $this->assertSame(12.0, $configurationTransfer->getRelevanceSaturationPoint());
+        $this->assertSame(3.0, $configurationTransfer->getSpecificitySaturationPoint());
     }
 
     public function testMapVectorToConfigurationProducesNoMetricWeightsAtAllForZeroActiveMetrics(): void
@@ -286,7 +305,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame([], $configurationTransfer->getMetricWeights());
@@ -299,7 +318,7 @@ class ParameterVectorMapperTest extends Unit
         $originalVector = [0.65, 0.8, -1.3, 1.3, 1.0, 0.2, 0.7];
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0, 3.0);
         $roundTrippedVector = $mapper->mapConfigurationToVector($configurationTransfer);
 
         // Assert
@@ -359,7 +378,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.4]);
 
         // Act -- all-zero z's produce a uniform split between the two optimizable metrics.
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 0.0, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 0.0, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $metricWeights = $configurationTransfer->getMetricWeights();
@@ -384,7 +403,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper($optimizableMetrics, ['random' => 0.7, 'other_random' => 0.5]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $metricWeights = $configurationTransfer->getMetricWeights();
@@ -403,7 +422,7 @@ class ParameterVectorMapperTest extends Unit
         );
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['random' => 0.4, 'top_seller' => 0.6], $configurationTransfer->getMetricWeights());
@@ -415,7 +434,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([], ['random' => 1.0]);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(['random' => 1.0], $configurationTransfer->getMetricWeights());
@@ -469,7 +488,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([], [], 0.75, true, 0.42);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([1.0, 1.0, 0.2, 0.7], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([1.0, 1.0, 0.2, 0.7], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.42, $configurationTransfer->getRelevanceWeight(), 'The fixed value, exactly as passed in -- never read off the vector.');
@@ -487,7 +506,7 @@ class ParameterVectorMapperTest extends Unit
         $mapper = $this->buildMapper([], [], 0.75, true, null, null, null, null, 0.65);
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2], 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration([0.75, 1.0, 1.0, 0.2], 12.0, 3.0);
 
         // Assert
         $this->assertSame(0.75, $configurationTransfer->getRelevanceWeight());
@@ -529,7 +548,7 @@ class ParameterVectorMapperTest extends Unit
         $originalVector = [0.8, -1.3, 1.3, 1.0, 0.2];
 
         // Act
-        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0);
+        $configurationTransfer = $mapper->mapVectorToConfiguration($originalVector, 12.0, 3.0);
         $roundTrippedVector = $mapper->mapConfigurationToVector($configurationTransfer);
 
         // Assert

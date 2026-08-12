@@ -285,9 +285,13 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
      *
      * @param array<int, float> $vector
      * @param float $relevanceSaturationPoint
+     * @param float $specificitySaturationPoint
      */
-    public function mapVectorToConfiguration(array $vector, float $relevanceSaturationPoint): SearchRankingConfigurationStorageTransfer
-    {
+    public function mapVectorToConfiguration(
+        array $vector,
+        float $relevanceSaturationPoint,
+        float $specificitySaturationPoint,
+    ): SearchRankingConfigurationStorageTransfer {
         $vector = array_values($vector);
         $offset = 0;
 
@@ -332,6 +336,7 @@ class ParameterVectorMapper implements ParameterVectorMapperInterface
         return (new SearchRankingConfigurationStorageTransfer())
             ->setRelevanceWeight($relevanceWeight)
             ->setRelevanceSaturationPoint($relevanceSaturationPoint)
+            ->setSpecificitySaturationPoint($specificitySaturationPoint)
             ->setMetricWeights($metricWeights)
             ->setSpecificityCurveExponent($specificityValues['specificityCurveExponent'])
             ->setSpecificityWeightExponent($specificityValues['specificityWeightExponent'])

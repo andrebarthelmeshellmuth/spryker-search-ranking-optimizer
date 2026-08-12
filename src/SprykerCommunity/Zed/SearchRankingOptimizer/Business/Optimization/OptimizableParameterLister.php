@@ -42,14 +42,20 @@ class OptimizableParameterLister implements OptimizableParameterListerInterface
      */
     public function list(string $storeName, string $localeName): array
     {
+        // Deliberately NOT just handed back as the transfer itself: the run form's checklist needs each
+        // metric's idSearchRankingMetric (to post a per-metric pin back), which
+        // SearchRankingConfigurationStorageTransfer models only as a name => weight map, and it needs
+        // isSpecificityWeightingEnabled, which is a code-level project flag rather than per-scope config.
+        $configurationTransfer = $this->searchRankingFacade->getConfiguration($storeName, $localeName);
+
         return [
-            'relevanceWeight' => $this->searchRankingFacade->getRelevanceWeight($storeName, $localeName),
+            'relevanceWeight' => $configurationTransfer->getRelevanceWeightOrFail(),
             'isSpecificityWeightingEnabled' => $this->searchRankingFacade->isSpecificityWeightingEnabled(),
-            'specificityCurveExponent' => $this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName),
-            'specificityWeightExponent' => $this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName),
-            'specificityWeightShiftMagnitude' => $this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName),
-            'specificityBlendWeight' => $this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName),
-            'metrics' => $this->listMetrics($storeName, $localeName),
+            'specificityCurveExponent' => $configurationTransfer->getSpecificityCurveExponentOrFail(),
+            'specificityWeightExponent' => $configurationTransfer->getSpecificityWeightExponentOrFail(),
+            'specificityWeightShiftMagnitude' => $configurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            'specificityBlendWeight' => $configurationTransfer->getSpecificityBlendWeightOrFail(),
+            'metrics' => $this->listMetrics($configurationTransfer->getMetricWeights(), $storeName, $localeName),
         ];
     }
 
@@ -58,19 +64,16 @@ class OptimizableParameterLister implements OptimizableParameterListerInterface
      * holds those fixed at their live weight unconditionally, a human's checklist choice can never change
      * that, so listing them as a dead, uncheckable row here would only be noise, not a real option.
      *
+     * @param array<string, float> $weightsByName This scope's live active-metric weights, from
+     *   {@see list()}'s single configuration read — active is exactly the set iterated below, so no
+     *   second weight lookup is needed.
      * @param string $storeName
      * @param string $localeName
      *
      * @return array<int, array{idSearchRankingMetric: int, name: string, weight: float}>
      */
-    protected function listMetrics(string $storeName, string $localeName): array
+    protected function listMetrics(array $weightsByName, string $storeName, string $localeName): array
     {
-        $weightsByName = [];
-
-        foreach ($this->searchRankingFacade->getMetricWeights($storeName, $localeName) as $metricWeight) {
-            $weightsByName[$metricWeight['name']] = $metricWeight['weight'];
-        }
-
         $metrics = [];
 
         foreach ($this->searchRankingFacade->getActiveMetrics($storeName, $localeName) as $metric) {

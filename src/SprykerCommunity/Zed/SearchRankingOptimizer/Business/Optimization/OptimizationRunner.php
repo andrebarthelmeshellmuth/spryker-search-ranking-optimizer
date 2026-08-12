@@ -160,11 +160,22 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $baselineScore,
         );
 
-        $objectiveFunction = $this->buildObjectiveFunction($mapper, $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(), $storeName, $localeName, $idOptimizerRun);
+        $objectiveFunction = $this->buildObjectiveFunction(
+            $mapper,
+            $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(),
+            $liveConfigurationTransfer->getSpecificitySaturationPointOrFail(),
+            $storeName,
+            $localeName,
+            $idOptimizerRun,
+        );
         $problem = new CallableProblem($objectiveFunction, $mapper->getLowerBounds(), $mapper->getUpperBounds());
         $result = $algorithm->optimize($problem);
 
-        $bestConfigurationTransfer = $mapper->mapVectorToConfiguration($result->getBestVector(), $liveConfigurationTransfer->getRelevanceSaturationPointOrFail());
+        $bestConfigurationTransfer = $mapper->mapVectorToConfiguration(
+            $result->getBestVector(),
+            $liveConfigurationTransfer->getRelevanceSaturationPointOrFail(),
+            $liveConfigurationTransfer->getSpecificitySaturationPointOrFail(),
+        );
 
         $this->entityManager->completeOptimizerRun(
             $idOptimizerRun,
@@ -183,27 +194,16 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * Reads the LIVE configuration straight from search-ranking's own Zed-side facade (never the synced
      * key-value storage copy the storefront reads at request time) — this package's optimizer works
      * against what a Query Curator actually configured in Zed, not a possibly-stale-or-never-published
-     * snapshot. Includes EVERY metric's weight (not just active ones), same as the real live formula does.
+     * snapshot. Carries the weights of this scope's ACTIVE metrics, the same set the real live formula
+     * scores with, raw rather than normalized: {@see ParameterVectorMapper} owns the [0;1] budget and
+     * already handles live weights that never summed to 1.
      *
      * @param string $storeName
      * @param string $localeName
      */
     protected function buildLiveConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
-        $metricWeightsByName = [];
-
-        foreach ($this->searchRankingFacade->getMetricWeights($storeName, $localeName) as $metricWeight) {
-            $metricWeightsByName[$metricWeight['name']] = $metricWeight['weight'];
-        }
-
-        return (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight($this->searchRankingFacade->getRelevanceWeight($storeName, $localeName))
-            ->setRelevanceSaturationPoint($this->searchRankingFacade->getRelevanceSaturationPoint($storeName, $localeName))
-            ->setMetricWeights($metricWeightsByName)
-            ->setSpecificityCurveExponent($this->searchRankingFacade->getSpecificityCurveExponent($storeName, $localeName))
-            ->setSpecificityWeightExponent($this->searchRankingFacade->getSpecificityWeightExponent($storeName, $localeName))
-            ->setSpecificityWeightShiftMagnitude($this->searchRankingFacade->getSpecificityWeightShiftMagnitude($storeName, $localeName))
-            ->setSpecificityBlendWeight($this->searchRankingFacade->getSpecificityBlendWeight($storeName, $localeName));
+        return $this->searchRankingFacade->getConfiguration($storeName, $localeName);
     }
 
     /**
@@ -309,6 +309,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
      *
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperInterface $mapper
      * @param float $relevanceSaturationPoint
+     * @param float $specificitySaturationPoint
      * @param string $storeName
      * @param string $localeName
      * @param int $idOptimizerRun
@@ -316,14 +317,15 @@ class OptimizationRunner implements OptimizationRunnerInterface
     protected function buildObjectiveFunction(
         ParameterVectorMapperInterface $mapper,
         float $relevanceSaturationPoint,
+        float $specificitySaturationPoint,
         string $storeName,
         string $localeName,
         int $idOptimizerRun,
     ): callable {
         $evaluationsSoFar = 0;
 
-        return function (array $vector) use ($mapper, $relevanceSaturationPoint, $storeName, $localeName, $idOptimizerRun, &$evaluationsSoFar): float {
-            $candidateConfigurationTransfer = $mapper->mapVectorToConfiguration($vector, $relevanceSaturationPoint);
+        return function (array $vector) use ($mapper, $relevanceSaturationPoint, $specificitySaturationPoint, $storeName, $localeName, $idOptimizerRun, &$evaluationsSoFar): float {
+            $candidateConfigurationTransfer = $mapper->mapVectorToConfiguration($vector, $relevanceSaturationPoint, $specificitySaturationPoint);
             $score = $this->rankEvaluationRunner->evaluateCandidate($storeName, $localeName, $candidateConfigurationTransfer);
 
             $evaluationsSoFar++;

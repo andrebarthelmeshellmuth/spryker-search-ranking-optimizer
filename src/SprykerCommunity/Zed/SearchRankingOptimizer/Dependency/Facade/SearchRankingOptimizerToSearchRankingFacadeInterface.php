@@ -9,10 +9,28 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade;
 
+use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 
 interface SearchRankingOptimizerToSearchRankingFacadeInterface
 {
+    /**
+     * `search-ranking`'s whole LIVE configuration for one scope in a single read — every scalar the
+     * ranking formula uses plus that scope's active metric weights keyed by name, straight from Zed's own
+     * settings rather than the synced storage copy the storefront reads. Unlike every other method here
+     * this DOES return a transfer, because `SearchRankingConfigurationStorageTransfer` is a generated
+     * `Generated\Shared\Transfer\*` class this package already builds and consumes throughout its own
+     * evaluation path — the coupling discipline the plain-array methods below exist for is about not
+     * referencing `search-ranking`'s own PHP classes, which this does not.
+     *
+     * Weights arrive raw (un-normalized) — the same numbers a curator entered, which is what a tuning
+     * run has to start from; the published storefront document normalizes them separately.
+     *
+     * @param string $storeName
+     * @param string $localeName
+     */
+    public function getConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer;
+
     /**
      * @param string $storeName
      * @param string $localeName
