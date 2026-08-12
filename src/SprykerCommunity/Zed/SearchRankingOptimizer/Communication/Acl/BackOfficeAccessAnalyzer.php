@@ -58,7 +58,7 @@ class BackOfficeAccessAnalyzer implements BackOfficeAccessAnalyzerInterface
         $restrictedRoleWithAccessCount = 0;
 
         foreach ($this->findGroupedRoleIds() as $idAclRole) {
-            $ruleTransfers = $this->aclFacade->getRoleRules($idAclRole)->getRules();
+            $ruleTransfers = $this->aclFacade->getRoleRules($idAclRole)->getRules()->getArrayCopy();
 
             if ($this->hasUnrestrictedAccess($ruleTransfers)) {
                 $unrestrictedRoleCount++;
@@ -119,9 +119,9 @@ class BackOfficeAccessAnalyzer implements BackOfficeAccessAnalyzerInterface
      *
      * A total-wildcard DENY anywhere in the role revokes this, same as it does in Spryker's own evaluation.
      *
-     * @param iterable<\Generated\Shared\Transfer\RuleTransfer> $ruleTransfers
+     * @param array<\Generated\Shared\Transfer\RuleTransfer> $ruleTransfers
      */
-    protected function hasUnrestrictedAccess(iterable $ruleTransfers): bool
+    protected function hasUnrestrictedAccess(array $ruleTransfers): bool
     {
         $isAllowed = false;
 
@@ -160,52 +160,68 @@ class BackOfficeAccessAnalyzer implements BackOfficeAccessAnalyzerInterface
      * diagnostic is trying to establish. Whether that role can reach one specific page is Spryker's own
      * per-request decision, and not something worth second-guessing here.
      *
-     * @param iterable<\Generated\Shared\Transfer\RuleTransfer> $ruleTransfers
+     * @param array<\Generated\Shared\Transfer\RuleTransfer> $ruleTransfers
      * @param array<string> $moduleNames
      */
-    protected function hasAccessToAnyModule(iterable $ruleTransfers, array $moduleNames): bool
+    protected function hasAccessToAnyModule(array $ruleTransfers, array $moduleNames): bool
     {
-        $allowedModuleNames = [];
-        $deniedModuleNames = [];
+        $allowedModuleNames = $this->collectRuledModuleNames($ruleTransfers, $moduleNames, static::RULE_TYPE_ALLOW);
+        $deniedModuleNames = $this->collectRuledModuleNames($ruleTransfers, $moduleNames, static::RULE_TYPE_DENY);
 
-        foreach ($ruleTransfers as $ruleTransfer) {
-            $ruleBundle = $ruleTransfer->getBundle();
-
-            foreach ($moduleNames as $moduleName) {
-                if ($ruleBundle !== static::WILDCARD && $ruleBundle !== $moduleName) {
-                    continue;
-                }
-
-                if ($ruleTransfer->getType() === static::RULE_TYPE_DENY && $this->isWholeModuleRule($ruleTransfer)) {
-                    $deniedModuleNames[$moduleName] = true;
-
-                    continue;
-                }
-
-                if ($ruleTransfer->getType() !== static::RULE_TYPE_ALLOW) {
-                    continue;
-                }
-
-                $allowedModuleNames[$moduleName] = true;
-            }
-        }
-
-        foreach (array_keys($allowedModuleNames) as $moduleName) {
-            if (isset($deniedModuleNames[$moduleName])) {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
+        return array_diff_key($allowedModuleNames, $deniedModuleNames) !== [];
     }
 
     /**
-     * A deny only cancels a module out when it covers the whole module — a deny on one specific
-     * controller/action (an adopter may well grant a role the review pages but deny it
-     * the apply action) leaves the rest of the module reachable, and must not read as "no access".
+     * The module names these rules allow, or — for $ruleType = deny — the ones they revoke outright.
      *
+     * A deny only counts when it covers the WHOLE module: a deny on one specific controller/action
+     * (an adopter may well grant a role the review pages but deny it the
+     * apply action) leaves the rest of the module
+     * reachable, and must not read as "no access".
+     *
+     * @param array<\Generated\Shared\Transfer\RuleTransfer> $ruleTransfers
+     * @param array<string> $moduleNames
+     * @param string $ruleType
+     *
+     * @return array<string, true>
+     */
+    protected function collectRuledModuleNames(array $ruleTransfers, array $moduleNames, string $ruleType): array
+    {
+        $ruledModuleNames = [];
+
+        foreach ($ruleTransfers as $ruleTransfer) {
+            if ($ruleTransfer->getType() !== $ruleType) {
+                continue;
+            }
+
+            if ($ruleType === static::RULE_TYPE_DENY && !$this->isWholeModuleRule($ruleTransfer)) {
+                continue;
+            }
+
+            foreach ($this->findMatchingModuleNames($ruleTransfer, $moduleNames) as $moduleName) {
+                $ruledModuleNames[$moduleName] = true;
+            }
+        }
+
+        return $ruledModuleNames;
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\RuleTransfer $ruleTransfer
+     * @param array<string> $moduleNames
+     *
+     * @return array<string>
+     */
+    protected function findMatchingModuleNames(RuleTransfer $ruleTransfer, array $moduleNames): array
+    {
+        if ($ruleTransfer->getBundle() === static::WILDCARD) {
+            return $moduleNames;
+        }
+
+        return array_values(array_intersect($moduleNames, [$ruleTransfer->getBundle()]));
+    }
+
+    /**
      * @param \Generated\Shared\Transfer\RuleTransfer $ruleTransfer
      */
     protected function isWholeModuleRule(RuleTransfer $ruleTransfer): bool
