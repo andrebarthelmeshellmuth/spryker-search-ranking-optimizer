@@ -43,6 +43,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Persistence
  * @group SearchRankingOptimizerEntityManagerTest
  * Add your own group annotations below this line
+ * @group NeedsDatabase
  */
 class SearchRankingOptimizerEntityManagerTest extends Unit
 {

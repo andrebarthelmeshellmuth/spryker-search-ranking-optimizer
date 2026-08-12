@@ -26,6 +26,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\QueryContainer\Search
  * @group AutoTune
  * @group AutoTuneNotificationRecipientResolverTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class AutoTuneNotificationRecipientResolverTest extends Unit
 {

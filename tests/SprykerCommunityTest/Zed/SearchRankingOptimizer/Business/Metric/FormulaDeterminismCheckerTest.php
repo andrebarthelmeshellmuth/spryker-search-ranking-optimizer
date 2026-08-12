@@ -19,6 +19,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDetermini
  * @group Business
  * @group Metric
  * @group FormulaDeterminismCheckerTest
+ * @group Portable
  */
 class FormulaDeterminismCheckerTest extends Unit
 {

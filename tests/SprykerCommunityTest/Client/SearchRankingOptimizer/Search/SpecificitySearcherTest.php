@@ -35,6 +35,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher;
  * @group SearchRankingOptimizer
  * @group Search
  * @group SpecificitySearcherTest
+ * @group NeedsSearch
  */
 class SpecificitySearcherTest extends Unit
 {

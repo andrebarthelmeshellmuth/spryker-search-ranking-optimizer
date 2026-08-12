@@ -24,6 +24,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeig
  * @group Communication
  * @group Form
  * @group AutomatedWeightOptimizationRunFormTest
+ * @group Portable
  */
 class AutomatedWeightOptimizationRunFormTest extends Unit
 {

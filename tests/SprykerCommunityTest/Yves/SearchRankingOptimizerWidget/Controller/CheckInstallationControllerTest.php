@@ -38,6 +38,7 @@ use Symfony\Component\HttpFoundation\Response;
  * @group Controller
  * @group CheckInstallationControllerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class CheckInstallationControllerTest extends Unit
 {

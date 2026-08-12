@@ -24,6 +24,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmF
  * @group Business
  * @group Optimization
  * @group AlgorithmFactoryTest
+ * @group Portable
  */
 class AlgorithmFactoryTest extends Unit
 {

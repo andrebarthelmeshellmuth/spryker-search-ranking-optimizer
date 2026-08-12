@@ -33,6 +33,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Evaluation
  * @group RankEvaluationRunnerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class RankEvaluationRunnerTest extends Unit
 {

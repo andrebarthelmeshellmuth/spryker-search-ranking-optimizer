@@ -32,6 +32,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group SaturationPointCalibration
  * @group ScoreCalibratorTest
  * Add your own group annotations below this line
+ * @group NeedsSearch
  */
 class ScoreCalibratorTest extends Unit
 {

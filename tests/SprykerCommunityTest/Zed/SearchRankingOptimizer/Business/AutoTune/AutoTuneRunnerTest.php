@@ -33,6 +33,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group AutoTune
  * @group AutoTuneRunnerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class AutoTuneRunnerTest extends Unit
 {

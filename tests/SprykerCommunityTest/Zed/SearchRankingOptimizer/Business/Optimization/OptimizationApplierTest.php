@@ -30,6 +30,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Business
  * @group Optimization
  * @group OptimizationApplierTest
+ * @group Portable
  */
 class OptimizationApplierTest extends Unit
 {

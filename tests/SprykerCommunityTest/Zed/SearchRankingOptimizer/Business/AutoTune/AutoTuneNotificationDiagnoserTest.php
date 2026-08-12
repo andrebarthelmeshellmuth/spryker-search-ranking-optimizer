@@ -23,6 +23,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Business
  * @group AutoTune
  * @group AutoTuneNotificationDiagnoserTest
+ * @group Portable
  */
 class AutoTuneNotificationDiagnoserTest extends Unit
 {

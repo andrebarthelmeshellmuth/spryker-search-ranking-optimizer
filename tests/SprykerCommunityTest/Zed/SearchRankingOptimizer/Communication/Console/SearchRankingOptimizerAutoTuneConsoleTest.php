@@ -31,6 +31,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  * @group Communication
  * @group Console
  * @group SearchRankingOptimizerAutoTuneConsoleTest
+ * @group Portable
  */
 class SearchRankingOptimizerAutoTuneConsoleTest extends Unit
 {

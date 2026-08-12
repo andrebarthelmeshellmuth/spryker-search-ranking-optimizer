@@ -28,6 +28,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group SaturationPointCalibration
  * @group SaturationPointCalibrationUploadHandlerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class SaturationPointCalibrationUploadHandlerTest extends Unit
 {

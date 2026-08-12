@@ -31,6 +31,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  * @group Communication
  * @group Acl
  * @group BackOfficeAccessAnalyzerTest
+ * @group Portable
  */
 class BackOfficeAccessAnalyzerTest extends Unit
 {

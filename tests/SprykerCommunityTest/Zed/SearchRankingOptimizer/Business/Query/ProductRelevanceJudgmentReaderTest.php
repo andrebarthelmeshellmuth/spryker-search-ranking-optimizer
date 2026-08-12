@@ -27,6 +27,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Query
  * @group ProductRelevanceJudgmentReaderTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class ProductRelevanceJudgmentReaderTest extends Unit
 {

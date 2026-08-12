@@ -28,6 +28,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Checkpoint
  * @group WeightCheckpointRestorerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class WeightCheckpointRestorerTest extends Unit
 {

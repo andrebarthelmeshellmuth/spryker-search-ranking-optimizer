@@ -22,6 +22,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\SearchTermCanonic
  * @group Query
  * @group SearchTermCanonicalizerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class SearchTermCanonicalizerTest extends Unit
 {

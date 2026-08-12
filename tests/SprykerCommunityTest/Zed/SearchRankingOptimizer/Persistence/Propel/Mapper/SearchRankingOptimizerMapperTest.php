@@ -34,6 +34,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper\Search
  * @group Mapper
  * @group SearchRankingOptimizerMapperTest
  * Add your own group annotations below this line
+ * @group NeedsDatabase
  */
 class SearchRankingOptimizerMapperTest extends Unit
 {

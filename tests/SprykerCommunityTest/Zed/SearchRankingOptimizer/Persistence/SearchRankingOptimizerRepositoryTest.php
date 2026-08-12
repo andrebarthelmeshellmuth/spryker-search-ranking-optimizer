@@ -35,6 +35,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Persistence
  * @group SearchRankingOptimizerRepositoryTest
  * Add your own group annotations below this line
+ * @group NeedsDatabase
  */
 class SearchRankingOptimizerRepositoryTest extends Unit
 {
