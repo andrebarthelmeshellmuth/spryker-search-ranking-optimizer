@@ -27,6 +27,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  * @group Authorization
  * @group CompanyUserPermissionAuthorizerTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class CompanyUserPermissionAuthorizerTest extends Unit
 {

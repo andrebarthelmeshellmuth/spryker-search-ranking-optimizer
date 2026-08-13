@@ -23,6 +23,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Query
  * @group QueryImportanceWeightUpdaterTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class QueryImportanceWeightUpdaterTest extends Unit
 {

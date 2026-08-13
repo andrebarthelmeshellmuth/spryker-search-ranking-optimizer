@@ -20,16 +20,12 @@ use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfigQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRunQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRatingQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationQuery;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTerm;
 use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibrationSearchTermQuery;
-use Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpointQuery;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManager;
 
@@ -47,69 +43,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Persistence
  * @group SearchRankingOptimizerEntityManagerTest
  * Add your own group annotations below this line
+ * @group NeedsDatabase
  */
 class SearchRankingOptimizerEntityManagerTest extends Unit
 {
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration>
-     */
-    protected array $calibrationEntities = [];
-
-    /**
-     * @var array<int>
-     */
-    protected array $evaluationIds = [];
-
-    /**
-     * @var array<int>
-     */
-    protected array $autoTuneMetricConfigIds = [];
-
-    /**
-     * @var array<int>
-     */
-    protected array $optimizerRunIds = [];
-
-    /**
-     * @var array<int>
-     */
-    protected array $queryIds = [];
-
-    /**
-     * @var array<int>
-     */
-    protected array $weightCheckpointIds = [];
-
-    protected function _after(): void
-    {
-        foreach ($this->calibrationEntities as $calibrationEntity) {
-            $calibrationEntity->delete();
-        }
-
-        foreach ($this->evaluationIds as $idSearchRankingEvaluation) {
-            SpySearchRankingEvaluationQuery::create()->findOneByIdSearchRankingEvaluation($idSearchRankingEvaluation)?->delete();
-        }
-
-        foreach ($this->autoTuneMetricConfigIds as $idSearchRankingAutoTuneMetricConfig) {
-            SpySearchRankingAutoTuneMetricConfigQuery::create()->findOneByIdSearchRankingAutoTuneMetricConfig($idSearchRankingAutoTuneMetricConfig)?->delete();
-        }
-
-        foreach ($this->optimizerRunIds as $idSearchRankingOptimizerRun) {
-            SpySearchRankingOptimizerRunQuery::create()->findOneByIdSearchRankingOptimizerRun($idSearchRankingOptimizerRun)?->delete();
-        }
-
-        foreach ($this->queryIds as $idSearchRankingQuery) {
-            SpySearchRankingQueryRatingQuery::create()->filterByFkSearchRankingQuery($idSearchRankingQuery)->find()->delete();
-            SpySearchRankingQueryQuery::create()->findOneByIdSearchRankingQuery($idSearchRankingQuery)?->delete();
-        }
-
-        foreach ($this->weightCheckpointIds as $idSearchRankingWeightCheckpoint) {
-            SpySearchRankingWeightCheckpointQuery::create()->findOneByIdSearchRankingWeightCheckpoint($idSearchRankingWeightCheckpoint)?->delete();
-        }
-
-        parent::_after();
-    }
-
     public function testCreateCalibrationPersistsTheCalibrationAndItsSearchTermsWithCorrectForeignKeys(): void
     {
         // Arrange
@@ -123,7 +60,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createCalibration($calibrationTransfer);
-        $this->trackForCleanup((int)$resultTransfer->getIdSearchRankingSaturationPointCalibrationOrFail());
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingSaturationPointCalibration());
@@ -282,7 +218,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createEvaluation($evaluationTransfer);
-        $this->evaluationIds[] = $resultTransfer->getIdSearchRankingEvaluationOrFail();
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingEvaluation());
@@ -307,7 +242,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig($autoTuneMetricConfigTransfer);
-        $this->autoTuneMetricConfigIds[] = $resultTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingAutoTuneMetricConfig());
@@ -333,7 +267,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
                 ->setIsNotifyEnabled(false),
         );
-        $this->autoTuneMetricConfigIds[] = $firstSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Act
         $secondSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
@@ -373,7 +306,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
                 ->setIsNotifyEnabled(false),
         );
-        $this->autoTuneMetricConfigIds[] = $deSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Act
         $atSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
@@ -386,7 +318,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
                 ->setIsNotifyEnabled(false),
         );
-        $this->autoTuneMetricConfigIds[] = $atSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Assert
         $this->assertNotSame($deSaveTransfer->getIdSearchRankingAutoTuneMetricConfig(), $atSaveTransfer->getIdSearchRankingAutoTuneMetricConfig());
@@ -414,7 +345,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
                 ->setIsNotifyEnabled(false),
         );
-        $this->autoTuneMetricConfigIds[] = $deDeSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Act
         $enUsSaveTransfer = (new SearchRankingOptimizerEntityManager())->saveAutoTuneMetricConfig(
@@ -427,7 +357,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAutoUpdateScope(SearchRankingOptimizerConfig::AUTO_UPDATE_SCOPE_PROGRAM_CHOICE)
                 ->setIsNotifyEnabled(false),
         );
-        $this->autoTuneMetricConfigIds[] = $enUsSaveTransfer->getIdSearchRankingAutoTuneMetricConfigOrFail();
 
         // Assert
         $this->assertNotSame($deDeSaveTransfer->getIdSearchRankingAutoTuneMetricConfig(), $enUsSaveTransfer->getIdSearchRankingAutoTuneMetricConfig());
@@ -448,23 +377,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $calibrationEntity->setStatus($status);
         $calibrationEntity->save();
 
-        $this->calibrationEntities[] = $calibrationEntity;
-
         return $calibrationEntity;
-    }
-
-    /**
-     * @param int $idSearchRankingSaturationPointCalibration
-     */
-    protected function trackForCleanup(int $idSearchRankingSaturationPointCalibration): void
-    {
-        $calibrationEntity = SpySearchRankingSaturationPointCalibrationQuery::create()->findOneByIdSearchRankingSaturationPointCalibration($idSearchRankingSaturationPointCalibration);
-
-        if ($calibrationEntity === null) {
-            return;
-        }
-
-        $this->calibrationEntities[] = $calibrationEntity;
     }
 
     public function testCreateOptimizerRunPersistsAQueuedRun(): void
@@ -477,7 +390,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun($optimizerRunTransfer);
-        $this->optimizerRunIds[] = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingOptimizerRun());
@@ -503,7 +415,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun($optimizerRunTransfer);
-        $this->optimizerRunIds[] = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
 
         // Assert
         $this->assertTrue($resultTransfer->getIsTerminationCriteriaTrusted());
@@ -630,10 +541,7 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
                 ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES),
         );
 
-        $idSearchRankingOptimizerRun = $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
-        $this->optimizerRunIds[] = $idSearchRankingOptimizerRun;
-
-        return $idSearchRankingOptimizerRun;
+        return $resultTransfer->getIdSearchRankingOptimizerRunOrFail();
     }
 
     public function testCreateQueryPersistsTheQuery(): void
@@ -647,7 +555,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createQuery($queryTransfer);
-        $this->queryIds[] = $resultTransfer->getIdSearchRankingQueryOrFail();
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingQuery());
@@ -667,7 +574,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createQuery($queryTransfer);
-        $this->queryIds[] = $resultTransfer->getIdSearchRankingQueryOrFail();
 
         // Assert -- the entity's own column default applies, this must not have thrown or forced null through.
         $this->assertNotNull($resultTransfer->getImportanceWeight());
@@ -824,7 +730,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createWeightCheckpoint($weightCheckpointTransfer);
-        $this->weightCheckpointIds[] = $resultTransfer->getIdSearchRankingWeightCheckpointOrFail();
 
         // Assert
         $this->assertNotNull($resultTransfer->getIdSearchRankingWeightCheckpoint());
@@ -852,8 +757,6 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $queryEntity->setStoreName($storeName);
         $queryEntity->setLocaleName($localeName);
         $queryEntity->save();
-
-        $this->queryIds[] = $queryEntity->getIdSearchRankingQuery();
 
         return $queryEntity;
     }

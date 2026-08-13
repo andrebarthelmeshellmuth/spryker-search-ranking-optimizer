@@ -22,6 +22,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingO
  * @group Business
  * @group Optimization
  * @group OptimizableParameterListerTest
+ * @group Portable
  */
 class OptimizableParameterListerTest extends Unit
 {

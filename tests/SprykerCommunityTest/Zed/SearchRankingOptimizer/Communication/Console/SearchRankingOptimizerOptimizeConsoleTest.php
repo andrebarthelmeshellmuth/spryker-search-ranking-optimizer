@@ -29,6 +29,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  * @group Communication
  * @group Console
  * @group SearchRankingOptimizerOptimizeConsoleTest
+ * @group Portable
  */
 class SearchRankingOptimizerOptimizeConsoleTest extends Unit
 {

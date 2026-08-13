@@ -22,6 +22,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SaturationPointCalibrat
  * @group SaturationPointCalibration
  * @group CsvSearchTermParserTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class CsvSearchTermParserTest extends Unit
 {

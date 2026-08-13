@@ -25,6 +25,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group AutoTune
  * @group AutoTuneMetricConfigWriterTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class AutoTuneMetricConfigWriterTest extends Unit
 {

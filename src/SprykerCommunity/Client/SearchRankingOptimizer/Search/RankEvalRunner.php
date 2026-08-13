@@ -273,7 +273,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         $normalizedSpecificity = $this->querySpecificityCalculator->normalize(
             $rawSpecificity,
             (float)$configurationTransfer->getSpecificitySaturationPoint(),
-            (float)($configurationTransfer->getSpecificityCurveExponent() ?? 1.0),
+            $configurationTransfer->getSpecificityCurveExponent() ?? 1.0,
         );
 
         $shift = $this->calculateSpecificityShift(

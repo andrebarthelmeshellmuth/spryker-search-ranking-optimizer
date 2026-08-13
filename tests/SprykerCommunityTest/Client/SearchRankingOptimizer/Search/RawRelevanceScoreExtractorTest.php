@@ -21,6 +21,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtra
  * @group Search
  * @group RawRelevanceScoreExtractorTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class RawRelevanceScoreExtractorTest extends Unit
 {

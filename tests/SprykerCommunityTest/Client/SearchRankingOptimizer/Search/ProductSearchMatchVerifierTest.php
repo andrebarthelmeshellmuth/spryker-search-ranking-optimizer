@@ -28,6 +28,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVeri
  * @group SearchRankingOptimizer
  * @group Search
  * @group ProductSearchMatchVerifierTest
+ * @group NeedsSearch
  */
 class ProductSearchMatchVerifierTest extends Unit
 {

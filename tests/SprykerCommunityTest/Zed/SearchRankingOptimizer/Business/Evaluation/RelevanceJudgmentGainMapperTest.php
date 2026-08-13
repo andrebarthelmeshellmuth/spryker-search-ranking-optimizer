@@ -23,6 +23,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJud
  * @group Evaluation
  * @group RelevanceJudgmentGainMapperTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class RelevanceJudgmentGainMapperTest extends Unit
 {

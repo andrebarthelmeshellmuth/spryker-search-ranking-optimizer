@@ -38,6 +38,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibra
  * @group SearchRankingOptimizer
  * @group Search
  * @group SaturationPointCalibrationSearcherTest
+ * @group NeedsSearch
  */
 class SaturationPointCalibrationSearcherTest extends Unit
 {

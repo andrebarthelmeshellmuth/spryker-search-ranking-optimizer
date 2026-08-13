@@ -35,77 +35,10 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimiz
  * @group Persistence
  * @group SearchRankingOptimizerRepositoryTest
  * Add your own group annotations below this line
+ * @group NeedsDatabase
  */
 class SearchRankingOptimizerRepositoryTest extends Unit
 {
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingSaturationPointCalibration>
-     */
-    protected array $calibrationEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQuery>
-     */
-    protected array $queryEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingQueryRating>
-     */
-    protected array $ratingEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingEvaluation>
-     */
-    protected array $evaluationEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig>
-     */
-    protected array $autoTuneMetricConfigEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingOptimizerRun>
-     */
-    protected array $optimizerRunEntities = [];
-
-    /**
-     * @var array<\Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingWeightCheckpoint>
-     */
-    protected array $weightCheckpointEntities = [];
-
-    protected function _after(): void
-    {
-        foreach ($this->calibrationEntities as $calibrationEntity) {
-            $calibrationEntity->delete();
-        }
-
-        foreach ($this->ratingEntities as $ratingEntity) {
-            $ratingEntity->delete();
-        }
-
-        foreach ($this->queryEntities as $queryEntity) {
-            $queryEntity->delete();
-        }
-
-        foreach ($this->evaluationEntities as $evaluationEntity) {
-            $evaluationEntity->delete();
-        }
-
-        foreach ($this->autoTuneMetricConfigEntities as $autoTuneMetricConfigEntity) {
-            $autoTuneMetricConfigEntity->delete();
-        }
-
-        foreach ($this->optimizerRunEntities as $optimizerRunEntity) {
-            $optimizerRunEntity->delete();
-        }
-
-        foreach ($this->weightCheckpointEntities as $weightCheckpointEntity) {
-            $weightCheckpointEntity->delete();
-        }
-
-        parent::_after();
-    }
-
     public function testGetUploadedCalibrationsReturnsOnlyUploadedStatusRowsNewestFirst(): void
     {
         // Arrange
@@ -587,8 +520,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $autoTuneMetricConfigEntity->setIsNotifyEnabled($isNotifyEnabled);
         $autoTuneMetricConfigEntity->save();
 
-        $this->autoTuneMetricConfigEntities[] = $autoTuneMetricConfigEntity;
-
         return $autoTuneMetricConfigEntity;
     }
 
@@ -605,8 +536,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $queryEntity->setLocaleName($localeName);
         $queryEntity->save();
 
-        $this->queryEntities[] = $queryEntity;
-
         return $queryEntity;
     }
 
@@ -621,8 +550,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $calibrationEntity->setLocaleName($localeName);
         $calibrationEntity->setStatus($status);
         $calibrationEntity->save();
-
-        $this->calibrationEntities[] = $calibrationEntity;
 
         return $calibrationEntity;
     }
@@ -646,8 +573,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $ratingEntity->setRatingType($ratingType);
         $ratingEntity->save();
 
-        $this->ratingEntities[] = $ratingEntity;
-
         return $ratingEntity;
     }
 
@@ -665,8 +590,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $evaluationEntity->setMetricScore($metricScore);
         $evaluationEntity->setQueryCount($queryCount);
         $evaluationEntity->save();
-
-        $this->evaluationEntities[] = $evaluationEntity;
 
         return $evaluationEntity;
     }
@@ -787,8 +710,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
         $optimizerRunEntity->setStatus($status);
         $optimizerRunEntity->save();
-
-        $this->optimizerRunEntities[] = $optimizerRunEntity;
 
         return $optimizerRunEntity;
     }
@@ -959,8 +880,6 @@ class SearchRankingOptimizerRepositoryTest extends Unit
         $weightCheckpointEntity->setIsSpecificityWeightingEnabled(true);
         $weightCheckpointEntity->setMetricWeights(json_encode([['idSearchRankingMetric' => 1, 'name' => 'top_seller', 'weight' => 1.0]]));
         $weightCheckpointEntity->save();
-
-        $this->weightCheckpointEntities[] = $weightCheckpointEntity;
 
         return $weightCheckpointEntity;
     }

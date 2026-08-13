@@ -44,6 +44,7 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * @group SearchRankingOptimizer
  * @group Search
  * @group RankEvalRunnerTest
+ * @group NeedsSearch
  */
 class RankEvalRunnerTest extends Unit
 {

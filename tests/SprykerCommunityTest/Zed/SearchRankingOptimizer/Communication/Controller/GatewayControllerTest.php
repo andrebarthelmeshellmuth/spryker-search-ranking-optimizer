@@ -68,6 +68,7 @@ use SprykerCommunityTest\Zed\SearchRankingOptimizer\SearchRankingOptimizerZedTes
  * @group GatewayControllerTest
  *
  * @property \SprykerCommunityTest\Zed\SearchRankingOptimizer\SearchRankingOptimizerZedTester $tester
+ * @group NeedsSearch
  */
 class GatewayControllerTest extends Unit
 {

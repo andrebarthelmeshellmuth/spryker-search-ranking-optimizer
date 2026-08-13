@@ -20,6 +20,8 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * why a single run isn't reliable enough on its own), then flips the ground truth to the opposite extreme
  * and does the same again -- asserting only that the median winning value moved in the expected DIRECTION
  * between the two, never an exact number.
+ *
+ * @group NeedsSearch
  */
 class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthTest
 {

@@ -26,6 +26,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentS
  * @group Zed
  * @group ProductRelevanceJudgmentStubTest
  * Add your own group annotations below this line
+ * @group Portable
  */
 class ProductRelevanceJudgmentStubTest extends Unit
 {

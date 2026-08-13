@@ -20,6 +20,7 @@
     <exclude-pattern>*Facade.php</exclude-pattern>
     <exclude-pattern>*FacadeInterface.php</exclude-pattern>
     <exclude-pattern>*Mapper.php</exclude-pattern>
+    <exclude-pattern>*/src/Generated/*</exclude-pattern>
 
     <rule ref="rulesets/codesize.xml/ExcessiveParameterList"/>
 </ruleset>

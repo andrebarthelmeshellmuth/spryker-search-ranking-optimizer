@@ -21,6 +21,7 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterV
  * @group Business
  * @group Optimization
  * @group ParameterVectorMapperTest
+ * @group Portable
  */
 class ParameterVectorMapperTest extends Unit
 {

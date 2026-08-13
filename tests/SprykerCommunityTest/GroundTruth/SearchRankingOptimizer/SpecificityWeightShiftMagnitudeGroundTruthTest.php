@@ -25,6 +25,8 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * leaning on a business signal instead) evaluated SIMULTANEOUSLY in one run, the optimizer converges on a
  * POSITIVE shift magnitude -- the only way one static relevanceWeight-independent-of-shift could satisfy
  * both queries at once.
+ *
+ * @group NeedsSearch
  */
 class SpecificityWeightShiftMagnitudeGroundTruthTest extends AbstractGroundTruthTest
 {

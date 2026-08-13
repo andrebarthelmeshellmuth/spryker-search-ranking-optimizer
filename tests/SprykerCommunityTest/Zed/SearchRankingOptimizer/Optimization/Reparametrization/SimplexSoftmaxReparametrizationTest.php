@@ -22,6 +22,7 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\Optimization\Reparametrizatio
  * @group SearchRankingOptimizer
  * @group Optimization
  * @group SimplexSoftmaxReparametrizationTest
+ * @group Portable
  */
 class SimplexSoftmaxReparametrizationTest extends Unit
 {
