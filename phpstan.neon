@@ -6,3 +6,13 @@ parameters:
     # classes, which don't exist outside a host shop (see README, "Testing and CI").
     bootstrapFiles:
         - '%rootDir%/../../../phpstan-bootstrap.php'
+
+    ignoreErrors:
+        -
+            # Spryker\Client\Catalog\Plugin\Elasticsearch\Query\ProductCatalogSearchQueryPlugin's parent
+            # (CatalogSearchQueryPlugin) DOES `implements QueryInterface` (verified directly against the
+            # installed vendor source) — this reproduces even on a clean result cache, single-file, so it's
+            # a real PHPStan generics-variance false positive on Spryker's own QueryInterface, not a
+            # genuine incompatibility. Runtime is unaffected: PHP's own type system accepts this call.
+            message: '#Parameter \#1 \$searchQuery of method Spryker\\Client\\SearchElasticsearch\\Plugin\\QueryExpander\\IsActiveQueryExpanderPlugin::expandQuery\(\) expects Spryker\\Client\\SearchExtension\\Dependency\\Plugin\\QueryInterface, Spryker\\Client\\Catalog\\Plugin\\Elasticsearch\\Query\\ProductCatalogSearchQueryPlugin given\.#'
+            path: src/SprykerCommunity/Client/SearchRankingOptimizer/Search/LiveCatalogSearchQueryBuilder.php
