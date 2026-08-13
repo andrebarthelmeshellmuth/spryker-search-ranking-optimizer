@@ -1162,6 +1162,7 @@ to maintain.
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
 | `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | complexity / method- and class-length limits, run as two separate invocations (PHPMD merges every ruleset's `exclude-pattern` into one global list per run, and only the public-method-count rule should skip Facades/Factories) |
+| `phpstan` (PHP 8.3, 8.4) | static analysis, level 8, standalone CI variant — see "Static analysis" below |
 | `portable tests` (PHP 8.3, 8.4) | this package's own `@group Portable` test subset actually passes — see "Test suite" below |
 
 `check-floors` resolves every declared constraint to its **oldest** allowed version
@@ -1374,14 +1375,26 @@ the one further exemption, same class as those two: it is a thin pass-through to
 needs a real HTTP request/response cycle to exercise meaningfully — covered by the live browser
 verification in [Status](#status) instead of a unit test.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon), zero errors across all 151
-files) is run from a host shop rather than in CI, same reasoning as the test suite — it needs the
-generated `Generated\Shared\Transfer\*` classes, which only exist once a project has run
-`transfer:generate`. **Invoke it via the real `packages/` path, not the `vendor/` symlink** — running it
-against `vendor/spryker-community/search-ranking-optimizer/...` produces spurious "return statement is
-missing" errors on every Propel `Query::create()`-returning factory method (a path-resolution artifact of
-analyzing a symlinked package, not a real defect); the identical source analyzed via its real path is
-clean:
+### Static analysis
+
+Static analysis (`phpstan`, level 8) runs in two variants:
+
+- **`composer phpstan-ci`** (config [`phpstan.ci.neon`](phpstan.ci.neon)) — what CI runs on every push,
+  standalone. Same transfer-generation recipe as the `Portable` test subset above, and treats two
+  categories of class as out of scope rather than faking them: Propel's generated `Orm\Zed\*\Persistence\*`
+  entity/query/map classes (need a real schema + database, via `propel:model:build`) and the aggregated
+  `Generated\{Zed,Yves,Client,Service}\Ide\AutoCompletion` stub (an aggregate across every module in a real
+  project's full dependency graph, via `console dev:ide-auto-completion:generate`) — the same shape of gap
+  as this package's own checked-in `PageIndexMap.php` fixture.
+- **`composer phpstan`** (config [`phpstan.neon`](phpstan.neon), zero errors across all 151 files) — the
+  full check, run from a host shop, same reasoning as the test suite: it needs the generated
+  `Generated\Shared\Transfer\*` classes, which only exist once a project has run `transfer:generate`, so it
+  stays the authoritative check for adopters even though CI can't run it. **Invoke it via the real
+  `packages/` path, not the `vendor/` symlink** — running it against
+  `vendor/spryker-community/search-ranking-optimizer/...` produces spurious "return statement is missing"
+  errors on every Propel `Query::create()`-returning factory method (a path-resolution artifact of
+  analyzing a symlinked package, not a real defect); the identical source analyzed via its real path is
+  clean:
 
 ```bash
 vendor/bin/phpstan clear-result-cache -c packages/spryker-community/search-ranking-optimizer/phpstan.neon
