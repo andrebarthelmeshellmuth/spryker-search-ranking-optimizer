@@ -61,6 +61,9 @@ class SearchRankingOptimizerWidgetPresentationTester extends Actor
      */
     public function loginAsCustomer(string $email): void
     {
+        // WebDriver keeps the browser session across Cests in this suite (restart: false), so a
+        // prior test's login can still be active here - log out first or the login form never renders.
+        $this->amOnPage('/logout');
         $this->amOnPage(LoginPage::URL);
         $this->submitForm(['name' => 'loginForm'], [
             LoginPage::FORM_FIELD_EMAIL => $email,
