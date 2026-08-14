@@ -656,7 +656,7 @@ That's the whole loop: tune once for real, replicate everywhere else. It's not f
 - **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
   into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
   auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^3.0.0`); not on Packagist, so
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^4.0.1`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
   [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
   algorithms the automated weight optimization feature searches with.
@@ -679,17 +679,17 @@ shares its `SprykerCommunity` core namespace and its `spryker-community/*` trans
 
 ### 1. Install the package
 
-Not yet published on Packagist — install from a path repository. Its 2 real, non-Spryker `require`s
-(`spryker-community/search-ranking` and `andrebarthelmeshellmuth/blackbox-optimizer`) aren't on Packagist
-either, so both need their own `vcs` repository entries too (skip whichever you already have —
-`search-ranking`'s is often already present if it's separately installed):
+Not published on Packagist under the `spryker-community`/`andrebarthelmeshellmuth` vendor namespaces —
+install from VCS repositories instead. Its 2 real, non-Spryker `require`s
+(`spryker-community/search-ranking` and `andrebarthelmeshellmuth/blackbox-optimizer`) need their own `vcs`
+repository entries too (skip whichever you already have — `search-ranking`'s is often already present if
+it's separately installed):
 
 ```json
 "repositories": [
     {
-        "type": "path",
-        "url": "packages/spryker-community/search-ranking-optimizer",
-        "options": { "symlink": true }
+        "type": "vcs",
+        "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer"
     },
     {
         "type": "vcs",
@@ -703,11 +703,29 @@ either, so both need their own `vcs` repository entries too (skip whichever you 
 ```
 
 ```bash
+composer require spryker-community/search-ranking-optimizer:^1.0
+```
+
+Working inside this demoshop's own monorepo instead of a separate project? Use a `path` repository for
+this package itself (keep the two sibling `vcs` entries above as-is) and `:@dev`, so edits are picked up
+without a round trip through GitHub:
+
+```json
+"repositories": [
+    {
+        "type": "path",
+        "url": "packages/spryker-community/search-ranking-optimizer",
+        "options": { "symlink": true }
+    }
+]
+```
+
+```bash
 composer require spryker-community/search-ranking-optimizer:@dev
 ```
 
 **If your project's `search-ranking` is installed from a dev branch rather than a tagged release**,
-Composer can fail this step with `require spryker-community/search-ranking ^1.3.0 -> found
+Composer can fail this step with an error like `require spryker-community/search-ranking ^2.2.0 -> found
 spryker-community/search-ranking[dev-your-branch] but it does not match the constraint` — a dev-branch
 version doesn't satisfy a normal semver constraint on its own, regardless of what commits it actually
 contains. Fix it in `search-ranking`'s own `composer.json`, not this package's:
@@ -715,13 +733,13 @@ contains. Fix it in `search-ranking`'s own `composer.json`, not this package's:
 ```json
 "extra": {
     "branch-alias": {
-        "dev-your-branch-name": "1.3.x-dev"
+        "dev-your-branch-name": "2.3.x-dev"
     }
 }
 ```
 
-telling Composer to treat that branch as the `1.3.x` version line for constraint-matching purposes. Pick
-the alias version to match whichever tagged release your branch is actually built on top of.
+telling Composer to treat that branch as that version line for constraint-matching purposes. Pick the
+alias version to match whichever tagged release your branch is actually built on top of.
 
 ### 2. Register the core namespace
 
