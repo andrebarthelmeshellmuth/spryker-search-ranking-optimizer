@@ -724,23 +724,6 @@ without a round trip through GitHub:
 composer require spryker-community/search-ranking-optimizer:@dev
 ```
 
-**If your project's `search-ranking` is installed from a dev branch rather than a tagged release**,
-Composer can fail this step with an error like `require spryker-community/search-ranking ^2.2.0 -> found
-spryker-community/search-ranking[dev-your-branch] but it does not match the constraint` — a dev-branch
-version doesn't satisfy a normal semver constraint on its own, regardless of what commits it actually
-contains. Fix it in `search-ranking`'s own `composer.json`, not this package's:
-
-```json
-"extra": {
-    "branch-alias": {
-        "dev-your-branch-name": "2.3.x-dev"
-    }
-}
-```
-
-telling Composer to treat that branch as that version line for constraint-matching purposes. Pick the
-alias version to match whichever tagged release your branch is actually built on top of.
-
 ### 2. Register the core namespace
 
 In `config/Shared/config_default.php`, ensure `SprykerCommunity` is in `KernelConstants::CORE_NAMESPACES`
