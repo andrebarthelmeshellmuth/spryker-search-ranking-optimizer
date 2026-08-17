@@ -65,6 +65,7 @@
         "phpstan": "phpstan analyse -c phpstan.neon src/",
         "phpstan-ci": [
             "php tests/_ci-standalone/generate-transfers.php",
+            "php tests/_ci-standalone/generate-index-map.php",
             "phpstan analyse -c phpstan.ci.neon src/"
         ]
     },
@@ -83,7 +84,7 @@
     "autoload-dev": {
         "psr-4": {
             "SprykerCommunityTest\\": "tests/SprykerCommunityTest/",
-            "Generated\\": ["src/Generated/", "tests/_ci-standalone/Generated/"]
+            "Generated\\": "src/Generated/"
         }
     },
     "config": {
