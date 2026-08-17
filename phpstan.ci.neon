@@ -9,11 +9,10 @@ includes:
 #   real project's full dependency graph, produced by `console dev:ide-auto-completion:generate`. Not
 #   reproducible for one package in isolation.
 # - `Orm\Zed\*\Persistence\*` (Propel entity/query/map classes) — produced by `propel:model:build` against
-#   a real schema + database. Same category of gap as the checked-in `PageIndexMap.php` fixture the search
-#   suite already carries for its own generator gap. The `classConstant.phpDocType` identifier ignore below
-#   is the same root cause surfacing through a `@var class-string<...>` docblock instead of a plain
-#   class.notFound — PHPStan can't confirm the referenced Orm\Zed\* classes are ModelCriteria subtypes
-#   without them existing to check against.
+#   a real schema + database. The `classConstant.phpDocType` identifier ignore below is the same root
+#   cause surfacing through a `@var class-string<...>` docblock instead of a plain class.notFound —
+#   PHPStan can't confirm the referenced Orm\Zed\* classes are ModelCriteria subtypes without them
+#   existing to check against.
 #
 # Both are still exercised for real by this package's DB-backed Codeception suite when run from a host
 # shop (see README, "Testing and CI") — this file only relaxes what a single standalone package checkout
@@ -26,7 +25,6 @@ parameters:
             - src/Generated/*
     scanDirectories:
         - src/Generated
-        - tests/_ci-standalone/Generated
     ignoreErrors:
         -
             message: '#Generated\\(Zed|Yves|Client|Service)\\Ide\\AutoCompletion#'
