@@ -5,6 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+# Authenticates composer's GitHub dist/API calls with the workflow's own GITHUB_TOKEN -- unauthenticated
+# codeload.github.com downloads share a low, IP-wide rate limit that a normal composer install (dozens of
+# packages) can exhaust on its own, surfacing as "could not be downloaded (HTTP/2 429)" partway through.
+# Authenticated requests get a much higher ceiling. GITHUB_TOKEN is always available in Actions, no secret
+# to configure.
+env:
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+
 jobs:
   validate:
     name: composer validate
