@@ -644,10 +644,14 @@ That's the whole loop: tune once for real, replicate everywhere else. It's not f
 - **`spryker-community/search-ranking` installed and wired** — a real `require`; the Apply step writes
   into its `relevanceSaturationPoint`/`specificitySaturationPoint` settings via its facade, and the
   auto-tune job writes into its metric formulas the same way
-- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^4.0.1`); not on Packagist, so
+- **`andrebarthelmeshellmuth/blackbox-optimizer`** — also a real `require` (`^4.1.0`); not on Packagist, so
   it needs the same repository-entry treatment as `search-ranking` below (see
   [Installation](#installation)). Provides the actual CMA-ES/Rechenberg-Schwefel-ES/Differential-Evolution
-  algorithms the automated weight optimization feature searches with.
+  algorithms the automated weight optimization feature searches with. The `4.1.0` floor is deliberate,
+  not housekeeping: before it, Differential Evolution could stop early on a plateaued best value while
+  its population was still spread out, ending a run at a materially worse optimum and silently reporting
+  it as finished. Runs driven from here are affected directly, since they hand the algorithm a fixed
+  generation budget and take whatever it returns. CMA-ES (the default) was never affected.
 - **B2B company-user accounts** — the rating widget resolves "is this customer allowed to rate" via their
   active `CompanyUser`, the same permission-granting mechanism the rest of a B2B shop already uses. A B2C-only
   shop with no `CompanyUser` module has nothing to grant the Relevance Rater/Query Curator permissions to.
