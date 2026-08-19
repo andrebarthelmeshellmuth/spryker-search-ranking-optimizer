@@ -362,8 +362,6 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $idProductAbstractHigher
      * @param int $idProductAbstractLower
      * @param string $searchTerm
-     *
-     * @return float
      */
     protected function computeNormalizedTextRelevanceGap(
         int $idProductAbstractHigher,
@@ -630,9 +628,11 @@ abstract class AbstractGroundTruthTest extends Unit
                 $idProductAbstractLower = $productIds[$j];
                 $gap = $normalize($scoresByProductId[$idProductAbstractHigher]) - $normalize($scoresByProductId[$idProductAbstractLower]);
 
-                if ($gap > 0.0) {
-                    $pairs[] = [$idProductAbstractLower, $idProductAbstractHigher, $gap];
+                if ($gap <= 0.0) {
+                    continue;
                 }
+
+                $pairs[] = [$idProductAbstractLower, $idProductAbstractHigher, $gap];
             }
         }
 
@@ -720,11 +720,13 @@ abstract class AbstractGroundTruthTest extends Unit
                 continue;
             }
 
-            if ($gap > $bestGap) {
-                $bestGap = $gap;
-                $bestPair = [$idLoser, $idWinner];
-                $requiredLeadThreshold = $threshold;
+            if ($gap <= $bestGap) {
+                continue;
             }
+
+            $bestGap = $gap;
+            $bestPair = [$idLoser, $idWinner];
+            $requiredLeadThreshold = $threshold;
         }
 
         if ($bestPair === null) {
@@ -1239,5 +1241,4 @@ abstract class AbstractGroundTruthTest extends Unit
             static::MAX_QUEUE_DRAIN_ATTEMPTS,
         ));
     }
-
 }
