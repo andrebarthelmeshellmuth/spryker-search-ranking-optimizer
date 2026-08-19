@@ -667,11 +667,13 @@ shares its `SprykerCommunity` core namespace and its `spryker-community/*` trans
 
 ### 1. Install the package
 
-Not published on Packagist under the `spryker-community`/`andrebarthelmeshellmuth` vendor namespaces —
-install from VCS repositories instead. Its 2 real, non-Spryker `require`s
-(`spryker-community/search-ranking` and `andrebarthelmeshellmuth/blackbox-optimizer`) need their own `vcs`
-repository entries too (skip whichever you already have — `search-ranking`'s is often already present if
-it's separately installed):
+Not yet published on Packagist under the `spryker-community`/`andrebarthelmeshellmuth` vendor namespaces.
+The `spryker-community` namespace and its GitHub org (`github.com/spryker-community`) are maintained by
+Spryker's own community program — we're in contact with them about bringing these packages in properly
+(their `dummy-module` template is the onboarding path). Until that lands, install from VCS repositories
+instead. Its 2 real, non-Spryker `require`s (`spryker-community/search-ranking` and
+`andrebarthelmeshellmuth/blackbox-optimizer`) need their own `vcs` repository entries too (skip whichever
+you already have — `search-ranking`'s is often already present if it's separately installed):
 
 ```json
 "repositories": [
