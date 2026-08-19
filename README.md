@@ -884,6 +884,18 @@ a CLI probe.
 
 ## Limitations
 
+- **CMA-ES has no restart strategy, so a single run can converge to a real but low-quality local optimum.**
+  Measured on the metric-weight ground truth suite (`tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer/`):
+  a clear-cut, unambiguous ground truth was only correctly discovered by ~10% of independent runs (2/20 in
+  one measured batch), because the algorithm's own early-termination criteria (TolX/TolFun, see
+  `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm`) converge fast on a low-dimensional,
+  discretely multi-modal `rank_eval` objective and then stop, wherever that landed. A production run is a
+  single such attempt, with the same odds. **Intend to fix this soonish** with a restart-on-plateau strategy
+  (IPOP-CMA-ES style: on early termination, restart from a fresh point, optionally with a larger population,
+  keep the best across restarts) in the algorithm itself, so a single run becomes reliable without the
+  caller needing to work around it. Until then, the ground truth test compensates by taking the best of many
+  repeated runs (see `RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT`) — a
+  test-only workaround, not a fix for real "Run now" usage.
 - **Optimization runs are local search, not global search.** `relevanceWeight` is bounded to a trust region
   around its current live value (`±0.15` by default) specifically so one run can't propose something wild
   and untested in a single shot — but that means a systematically wrong starting point is never escaped in
