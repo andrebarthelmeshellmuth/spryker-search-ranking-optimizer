@@ -1,5 +1,10 @@
 # Spryker Search Ranking Optimizer
 
+[![CI](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer/actions/workflows/ci.yml)
+[![PHP](https://img.shields.io/badge/php-%E2%89%A5%208.3-777bb4)](composer.json)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-2a6b2a)](phpstan.neon)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Deciding *what* the ranking weights and parameters should be, on top of
 [spryker-community/search-ranking](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking),
 which provides the mechanism to *use* them (business-signal metrics, formulas, `function_score` ranking,
