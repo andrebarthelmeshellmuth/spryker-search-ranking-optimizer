@@ -465,10 +465,16 @@ Three black-box algorithms ship, selectable per run:
 As of `blackbox-optimizer` 1.2, all three also stop before `maxGenerations` on their own once they've
 converged, diverged, or plateaued (each algorithm's own criteria — see that package's own README for the
 per-algorithm detail), and expose a `trustTerminationCriteria()` escape hatch to trust that over an
-arbitrary generation-count guess. `OptimizationRunner` doesn't call it yet — every run here still uses the
-fixed `getOptimizationMaxGenerations()` budget (150) as its own stopping point; wiring up
-`trustTerminationCriteria()` as a run option is a natural, still-open follow-up, not done as part of this
-bump.
+arbitrary generation-count guess. That escape hatch is wired up here as a per-run choice: the
+**Automated Weight Optimization** form carries a "trust the algorithm's own termination criteria"
+option, and `OptimizationRunner` passes it through to `AlgorithmFactory`, which calls
+`trustTerminationCriteria()` on the algorithm it builds.
+
+Leave it off — the default — and a run stops at the fixed `getOptimizationMaxGenerations()` budget
+(150), which is predictable and bounds how long a run can take. Turn it on and the generation cap is
+replaced by the algorithm's own convergence test, so a run stops when it stops improving rather than
+when it runs out of budget: better optima on problems that need more generations, and less wasted
+work on ones that converge early, at the cost of a run whose length you cannot predict up front.
 
 The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
