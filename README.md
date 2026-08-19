@@ -48,6 +48,8 @@ Verified live end-to-end in a real browser (not just the automated test suite �
 button on the storefront, the judgment round-trips through the Yves→Zed gateway with a server-side
 permission re-check, and lands correctly in the database.
 
+![The SRP relevance-rating widget: heart/check/X buttons below each product tile](docs/screenshots/srp-rating-widget.png)
+
 ## Before you start: this needs real relevance ratings
 
 A fresh install has zero rows in `spy_search_ranking_query_rating`. Someone has to actually click
@@ -97,6 +99,8 @@ data, not guessed:
 
 Both constants have no universal correct value — they depend entirely on a shop's own field boosts, catalog
 size, and typical query shapes. Saturation Point Calibration is the one tool, with a type selector, that samples either.
+
+![The Saturation Point Calibration page: the current live saturation point (k) for both signals — "no calibration run has finished yet" until the first one calculates — and a form to start a new run against a chosen calibration type/store/locale, sampling either organically rated search terms or an uploaded CSV](docs/screenshots/saturation-point-calibration.png)
 
 The workflow, all from the **Search Ranking Optimizer → Saturation Point Calibration** Zed page, which has
 its own **Viewing** Store+Locale picker at the top — independent of the "Start New Calibration Run"
@@ -204,6 +208,8 @@ already collects into a real nDCG (Normalized Discounted Cumulative Gain) score 
 Elasticsearch's `_rank_eval` API — a genuine information-retrieval metric, not human opinion averaged
 together.
 
+![The Test Current Evaluation page: a store/locale picker with an "Evaluate now" button, the latest weighted nDCG@10 result, and a history of past evaluations for that store/locale](docs/screenshots/test-current-evaluation.png)
+
 The workflow, from the **Search Ranking Optimizer → Test Current Evaluation** Zed page:
 
 1. **Pick a store and locale** and click **Evaluate now**. Unlike Saturation Point Calibration's upload-then-cron-then-poll
@@ -236,6 +242,8 @@ Every tuning knob this package will eventually set automatically (weight-slider 
 apply, auto-tune) is still, today, something an admin edits directly on `search-ranking`'s own Settings
 page. A checkpoint is a point-in-time snapshot of every one of those knobs, so a manual edit — or a future
 automated one — is always reversible.
+
+![The Weight Checkpoints page: the current live relevanceWeight, specificity knobs, and per-metric weights, a "Take checkpoint now" button, and a history of past checkpoints each with its own Restore action](docs/screenshots/weight-checkpoints.png)
 
 From the **Search Ranking Optimizer → Weight Checkpoints** Zed page, which — like every other scoped page
 in this package — has its own **Store + Locale selector** at the top:
@@ -316,6 +324,8 @@ full result line per locale instead):
 [DE/de_DE] top_seller: fit still adequate (R² = 0.9883), no change.
 [DE/de_DE] top_seller:   ⚠ fit varies by locale (spread 0.3861): de_DE=0.9883, en_US=0.6022 — this store-wide formula may not fit every locale equally well.
 ```
+
+![The Auto-Tune Settings page: one row per active metric, showing its current fit (R²) and its own threshold/auto-update/auto-update-scope/notify-by-email settings](docs/screenshots/auto-tune-settings.png)
 
 From the **Search Ranking Optimizer → Auto-Tune Settings** Zed page — like every other scoped page in
 this package, with its own **Store + Locale selector** at the top — per active metric:
@@ -475,6 +485,8 @@ Leave it off — the default — and a run stops at the fixed `getOptimizationMa
 replaced by the algorithm's own convergence test, so a run stops when it stops improving rather than
 when it runs out of budget: better optima on problems that need more generations, and less wasted
 work on ones that converge early, at the cost of a run whose length you cannot predict up front.
+
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-weight-optimization.png)
 
 The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
