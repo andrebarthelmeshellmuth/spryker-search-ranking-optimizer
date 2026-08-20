@@ -93,16 +93,21 @@ class RankEvalRunner implements RankEvalRunnerInterface
     /**
      * `_rank_eval` matches `ratings[]` entries to `hits[]` by the EXACT `(_index, _id)` pair — and a hit's
      * `_index` is always the concrete backing index a request against an alias actually resolved to, never
-     * the alias name itself (standard Elasticsearch/OpenSearch behavior). `$indexName` throughout this
-     * class is an alias (this shop reindexes into a freshly timestamped concrete index and flips the alias
-     * atomically), so a `ratings[]._index` built from that same alias string silently matches NOTHING:
+     * the alias name itself (standard Elasticsearch/OpenSearch behavior). By default, `$indexName`
+     * throughout this class already IS a concrete index — the `_alias` lookup below is then a harmless
+     * no-op that returns it unchanged. Installing `spryker-community/search-index-alias` (a separate,
+     * optional package that adds no-downtime reindexing: reindex into a freshly timestamped concrete
+     * index, then flip an Elasticsearch/OpenSearch alias to it atomically) changes that — `$indexName`
+     * becomes the alias, resolved to a *different* concrete index on every reindex/flip. Without this
+     * resolution, a `ratings[]._index` built from that alias string would then silently match NOTHING:
      * every hit comes back with `"rating": null`, `_rank_eval` treats the query as if it had zero ratings
      * at all, and `metric_score` is 0.0 for every single query — no error, no partial signal, just an
      * evaluation that always reports "no improvement possible" regardless of how much real relevance data
-     * exists. Resolving the alias to its concrete index once per {@see evaluate()} call and using THAT for
-     * every `ratings[]._index` in the request fixes the match. Same process-scoped/short-TTL caching
-     * rationale as `$idfCache` above: cheap to resolve once per run, wasteful to resolve on every one of
-     * potentially thousands of `evaluate()` calls within one optimization run.
+     * exists. Resolving to the concrete index once per {@see evaluate()} call and using THAT for every
+     * `ratings[]._index` in the request keeps both cases correct with no version constraint on the alias
+     * package needed. Same process-scoped/short-TTL caching rationale as `$idfCache` above: cheap to
+     * resolve once per run, wasteful to resolve on every one of potentially thousands of `evaluate()`
+     * calls within one optimization run.
      *
      * @var array<string, array{0: string, 1: float}>
      */
@@ -491,14 +496,15 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * Resolves `$indexName` (an alias, per this class's own top docblock) to the concrete index it
-     * currently points to — see {@see $concreteIndexNameCache} for why this matters for `_rank_eval`
-     * specifically. `GET {indexName}/_alias` returns `{"<concreteName>": {"aliases": {...}}}`; the first
-     * (and, for a single-index alias as used here, only) top-level key is the concrete name. Falls back to
-     * the given `$indexName` unchanged if the lookup fails or the response shape is unexpected (e.g. a
-     * project or test double pointing this straight at an already-concrete index with no alias at all) —
-     * the same "don't hard-fail evaluation over an index-naming edge case" posture the rest of this class
-     * already takes.
+     * Resolves `$indexName` to the concrete index it currently points to — see
+     * {@see $concreteIndexNameCache} for why this matters for `_rank_eval` specifically, and why it's a
+     * no-op on the common, non-aliased case. `GET {indexName}/_alias` returns
+     * `{"<concreteName>": {"aliases": {...}}}` when `$indexName` is an alias (e.g. with
+     * `spryker-community/search-index-alias` installed); the first (and, for a single-index alias as used
+     * there, only) top-level key is the concrete name. Falls back to the given `$indexName` unchanged if
+     * the lookup fails or the response shape is unexpected — including the default case where `$indexName`
+     * is already a concrete index with no alias at all — the same "don't hard-fail evaluation over an
+     * index-naming edge case" posture the rest of this class already takes.
      *
      * @param string $indexName
      */
