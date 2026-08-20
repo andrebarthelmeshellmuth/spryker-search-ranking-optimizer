@@ -13,6 +13,8 @@ use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
 use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
 use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
 use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
+use BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator;
+use InvalidArgumentException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 class AlgorithmFactory implements AlgorithmFactoryInterface
@@ -40,6 +42,9 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param bool $isTerminationCriteriaTrusted
      * @param array<int, float>|null $warmStartVector
      * @param float $warmStartFraction
+     * @param bool $isRestartOnPlateauEnabled
+     *
+     * @throws \InvalidArgumentException
      */
     public function create(
         string $algorithmName,
@@ -48,8 +53,22 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
         bool $isTerminationCriteriaTrusted = false,
         ?array $warmStartVector = null,
         float $warmStartFraction = 0.0,
+        bool $isRestartOnPlateauEnabled = false,
     ): OptimizerAlgorithmInterface {
+        if ($isTerminationCriteriaTrusted && $isRestartOnPlateauEnabled) {
+            throw new InvalidArgumentException(
+                'isTerminationCriteriaTrusted and isRestartOnPlateauEnabled are mutually exclusive -- '
+                . 'RestartingOptimizerDecorator does not support trusting an inner algorithm\'s own safety '
+                . 'ceiling, since it would blow through the decorator\'s own evaluation-budget accounting.',
+            );
+        }
+
         $algorithm = $this->createAll()[$algorithmName] ?? $this->createCmaEs();
+
+        if ($isRestartOnPlateauEnabled) {
+            $algorithm = new RestartingOptimizerDecorator($algorithm);
+        }
+
         $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
 
         if ($isTerminationCriteriaTrusted) {

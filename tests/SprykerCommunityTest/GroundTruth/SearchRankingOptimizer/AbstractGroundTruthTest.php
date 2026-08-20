@@ -852,10 +852,17 @@ abstract class AbstractGroundTruthTest extends Unit
      *   value for the run -- lets a ground truth remove relevanceWeight as a confound OUTRIGHT (see
      *   {@see discoverMarginalTextRelevancePair()}) rather than merely reasoning about the worst case it
      *   could reach.
+     * @param bool $isRestartOnPlateauEnabled False (the default): a single run, same as every ground truth
+     *   scenario before this parameter existed. True: wraps the run's algorithm in `blackbox-optimizer`'s
+     *   `RestartingOptimizerDecorator` -- see {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()},
+     *   which measures exactly what this buys a single "Run now" click against the same scenario
+     *   {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT}'s
+     *   own docblock measured the ~10% baseline hit rate on.
      */
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
+        bool $isRestartOnPlateauEnabled = false,
     ): SearchRankingOptimizerRunTransfer {
         $queuedRunTransfer = $this->getFacade()->queueOptimizationRun(
             static::STORE_NAME,
@@ -864,6 +871,12 @@ abstract class AbstractGroundTruthTest extends Unit
             false,
             0.0,
             $fixedRelevanceWeight,
+            null,
+            null,
+            null,
+            null,
+            [],
+            $isRestartOnPlateauEnabled,
         );
         $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 

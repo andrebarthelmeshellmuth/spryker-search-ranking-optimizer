@@ -356,12 +356,33 @@
          fix can still end up held constant anyway if its own formula turns out non-deterministic (see
          FormulaDeterminismCheckerInterface) — that's OptimizationRunner's own orthogonal decision, not
          recorded here. -->
+    <!-- One restart RestartingOptimizerDecorator (andrebarthelmeshellmuth/blackbox-optimizer) actually ran,
+         mirroring BlackboxOptimizer\Algorithm\RestartHistoryEntry's own fields. bestScore is this restart's
+         own best value NEGATED back into this package's own nDCG-is-better-when-higher convention (every
+         blackbox-optimizer algorithm minimizes, so a run's own objective negates nDCG before handing it
+         over — see OptimizationRunner::buildObjectiveFunction() — and this undoes that same negation for
+         display, exactly like SearchRankingOptimizerRun::bestScore already does for the run as a whole).
+         terminationReason is BlackboxOptimizer\Algorithm\Internal\TerminationReason's own case name
+         (NONE/TOL_X/TOL_X_UP/CONDITION_COV/TOL_FUN) as a plain string, so this transfer stays free of a
+         dependency on that package's enum type. -->
+    <transfer name="SearchRankingOptimizerRestartHistoryEntry" strict="true">
+        <property name="restartIndex" type="int"/>
+        <property name="populationSize" type="int"/>
+        <property name="generationsAllowed" type="int"/>
+        <property name="generationsUsed" type="int"/>
+        <property name="terminationReason" type="string"/>
+        <property name="bestScore" type="float"/>
+        <property name="evaluationsConsumed" type="int"/>
+        <property name="improvedOverallBest" type="bool"/>
+    </transfer>
+
     <transfer name="SearchRankingOptimizerRun" strict="true">
         <property name="idSearchRankingOptimizerRun" type="int"/>
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="algorithm" type="string"/>
         <property name="isTerminationCriteriaTrusted" type="bool"/>
+        <property name="isRestartOnPlateauEnabled" type="bool"/>
         <property name="warmStartFraction" type="float"/>
         <property name="fixedRelevanceWeight" type="float"/>
         <property name="fixedSpecificityCurveExponent" type="float"/>
@@ -373,6 +394,7 @@
         <property name="totalCount" type="int"/>
         <property name="processedCount" type="int"/>
         <property name="generationsUsed" type="int"/>
+        <property name="restartHistory" type="SearchRankingOptimizerRestartHistoryEntry[]" singular="restartHistoryEntry"/>
         <property name="baselineScore" type="float"/>
         <property name="bestRelevanceWeight" type="float"/>
         <property name="bestMetricWeights" type="SearchRankingWeightCheckpointMetricWeight[]" singular="bestMetricWeight"/>

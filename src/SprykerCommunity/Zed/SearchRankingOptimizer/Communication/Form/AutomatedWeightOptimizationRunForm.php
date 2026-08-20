@@ -47,6 +47,11 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
     /**
      * @var string
      */
+    public const FIELD_IS_RESTART_ON_PLATEAU_ENABLED = 'isRestartOnPlateauEnabled';
+
+    /**
+     * @var string
+     */
     public const FIELD_WARM_START_FRACTION_PERCENT = 'warmStartFractionPercent';
 
     /**
@@ -102,6 +107,17 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
                 . 'generation safety limit instead, for a search that needs real room to keep converging '
                 . 'past the normal budget — slower per run, not faster, since it can now run far longer '
                 . 'before that detection (or the higher ceiling itself) finally stops it.',
+            'choices' => ['Off' => false, 'On' => true],
+            'data' => false,
+        ]);
+
+        $builder->add(static::FIELD_IS_RESTART_ON_PLATEAU_ENABLED, ChoiceType::class, [
+            'label' => 'Restart on plateau',
+            'help' => 'Off (default): a single run, same as always. On: when the search stops on a genuine '
+                . 'fitness plateau (not converged, not diverged — just stuck), restart from a fresh random '
+                . 'point with a doubled population, within the SAME total evaluation budget this run already '
+                . 'uses — never more evaluations, just spent differently across restarts instead of one '
+                . 'longer run. Mutually exclusive with "Trust termination criteria" above.',
             'choices' => ['Off' => false, 'On' => true],
             'data' => false,
         ]);

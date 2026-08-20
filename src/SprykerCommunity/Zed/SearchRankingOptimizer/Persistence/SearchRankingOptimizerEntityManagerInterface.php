@@ -194,6 +194,8 @@ interface SearchRankingOptimizerEntityManagerInterface
      * @param int $generationsUsed The real number of generations the algorithm actually ran (count of
      *   OptimizationResult::getBestValueHistory()) -- independent of totalCount/processedCount, which count
      *   candidate evaluations, not generations.
+     * @param array<\BlackboxOptimizer\Algorithm\RestartHistoryEntry> $restartHistoryEntries Empty for a run
+     *   that didn't have restart-on-plateau enabled -- the normal case.
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
@@ -205,6 +207,7 @@ interface SearchRankingOptimizerEntityManagerInterface
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
         int $generationsUsed,
+        array $restartHistoryEntries = [],
     ): void;
 
     /**

@@ -11,6 +11,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingOptimizerRestartHistoryEntryTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
@@ -217,6 +218,60 @@ class SearchRankingOptimizerMapper
     }
 
     /**
+     * @param array<\BlackboxOptimizer\Algorithm\RestartHistoryEntry> $restartHistoryEntries
+     */
+    public function encodeRestartHistory(array $restartHistoryEntries): ?string
+    {
+        if ($restartHistoryEntries === []) {
+            return null;
+        }
+
+        $entries = [];
+
+        foreach ($restartHistoryEntries as $restartHistoryEntry) {
+            $entries[] = [
+                'restartIndex' => $restartHistoryEntry->getRestartIndex(),
+                'populationSize' => $restartHistoryEntry->getPopulationSize(),
+                'generationsAllowed' => $restartHistoryEntry->getGenerationsAllowed(),
+                'generationsUsed' => $restartHistoryEntry->getGenerationsUsed(),
+                'terminationReason' => $restartHistoryEntry->getTerminationReason()->name,
+                // Negated back into this package's own "higher nDCG is better" convention -- see this
+                // transfer's own docblock in search_ranking_optimizer.transfer.xml.
+                'bestScore' => -$restartHistoryEntry->getBestValueAtStop(),
+                'evaluationsConsumed' => $restartHistoryEntry->getEvaluationsConsumed(),
+                'improvedOverallBest' => $restartHistoryEntry->improvedOverallBest(),
+            ];
+        }
+
+        return (string)json_encode($entries);
+    }
+
+    /**
+     * @param string $restartHistoryJson
+     *
+     * @return array<\Generated\Shared\Transfer\SearchRankingOptimizerRestartHistoryEntryTransfer>
+     */
+    protected function decodeRestartHistory(string $restartHistoryJson): array
+    {
+        $decoded = json_decode($restartHistoryJson, true);
+        $restartHistoryEntryTransfers = [];
+
+        foreach ((is_array($decoded) ? $decoded : []) as $entry) {
+            $restartHistoryEntryTransfers[] = (new SearchRankingOptimizerRestartHistoryEntryTransfer())
+                ->setRestartIndex((int)$entry['restartIndex'])
+                ->setPopulationSize((int)$entry['populationSize'])
+                ->setGenerationsAllowed((int)$entry['generationsAllowed'])
+                ->setGenerationsUsed((int)$entry['generationsUsed'])
+                ->setTerminationReason((string)$entry['terminationReason'])
+                ->setBestScore((float)$entry['bestScore'])
+                ->setEvaluationsConsumed((int)$entry['evaluationsConsumed'])
+                ->setImprovedOverallBest((bool)$entry['improvedOverallBest']);
+        }
+
+        return $restartHistoryEntryTransfers;
+    }
+
+    /**
      * @param \Orm\Zed\SearchRankingOptimizer\Persistence\SpySearchRankingAutoTuneMetricConfig $autoTuneMetricConfigEntity
      * @param \Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer $autoTuneMetricConfigTransfer
      */
@@ -268,6 +323,7 @@ class SearchRankingOptimizerMapper
             ->setLocaleName($optimizerRunEntity->getLocaleName())
             ->setAlgorithm($optimizerRunEntity->getAlgorithm())
             ->setIsTerminationCriteriaTrusted($optimizerRunEntity->getIsTerminationCriteriaTrusted())
+            ->setIsRestartOnPlateauEnabled($optimizerRunEntity->getIsRestartOnPlateauEnabled())
             ->setWarmStartFraction($optimizerRunEntity->getWarmStartFraction())
             ->setFixedRelevanceWeight($optimizerRunEntity->getFixedRelevanceWeight())
             ->setFixedSpecificityCurveExponent($optimizerRunEntity->getFixedSpecificityCurveExponent())
@@ -304,6 +360,14 @@ class SearchRankingOptimizerMapper
         if ($fixedMetricWeightsJson !== null) {
             foreach ($this->decodeMetricWeights($fixedMetricWeightsJson) as $metricWeightTransfer) {
                 $optimizerRunTransfer->addFixedMetricWeight($metricWeightTransfer);
+            }
+        }
+
+        $restartHistoryJson = $optimizerRunEntity->getRestartHistory();
+
+        if ($restartHistoryJson !== null) {
+            foreach ($this->decodeRestartHistory($restartHistoryJson) as $restartHistoryEntryTransfer) {
+                $optimizerRunTransfer->addRestartHistoryEntry($restartHistoryEntryTransfer);
             }
         }
 

@@ -486,7 +486,25 @@ replaced by the algorithm's own convergence test, so a run stops when it stops i
 when it runs out of budget: better optima on problems that need more generations, and less wasted
 work on ones that converge early, at the cost of a run whose length you cannot predict up front.
 
-![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-weight-optimization.png)
+As of `blackbox-optimizer` 4.2, there's a second, independent form option: **restart on plateau**. Where
+"trust termination criteria" changes how long a single run is *allowed* to search, restart-on-plateau
+changes what happens when a run stops early on a genuine fitness plateau (not converged, not diverged —
+just stuck): rather than accepting whichever local optimum that one random initialization happened to land
+in, `RestartingOptimizerDecorator` restarts from a fresh random point with a **doubled** population, within
+the exact same total evaluation budget the run already had (`populationSize * maxGenerations`) — never more
+evaluations, just spent differently across restarts instead of one longer run. The two options are
+mutually exclusive (`AlgorithmFactory` rejects a run with both set): restart-on-plateau's own budget
+discipline requires a fixed `maxGenerations` to divide up across restarts, which "trust termination
+criteria" replaces with a much larger safety ceiling instead.
+
+This exists because CMA-ES's own early-termination criteria (see above) converge fast on this package's
+low-dimensional, discretely multi-modal `rank_eval` objective and then stop wherever that landed — a single
+run without this option has real, measured odds of settling for a mediocre local optimum instead of the
+best one available (see [Limitations](#limitations) below for the numbers). A run's own restart history
+(population size, generations used, why it stopped, and its own best score per restart) is shown on the run
+detail page once a restart-enabled run completes.
+
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, a restart-on-plateau run's own restart history (population/generations/why it stopped/best score per restart), when it was applied, and a form to queue a new run against a chosen store/locale/algorithm/restart-on-plateau setting](docs/screenshots/automated-weight-optimization.png)
 
 The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
@@ -902,18 +920,19 @@ a CLI probe.
 
 ## Limitations
 
-- **CMA-ES has no restart strategy, so a single run can converge to a real but low-quality local optimum.**
+- **A single run without restart-on-plateau can converge to a real but low-quality local optimum.**
   Measured on the metric-weight ground truth suite (`tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer/`):
   a clear-cut, unambiguous ground truth was only correctly discovered by ~10% of independent runs (2/20 in
-  one measured batch), because the algorithm's own early-termination criteria (TolX/TolFun, see
-  `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm`) converge fast on a low-dimensional,
-  discretely multi-modal `rank_eval` objective and then stop, wherever that landed. A production run is a
-  single such attempt, with the same odds. **Intend to fix this soonish** with a restart-on-plateau strategy
-  (IPOP-CMA-ES style: on early termination, restart from a fresh point, optionally with a larger population,
-  keep the best across restarts) in the algorithm itself, so a single run becomes reliable without the
-  caller needing to work around it. Until then, the ground truth test compensates by taking the best of many
-  repeated runs (see `RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT`) — a
-  test-only workaround, not a fix for real "Run now" usage.
+  one measured batch) WITHOUT restart-on-plateau, because CMA-ES's own early-termination criteria
+  (TolX/TolFun, see `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm`) converge fast on a
+  low-dimensional, discretely multi-modal `rank_eval` objective and then stop, wherever that landed. **Fixed**
+  by enabling restart-on-plateau (see [Automated weight optimization](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+  above, and `andrebarthelmeshellmuth/blackbox-optimizer`'s own `RestartingOptimizerDecorator`): the SAME
+  scenario, restart-on-plateau enabled, cleared the threshold on 20/20 individual runs across two independent
+  10-run batches (`RelevanceWeightAndMetricWeightGroundTruthTest::testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()`).
+  Restart-on-plateau is opt-in, not the default (mutually exclusive with "trust termination criteria" — see
+  above), so a run queued without it still has the original ~10% single-run odds; enabling it is the fix, not
+  automatic.
 - **Optimization runs are local search, not global search.** `relevanceWeight` is bounded to a trust region
   around its current live value (`±0.15` by default) specifically so one run can't propose something wild
   and untested in a single shot — but that means a systematically wrong starting point is never escaped in

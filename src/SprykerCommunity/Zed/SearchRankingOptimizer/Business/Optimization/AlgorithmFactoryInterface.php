@@ -44,6 +44,15 @@ interface AlgorithmFactoryInterface
      *   warm start, same as never calling `setWarmStart()` at all.
      * @param float $warmStartFraction Passed through to the built algorithm's own `setWarmStart()` --
      *   see that method's own docblock. Ignored when $warmStartVector is null.
+     * @param bool $isRestartOnPlateauEnabled Wraps the built algorithm in `blackbox-optimizer`'s own
+     *   `RestartingOptimizerDecorator` when true: on a genuine fitness plateau, restarts from a fresh random
+     *   point with a doubled population, within the SAME total evaluation budget
+     *   (`populationSize * maxGenerations`) a non-restarting run already uses. Mutually exclusive with
+     *   $isTerminationCriteriaTrusted -- that decorator does not support trusting an inner algorithm's own
+     *   safety ceiling, since it would blow through the decorator's own budget accounting.
+     *
+     * @throws \InvalidArgumentException When both $isTerminationCriteriaTrusted and
+     *   $isRestartOnPlateauEnabled are true.
      */
     public function create(
         string $algorithmName,
@@ -52,5 +61,6 @@ interface AlgorithmFactoryInterface
         bool $isTerminationCriteriaTrusted = false,
         ?array $warmStartVector = null,
         float $warmStartFraction = 0.0,
+        bool $isRestartOnPlateauEnabled = false,
     ): OptimizerAlgorithmInterface;
 }

@@ -113,6 +113,54 @@
                     </tbody>
                 </table>
 
+                {% if latestOptimizerRun.status == 'done' and latestOptimizerRun.restartHistory %}
+                    <table class="table">
+                        <caption>
+                            Restart history — restarted on a genuine fitness plateau, doubling the population
+                            each time, within the same total evaluation budget this run already used.
+                        </caption>
+                        <thead>
+                            <tr>
+                                <th>Restart</th>
+                                <th>Population</th>
+                                <th>Generations</th>
+                                <th>Stopped because</th>
+                                <th>Best score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for restart in latestOptimizerRun.restartHistory %}
+                                <tr>
+                                    <td>{{ restart.restartIndex }}</td>
+                                    <td>{{ restart.populationSize }}</td>
+                                    <td>{{ restart.generationsUsed }}/{{ restart.generationsAllowed }}</td>
+                                    <td>
+                                        {% if restart.terminationReason == 'TOL_FUN' %}
+                                            plateau
+                                        {% elseif restart.terminationReason == 'NONE' %}
+                                            budget exhausted
+                                        {% elseif restart.terminationReason == 'TOL_X' %}
+                                            converged
+                                        {% elseif restart.terminationReason == 'TOL_X_UP' %}
+                                            diverged
+                                        {% elseif restart.terminationReason == 'CONDITION_COV' %}
+                                            numerically degenerate
+                                        {% else %}
+                                            {{ restart.terminationReason }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ restart.bestScore }}
+                                        {% if restart.improvedOverallBest %}
+                                            <span class="label label-success">improved</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
                 {% if latestOptimizerRun.status == 'done' and latestOptimizerRun.bestMetricWeights %}
                     <table class="table">
                         <thead>
@@ -176,6 +224,7 @@
             {{ form_row(optimizeRunForm.localeName) }}
             {{ form_row(optimizeRunForm.algorithm) }}
             {{ form_row(optimizeRunForm.isTerminationCriteriaTrusted) }}
+            {{ form_row(optimizeRunForm.isRestartOnPlateauEnabled) }}
             {{ form_row(optimizeRunForm.warmStartFractionPercent) }}
 
             <h4>{{ 'Parameters' | trans }}</h4>

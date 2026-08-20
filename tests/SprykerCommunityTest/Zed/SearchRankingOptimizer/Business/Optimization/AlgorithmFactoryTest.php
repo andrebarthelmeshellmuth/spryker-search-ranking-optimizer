@@ -12,8 +12,10 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
 use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
 use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
+use BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator;
 use BlackboxOptimizer\Problem\CallableProblem;
 use Codeception\Test\Unit;
+use InvalidArgumentException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 
@@ -152,5 +154,30 @@ class AlgorithmFactoryTest extends Unit
         $result = $algorithm->optimize($problem);
 
         $this->assertLessThan(1.0, $result->getBestValue(), 'fraction=0.0 must leave the bounds-midpoint default fully in effect, ignoring the given warm-start vector.');
+    }
+
+    public function testCreateWrapsInRestartingOptimizerDecoratorWhenIsRestartOnPlateauEnabledIsTrue(): void
+    {
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, false, null, 0.0, true);
+
+        $this->assertInstanceOf(RestartingOptimizerDecorator::class, $algorithm);
+        // RestartingOptimizerDecorator::estimateEvaluationCount() is populationSize * maxIterations, same
+        // formula as a plain CmaEsAlgorithm -- proves create() applied both arguments to the DECORATOR, not
+        // just to the algorithm it wraps (which has no public getter to check directly).
+        $this->assertSame(60, $algorithm->estimateEvaluationCount());
+    }
+
+    public function testCreateDoesNotWrapInRestartingOptimizerDecoratorByDefault(): void
+    {
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5);
+
+        $this->assertNotInstanceOf(RestartingOptimizerDecorator::class, $algorithm);
+    }
+
+    public function testCreateThrowsWhenBothIsTerminationCriteriaTrustedAndIsRestartOnPlateauEnabledAreTrue(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, true, null, 0.0, true);
     }
 }

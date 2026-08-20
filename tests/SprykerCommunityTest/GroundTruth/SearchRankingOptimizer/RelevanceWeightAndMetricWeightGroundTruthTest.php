@@ -63,6 +63,32 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
     protected const METRIC_WEIGHT_REPEAT_COUNT = 30;
 
     /**
+     * How many INDEPENDENT, INDIVIDUAL runs {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()}
+     * takes -- deliberately smaller than {@see METRIC_WEIGHT_REPEAT_COUNT} (which measures a best-of-N
+     * `runRealOptimizationRepeatedBest()` result, not a per-run hit rate): this test measures the opposite
+     * thing, whether a SINGLE run with restart-on-plateau enabled clears the threshold, so its cost scales
+     * with the sample size directly rather than being amortized into one "best" figure. 10 is enough to
+     * distinguish "close to the ~10% single-run baseline" from "meaningfully higher" without this opt-in
+     * suite's own runtime growing past a couple of minutes for this one test alone.
+     *
+     * @var int
+     */
+    protected const RESTART_ON_PLATEAU_SAMPLE_SIZE = 10;
+
+    /**
+     * The bar {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()} asserts the measured hit
+     * rate clears. Deliberately far above the ~10% single-run baseline documented on {@see METRIC_WEIGHT_REPEAT_COUNT}
+     * (a 5x improvement, not a marginal one) while staying well short of "must hit every single time" --
+     * this decorator restarts only up to what the SAME fixed evaluation budget as before can still afford
+     * (see {@see \BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator}'s own docblock), so an
+     * occasional miss (a budget too tight for enough restarts to escape a stubborn plateau) is expected, not
+     * a regression.
+     *
+     * @var float
+     */
+    protected const RESTART_ON_PLATEAU_MIN_HIT_RATE = 0.5;
+
+    /**
      * A pair with a small but real, sized text-relevance gap, not an exact tie, is measured against a
      * precisely-known threshold -- see {@see AbstractGroundTruthTest::discoverMarginalTextRelevancePair()}'s
      * own docblock for why a bare "ranks correctly at all" (lead > 0) isn't reliable, and for the ROOT CAUSE
@@ -182,6 +208,96 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                     $requiredLeadThreshold,
                     $metricA,
                     $metricALeadWhenDisfavored,
+                ),
+            );
+        } finally {
+            foreach ($originalScoresByProductId as $idProductAbstract => $scores) {
+                $this->overrideScores($idProductAbstract, $scores);
+            }
+
+            $this->refreshIndex();
+        }
+    }
+
+    /**
+     * Directly measures what `andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`
+     * buys a real "Run now" click against the EXACT scenario {@see METRIC_WEIGHT_REPEAT_COUNT}'s own
+     * docblock measured the ~10% (2/20) single-run baseline on -- same pair-discovery, same filler pairs,
+     * same fixed relevanceWeight, same threshold. The only difference is what this test does with each of
+     * {@see RESTART_ON_PLATEAU_SAMPLE_SIZE} runs: instead of taking the single BEST of many (what
+     * {@see testMetricWeightConvergesTowardWhicheverMetricTheGroundTruthFavors()} needs to get a reliable
+     * pass/fail signal at all), this counts how many INDIVIDUAL runs clear the threshold ON THEIR OWN --
+     * the question that actually matters for a real, one-shot "Run now" click, restart-on-plateau enabled.
+     *
+     * Scenario 1 only (not both directions): a hit-rate measurement doesn't need the direction-comparison
+     * {@see testMetricWeightConvergesTowardWhicheverMetricTheGroundTruthFavors()}'s own two-scenario
+     * structure exists for -- one direction's hit rate is already the number this test is after.
+     */
+    public function testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight(): void
+    {
+        [$searchTerm] = $this->discoverTwoRatedProductIdsAndSearchTerm();
+        [$metricA, $metricB] = $this->discoverTwoOptimizableMetricNames();
+        [$productA, $productB, $requiredLeadThreshold] = $this->discoverMarginalTextRelevancePair($searchTerm);
+        $fillerPairs = $this->selectFillerMarginalTextRelevancePairs($searchTerm, [$productA, $productB]);
+        $zeroedScores = $this->buildAllActiveMetricsZeroedOut();
+
+        $fillerProductIds = [];
+
+        foreach ($fillerPairs as [$idFillerLoser, $idFillerWinner]) {
+            $fillerProductIds[] = $idFillerLoser;
+            $fillerProductIds[] = $idFillerWinner;
+        }
+
+        $originalScoresByProductId = [];
+
+        foreach (array_unique(array_merge([$productA, $productB], $fillerProductIds)) as $idProductAbstract) {
+            $originalScoresByProductId[$idProductAbstract] = $this->readScores($idProductAbstract);
+        }
+
+        try {
+            $this->overrideScores($productA, array_merge($zeroedScores, [$metricA => 1.0, $metricB => 0.0]));
+            $this->overrideScores($productB, array_merge($zeroedScores, [$metricA => 0.0, $metricB => 1.0]));
+
+            $idQuery = $this->insertSyntheticQuery($searchTerm);
+            $this->insertSyntheticRating($idQuery, $productA, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+            $this->insertSyntheticRating($idQuery, $productB, SearchRankingOptimizerConfig::RATING_TYPE_X);
+            $fillerQueryIds = $this->applyFillerPairsForScenario($fillerPairs, $zeroedScores, $metricA, $metricB, $searchTerm);
+            $this->refreshIndex();
+
+            $hitCount = 0;
+
+            for ($i = 0; $i < static::RESTART_ON_PLATEAU_SAMPLE_SIZE; $i++) {
+                $runTransfer = $this->runRealOptimization(
+                    SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+                    static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
+                    true,
+                );
+                $lead = $this->extractMetricWeight($runTransfer, $metricA) - $this->extractMetricWeight($runTransfer, $metricB);
+
+                if ($lead <= $requiredLeadThreshold) {
+                    continue;
+                }
+
+                $hitCount++;
+            }
+
+            $this->deleteSyntheticQuery($idQuery);
+
+            foreach ($fillerQueryIds as $idFillerQuery) {
+                $this->deleteSyntheticQuery($idFillerQuery);
+            }
+
+            $hitRate = $hitCount / static::RESTART_ON_PLATEAU_SAMPLE_SIZE;
+
+            $this->assertGreaterThanOrEqual(
+                static::RESTART_ON_PLATEAU_MIN_HIT_RATE,
+                $hitRate,
+                sprintf(
+                    'A single restart-on-plateau run should clear the threshold far more often than the ~10%%'
+                        . ' baseline measured without it -- got %d/%d (%.0f%%).',
+                    $hitCount,
+                    static::RESTART_ON_PLATEAU_SAMPLE_SIZE,
+                    $hitRate * 100,
                 ),
             );
         } finally {

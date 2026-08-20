@@ -332,6 +332,9 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param float|null $fixedSpecificityWeightShiftMagnitude
      * @param float|null $fixedSpecificityBlendWeight
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $fixedMetricWeights
+     * @param bool $isRestartOnPlateauEnabled Appended as the last parameter (rather than grouped next to
+     *   $isTerminationCriteriaTrusted, which it's mutually exclusive with) to keep every existing positional
+     *   call to this method valid unchanged.
      */
     public function queueOptimizationRun(
         string $storeName,
@@ -345,12 +348,14 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
         ?float $fixedSpecificityWeightShiftMagnitude = null,
         ?float $fixedSpecificityBlendWeight = null,
         array $fixedMetricWeights = [],
+        bool $isRestartOnPlateauEnabled = false,
     ): SearchRankingOptimizerRunTransfer {
         $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setStoreName($storeName)
             ->setLocaleName($localeName)
             ->setAlgorithm($algorithm)
             ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
+            ->setIsRestartOnPlateauEnabled($isRestartOnPlateauEnabled)
             ->setWarmStartFraction($warmStartFraction)
             ->setFixedRelevanceWeight($fixedRelevanceWeight)
             ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)

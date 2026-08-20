@@ -398,6 +398,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setLocaleName($optimizerRunTransfer->getLocaleNameOrFail());
         $optimizerRunEntity->setAlgorithm($optimizerRunTransfer->getAlgorithmOrFail());
         $optimizerRunEntity->setIsTerminationCriteriaTrusted($optimizerRunTransfer->getIsTerminationCriteriaTrusted() ?? false);
+        $optimizerRunEntity->setIsRestartOnPlateauEnabled($optimizerRunTransfer->getIsRestartOnPlateauEnabled() ?? false);
         $optimizerRunEntity->setWarmStartFraction($optimizerRunTransfer->getWarmStartFraction() ?? 0.0);
         $optimizerRunEntity->setFixedRelevanceWeight($optimizerRunTransfer->getFixedRelevanceWeight());
         $optimizerRunEntity->setFixedSpecificityCurveExponent($optimizerRunTransfer->getFixedSpecificityCurveExponent());
@@ -466,6 +467,8 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
      * @param float $bestSpecificityWeightExponent
      * @param float $bestSpecificityWeightShiftMagnitude
      * @param int $generationsUsed
+     * @param array<\BlackboxOptimizer\Algorithm\RestartHistoryEntry> $restartHistoryEntries Empty for a run
+     *   that didn't have restart-on-plateau enabled -- the normal case.
      */
     public function completeOptimizerRun(
         int $idSearchRankingOptimizerRun,
@@ -477,6 +480,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         float $bestSpecificityWeightExponent,
         float $bestSpecificityWeightShiftMagnitude,
         int $generationsUsed,
+        array $restartHistoryEntries = [],
     ): void {
         $optimizerRunEntity = $this->getFactory()
             ->createSearchRankingOptimizerRunQuery()
@@ -495,6 +499,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setBestSpecificityWeightExponent($bestSpecificityWeightExponent);
         $optimizerRunEntity->setBestSpecificityWeightShiftMagnitude($bestSpecificityWeightShiftMagnitude);
         $optimizerRunEntity->setGenerationsUsed($generationsUsed);
+        $optimizerRunEntity->setRestartHistory($this->getFactory()->createSearchRankingOptimizerMapper()->encodeRestartHistory($restartHistoryEntries));
         $optimizerRunEntity->setCompletedAt(new DateTime());
         $optimizerRunEntity->save();
     }

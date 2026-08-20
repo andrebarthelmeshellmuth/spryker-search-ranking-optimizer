@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 
+use BlackboxOptimizer\Algorithm\RestartHistoryEntry;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
@@ -406,6 +407,111 @@ class OptimizationRunnerTest extends Unit
     }
 
     /**
+     * Structural, not statistical, the same way {@see testRunNextPassesWarmStartFractionFromTheQueuedRunToTheAlgorithmWithoutError()}
+     * is: proves isRestartOnPlateauEnabled reaches AlgorithmFactory::create() (which wraps the built
+     * algorithm in RestartingOptimizerDecorator -- already proven at AlgorithmFactoryTest's own level) and
+     * that the decorator's own OptimizationResult::getRestartHistory() reaches completeOptimizerRun()'s new
+     * 10th argument, end to end through the real orchestration -- not that an actual restart happens (this
+     * run's tiny maxGenerations=2 budget is far too small to reliably trigger one; that's covered by
+     * blackbox-optimizer's own RestartingOptimizerDecoratorTest and this package's own ground truth suite).
+     * RestartingOptimizerDecorator::optimize() always reports at least one entry (covering the very first,
+     * non-restarted run), so a non-empty array here is itself the proof the decorator ran at all.
+     */
+    public function testRunNextPassesIsRestartOnPlateauEnabledFromTheQueuedRunToTheAlgorithmAndPersistsTheRestartHistory(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
+            $this->createQueuedRunTransfer(isRestartOnPlateauEnabled: true),
+        );
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedRestartHistory = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- the mock's signature must
+        // match completeOptimizerRun()'s real 10 arguments; only the last (restartHistoryEntries) is used.
+        $captureCallback = function (
+            int $idOptimizerRun,
+            float $bestRelevanceWeight,
+            array $bestMetricWeightTransfers,
+            float $bestScore,
+            float $bestSpecificityBlendWeight,
+            float $bestSpecificityCurveExponent,
+            float $bestSpecificityWeightExponent,
+            float $bestSpecificityWeightShiftMagnitude,
+            int $generationsUsed,
+            array $restartHistoryEntries = [],
+        ) use (&$capturedRestartHistory): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedRestartHistory = $restartHistoryEntries;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertNotEmpty($capturedRestartHistory);
+        $this->assertContainsOnlyInstancesOf(RestartHistoryEntry::class, $capturedRestartHistory);
+    }
+
+    /**
+     * The mirror of the test above: restart-on-plateau OFF (the default) must never reach
+     * completeOptimizerRun() with any restart history at all, even an empty array's worth of decorator
+     * bookkeeping -- proves AlgorithmFactory::create() really left the algorithm unwrapped, not just that
+     * the decorator happened to report nothing.
+     */
+    public function testRunNextPersistsNoRestartHistoryWhenRestartOnPlateauIsDisabled(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankEvaluationRunnerMock = $this->createMock(RankEvaluationRunnerInterface::class);
+        $rankEvaluationRunnerMock->method('evaluateCandidate')->willReturn(0.5);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $capturedRestartHistory = null;
+
+        // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- see the test above.
+        $captureCallback = function (
+            int $idOptimizerRun,
+            float $bestRelevanceWeight,
+            array $bestMetricWeightTransfers,
+            float $bestScore,
+            float $bestSpecificityBlendWeight,
+            float $bestSpecificityCurveExponent,
+            float $bestSpecificityWeightExponent,
+            float $bestSpecificityWeightShiftMagnitude,
+            int $generationsUsed,
+            array $restartHistoryEntries = [],
+        ) use (&$capturedRestartHistory): void {
+            // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+            $capturedRestartHistory = $restartHistoryEntries;
+        };
+        $entityManagerMock->expects($this->once())->method('completeOptimizerRun')->willReturnCallback($captureCallback);
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, $rankEvaluationRunnerMock);
+
+        // Act
+        $runner->runNext();
+
+        // Assert
+        $this->assertSame([], $capturedRestartHistory);
+    }
+
+    /**
      * Structural, not statistical: proves the mapConfigurationToVector()-to-setWarmStart() plumbing (a real
      * array shape/count match between ParameterVectorMapper's own output and what the built algorithm
      * accepts) doesn't break the run end to end. The actual warm-start ARITHMETIC is already proven
@@ -682,6 +788,7 @@ class OptimizationRunnerTest extends Unit
     /**
      * @param string|null $algorithm
      * @param bool $isTerminationCriteriaTrusted
+     * @param bool $isRestartOnPlateauEnabled
      * @param float $warmStartFraction
      * @param float|null $fixedRelevanceWeight
      * @param float|null $fixedSpecificityCurveExponent
@@ -693,6 +800,7 @@ class OptimizationRunnerTest extends Unit
     protected function createQueuedRunTransfer(
         ?string $algorithm = null,
         bool $isTerminationCriteriaTrusted = false,
+        bool $isRestartOnPlateauEnabled = false,
         float $warmStartFraction = 0.0,
         ?float $fixedRelevanceWeight = null,
         ?float $fixedSpecificityCurveExponent = null,
@@ -708,6 +816,7 @@ class OptimizationRunnerTest extends Unit
             ->setAlgorithm($algorithm ?? SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED)
             ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
+            ->setIsRestartOnPlateauEnabled($isRestartOnPlateauEnabled)
             ->setWarmStartFraction($warmStartFraction)
             ->setFixedRelevanceWeight($fixedRelevanceWeight)
             ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)

@@ -368,6 +368,12 @@ interface SearchRankingOptimizerFacadeInterface
      *   Metrics a human chose to pin at queue time, at whatever value they entered (not necessarily the
      *   live one). A metric NOT listed here can still end up held constant anyway if its own formula turns
      *   out non-deterministic — that's {@see runNextOptimization()}'s own orthogonal decision.
+     * @param bool $isRestartOnPlateauEnabled Wraps the run's algorithm in `blackbox-optimizer`'s own
+     *   `RestartingOptimizerDecorator`: on a genuine fitness plateau, restarts from a fresh random point
+     *   with a doubled population, within the SAME total evaluation budget a non-restarting run already
+     *   uses. Mutually exclusive with $isTerminationCriteriaTrusted. Defaults to false, preserving the
+     *   original single-run behavior. Appended last (not grouped with $isTerminationCriteriaTrusted) to
+     *   keep every existing positional call to this method valid unchanged.
      */
     public function queueOptimizationRun(
         string $storeName,
@@ -381,6 +387,7 @@ interface SearchRankingOptimizerFacadeInterface
         ?float $fixedSpecificityWeightShiftMagnitude = null,
         ?float $fixedSpecificityBlendWeight = null,
         array $fixedMetricWeights = [],
+        bool $isRestartOnPlateauEnabled = false,
     ): SearchRankingOptimizerRunTransfer;
 
     /**
