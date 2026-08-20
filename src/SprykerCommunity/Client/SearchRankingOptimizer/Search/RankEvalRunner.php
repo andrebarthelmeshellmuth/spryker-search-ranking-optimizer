@@ -91,6 +91,29 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected static array $idfCache = [];
 
     /**
+     * `_rank_eval` matches `ratings[]` entries to `hits[]` by the EXACT `(_index, _id)` pair — and a hit's
+     * `_index` is always the concrete backing index a request against an alias actually resolved to, never
+     * the alias name itself (standard Elasticsearch/OpenSearch behavior). By default, `$indexName`
+     * throughout this class already IS a concrete index — the `_alias` lookup below is then a harmless
+     * no-op that returns it unchanged. Installing `spryker-community/search-index-alias` (a separate,
+     * optional package that adds no-downtime reindexing: reindex into a freshly timestamped concrete
+     * index, then flip an Elasticsearch/OpenSearch alias to it atomically) changes that — `$indexName`
+     * becomes the alias, resolved to a *different* concrete index on every reindex/flip. Without this
+     * resolution, a `ratings[]._index` built from that alias string would then silently match NOTHING:
+     * every hit comes back with `"rating": null`, `_rank_eval` treats the query as if it had zero ratings
+     * at all, and `metric_score` is 0.0 for every single query — no error, no partial signal, just an
+     * evaluation that always reports "no improvement possible" regardless of how much real relevance data
+     * exists. Resolving to the concrete index once per {@see evaluate()} call and using THAT for every
+     * `ratings[]._index` in the request keeps both cases correct with no version constraint on the alias
+     * package needed. Same process-scoped/short-TTL caching rationale as `$idfCache` above: cheap to
+     * resolve once per run, wasteful to resolve on every one of potentially thousands of `evaluate()`
+     * calls within one optimization run.
+     *
+     * @var array<string, array{0: string, 1: float}>
+     */
+    protected static array $concreteIndexNameCache = [];
+
+    /**
      * @param \Elastica\Client $elasticaClient
      * @param \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface $indexNameResolver
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
@@ -179,13 +202,14 @@ class RankEvalRunner implements RankEvalRunnerInterface
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
     ): array {
         $rankEvalRequests = [];
+        $concreteIndexName = $this->resolveConcreteIndexName($indexName);
 
         foreach ($requestTransfer->getQueries() as $queryTransfer) {
             $ratings = [];
 
             foreach ($queryTransfer->getProductGains() as $productGainTransfer) {
                 $ratings[] = [
-                    '_index' => $indexName,
+                    '_index' => $concreteIndexName,
                     '_id' => $this->buildProductDocumentId($storeName, $localeName, $productGainTransfer->getIdProductAbstractOrFail()),
                     'rating' => $productGainTransfer->getGainOrFail(),
                 ];
@@ -469,5 +493,40 @@ class RankEvalRunner implements RankEvalRunnerInterface
             strtolower($localeName),
             $idProductAbstract,
         );
+    }
+
+    /**
+     * Resolves `$indexName` to the concrete index it currently points to — see
+     * {@see $concreteIndexNameCache} for why this matters for `_rank_eval` specifically, and why it's a
+     * no-op on the common, non-aliased case. `GET {indexName}/_alias` returns
+     * `{"<concreteName>": {"aliases": {...}}}` when `$indexName` is an alias (e.g. with
+     * `spryker-community/search-index-alias` installed); the first (and, for a single-index alias as used
+     * there, only) top-level key is the concrete name. Falls back to the given `$indexName` unchanged if
+     * the lookup fails or the response shape is unexpected — including the default case where `$indexName`
+     * is already a concrete index with no alias at all — the same "don't hard-fail evaluation over an
+     * index-naming edge case" posture the rest of this class already takes.
+     *
+     * @param string $indexName
+     */
+    protected function resolveConcreteIndexName(string $indexName): string
+    {
+        $cached = static::$concreteIndexNameCache[$indexName] ?? null;
+
+        if ($cached !== null && $cached[1] > microtime(true) - static::IDF_CACHE_TTL_SECONDS) {
+            return $cached[0];
+        }
+
+        try {
+            $responseData = $this->elasticaClient->request(sprintf('%s/_alias', $indexName), Request::GET)->getData();
+            $concreteIndexName = array_key_first($responseData);
+        } catch (Throwable) {
+            $concreteIndexName = null;
+        }
+
+        $concreteIndexName ??= $indexName;
+
+        static::$concreteIndexNameCache[$indexName] = [$concreteIndexName, microtime(true)];
+
+        return $concreteIndexName;
     }
 }
