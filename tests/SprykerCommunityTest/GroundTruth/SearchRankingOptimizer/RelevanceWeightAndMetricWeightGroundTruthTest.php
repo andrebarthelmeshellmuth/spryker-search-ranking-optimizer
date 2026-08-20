@@ -19,7 +19,7 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * several times, then flips the ground truth to the opposite extreme and does the same again -- asserting
  * only that the aggregated winning value moved in the expected DIRECTION between the two, never an exact
  * number. `testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()` aggregates via the
- * MEDIAN of 3 runs ({@see AbstractGroundTruthTest::runRealOptimizationRepeatedMedian()}); the metric-weight
+ * MEDIAN of {@see RELEVANCE_WEIGHT_REPEAT_COUNT} runs ({@see AbstractGroundTruthTest::runRealOptimizationRepeatedMedian()}); the metric-weight
  * test aggregates via the BEST of {@see METRIC_WEIGHT_REPEAT_COUNT} runs instead ({@see
  * AbstractGroundTruthTest::runRealOptimizationRepeatedBest()}) -- see that method's own docblock for why:
  * its landscape is genuinely multi-modal, not noise around one true value, so "typical run" is the wrong
@@ -52,11 +52,13 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
      * 1.3s/run measured, so ~2 minutes for both scenarios combined) -- acceptable for a suite that's
      * explicitly opt-in (see this class's own docblock), not part of default CI. A ~10% real hit rate for a
      * clear-cut, unambiguous ground truth is itself a production-quality signal, not just a test-tuning
-     * problem -- a real "Run now" click has the same ~10% odds, once. INTEND TO FIX THIS SOONISH with a
-     * restart-on-plateau strategy in `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm` itself
-     * (see the package README's own "Limitations" section, and {@see AbstractGroundTruthTest::runRealOptimizationRepeatedBest()}'s
-     * own docblock) -- once that lands, a single run should be reliable enough that this constant can drop
-     * back down, or this method can go back to `runRealOptimizationRepeatedMedian()` entirely.
+     * problem -- a real "Run now" click has the same ~10% odds, once, UNLESS it opts into restart-on-plateau
+     * (`andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`, see the package
+     * README's own "Limitations" section): {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()}
+     * confirms that raises a SINGLE run's own hit rate on this exact scenario to 20/20 across two live
+     * batches. This constant/best-of-N stays as this suite's OWN default aggregation strategy regardless --
+     * a real "Run now" click might not have restart-on-plateau enabled, and this suite's job is to measure
+     * what the DEFAULT single-run behavior actually does, not just what the best available option can do.
      *
      * @var int
      */
@@ -87,6 +89,63 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
      * @var float
      */
     protected const RESTART_ON_PLATEAU_MIN_HIT_RATE = 0.5;
+
+    /**
+     * How many additional FILLER pairs {@see testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()}
+     * adds alongside its own single main pair -- the relevanceWeight analog of
+     * {@see AbstractGroundTruthTest::METRIC_WEIGHT_FILLER_PAIR_COUNT}, added for the exact same reason: a
+     * single synthetic pair alone makes `rank_eval`'s aggregate nDCG a near step-function in relevanceWeight
+     * (flat everywhere except right at the one tipping point), which CMA-ES's own plateau detection stops
+     * on almost immediately -- confirmed empirically (see this class's own git history/PR discussion): that
+     * test failed 5/5 real runs, landing at the SAME trust-region boundary in BOTH scenarios regardless of
+     * restart-on-plateau, which is the signature of a flat landscape (restarting from a fresh point cannot
+     * help when there is no gradient to find ANYWHERE except at one point) rather than an unlucky local
+     * optimum. Several filler pairs, each crossing its own tipping point at a DIFFERENT relevanceWeight
+     * value (see {@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN}/{@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX}),
+     * give the aggregate objective real, graduated gradient across the reachable trust-region band instead
+     * of one giant flat step.
+     *
+     * @var int
+     */
+    protected const RELEVANCE_WEIGHT_FILLER_PAIR_COUNT = 4;
+
+    /**
+     * The band {@see testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()} spreads its
+     * filler pairs' own tipping points across. Satisfying EVERY filler at once needs relevanceWeight past
+     * whichever end of this band is farthest from the pinned start ({@see RELEVANCE_WEIGHT_TIPPING_POINT},
+     * 0.5) -- so this band's WIDTH is the real distance a run has to travel, not just "how far the trust
+     * region allows". Confirmed empirically: an earlier, wider [0.40; 0.60] band (deliberately spread
+     * toward the reachable trust-region edges, 0.35/0.65) fixed the original flat-landscape failure (no
+     * more identical-boundary ties) but left a real, still-too-far-to-reliably-travel distance for the
+     * scenario fighting this shop's own live relevanceWeight-prefers-high bias (see this test's own
+     * docblock) -- 2 of 3 real runs still missed, landing short of a full band-width move. A TIGHT band
+     * close to the pinned start needs far less distance for either scenario to travel within one run's
+     * budget, at the cost of a smaller (still real, still assertable) final separation between the two
+     * scenarios' own winning values.
+     *
+     * @var float
+     */
+    protected const RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN = 0.46;
+
+    /**
+     * @var float
+     */
+    protected const RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX = 0.54;
+
+    /**
+     * How many independent runs {@see AbstractGroundTruthTest::runRealOptimizationRepeatedMedian()} takes
+     * the median of, for {@see testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()} only
+     * -- bumped from that method's own default of 3 alongside the filler-pair fix above, not instead of it:
+     * filler pairs fixed the flat-landscape failure mode (no more identical-trust-region-boundary ties,
+     * confirmed empirically), but this scenario's "business signal correct" direction still fights this
+     * shop's own real rated queries' preference for a HIGH relevanceWeight (see this test's own docblock),
+     * which a single run occasionally still loses to by a small margin. 7 was confirmed empirically to clear
+     * that residual noise reliably: 5/5 clean runs at this repeat count and the narrowed filler band above,
+     * versus failures (either the old identical-boundary tie, or a small-margin miss) at the default of 3.
+     *
+     * @var int
+     */
+    protected const RELEVANCE_WEIGHT_REPEAT_COUNT = 7;
 
     /**
      * A pair with a small but real, sized text-relevance gap, not an exact tie, is measured against a
@@ -315,7 +374,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
      * the relevanceWeight range, so whatever arbitrary point inside its own half each run happens to return,
      * the two medians cannot cross.
      *
-     * Two things have to be true for that to hold, and neither is automatic:
+     * Three things have to be true for that to hold, and none is automatic:
      *
      * 1. Metric weights must be unable to satisfy either scenario on their own, or the optimizer takes that
      *    route and leaves relevanceWeight free to settle anywhere. A uniform signal across EVERY active
@@ -324,8 +383,18 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
      *    {@see SearchRankingOptimizerConfig::getRelevanceWeightTrustRegionMaxDistance()} from wherever it
      *    starts, so a shop sitting near a bound (this one runs at 0.01) cannot demonstrate an upward move at
      *    all. The starting value is therefore pinned to the midpoint for the duration and restored after,
-     *    exactly like the product scores around it, and the signal is sized so the tipping point lands on
-     *    that midpoint.
+     *    exactly like the product scores around it, and the signal is sized so the main pair's own tipping
+     *    point lands on that midpoint.
+     * 3. The landscape around that tipping point must not be FLAT. A single synthetic pair alone makes
+     *    `rank_eval`'s aggregate nDCG a near step-function in relevanceWeight (confirmed empirically: this
+     *    test failed 5/5 real runs with only the main pair, landing at the SAME trust-region boundary in
+     *    BOTH scenarios regardless of restart-on-plateau -- the signature of a flat landscape, not an
+     *    unlucky local optimum a fresh restart could escape). {@see RELEVANCE_WEIGHT_FILLER_PAIR_COUNT}
+     *    filler pairs, each crossing its OWN tipping point at a different relevanceWeight value spread
+     *    across {@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN}/{@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX},
+     *    give the aggregate objective real, graduated gradient across the reachable band instead -- the
+     *    same fix {@see testMetricWeightConvergesTowardWhicheverMetricTheGroundTruthFavors()} already needed
+     *    for the analogous problem in the metric-weight dimension.
      */
     public function testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors(): void
     {
@@ -339,44 +408,77 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
         $uniformSignal = $this->buildAllActiveMetricsSetTo($textGap);
         $zeroedScores = $this->buildAllActiveMetricsZeroedOut();
 
-        $originalScoresWinner = $this->readScores($textRelevanceWinner);
-        $originalScoresLoser = $this->readScores($textRelevanceLoser);
+        $fillerPairs = $this->selectRelevanceWeightFillerPairs($searchTerm, [$textRelevanceWinner, $textRelevanceLoser]);
+        $fillerUniformSignalsByIndex = $this->buildRelevanceWeightFillerUniformSignals($fillerPairs);
+
+        $originalScoresByProductId = [];
+
+        foreach ([$textRelevanceWinner, $textRelevanceLoser] as $idProductAbstract) {
+            $originalScoresByProductId[$idProductAbstract] = $this->readScores($idProductAbstract);
+        }
+
+        foreach ($fillerPairs as [$idFillerLoser, $idFillerWinner]) {
+            $originalScoresByProductId[$idFillerLoser] = $this->readScores($idFillerLoser);
+            $originalScoresByProductId[$idFillerWinner] = $this->readScores($idFillerWinner);
+        }
+
         $originalRelevanceWeight = $this->getSearchRankingFacade()->getRelevanceWeight(static::STORE_NAME, static::LOCALE_NAME);
 
         try {
             $this->getSearchRankingFacade()->saveRelevanceWeight(static::STORE_NAME, static::LOCALE_NAME, static::RELEVANCE_WEIGHT_TIPPING_POINT);
 
-            // One index state for both scenarios: the text winner carries no business signal, the text loser
-            // carries the uniform one. Text and business signal now point at OPPOSITE products, so every
-            // ranking is a straight trade-off between them and relevanceWeight is the only thing that can
-            // make it.
+            // One index state for both scenarios: every pair's text winner carries no business signal, its
+            // text loser carries its own uniform one. Text and business signal now point at OPPOSITE
+            // products on every pair, so every ranking is a straight trade-off between them and
+            // relevanceWeight is the only thing that can make it.
             $this->overrideScores($textRelevanceWinner, $zeroedScores);
             $this->overrideScores($textRelevanceLoser, $uniformSignal);
+
+            foreach ($fillerPairs as $index => [$idFillerLoser, $idFillerWinner]) {
+                $this->overrideScores($idFillerLoser, $fillerUniformSignalsByIndex[$index]);
+                $this->overrideScores($idFillerWinner, $zeroedScores);
+            }
+
             $this->refreshIndex();
 
-            // Scenario 1: the text winner is correct -- only a relevanceWeight ABOVE the tipping point ranks
-            // it first.
-            $idQueryScenario1 = $this->insertSyntheticQuery($searchTerm);
-            $this->insertSyntheticRating($idQueryScenario1, $textRelevanceWinner, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
-            $this->insertSyntheticRating($idQueryScenario1, $textRelevanceLoser, SearchRankingOptimizerConfig::RATING_TYPE_X);
+            // Scenario 1: the text winner is correct on every pair -- only a relevanceWeight ABOVE the main
+            // pair's own tipping point ranks it first.
+            $queryIdsScenario1 = $this->insertRelevanceWeightScenarioQueries(
+                $searchTerm,
+                $textRelevanceWinner,
+                $textRelevanceLoser,
+                $fillerPairs,
+                isTextSideCorrect: true,
+            );
 
             $relevanceWeightWhenTextAgrees = $this->runRealOptimizationRepeatedMedian(
                 fn (SearchRankingOptimizerRunTransfer $runTransfer) => $runTransfer->getBestRelevanceWeightOrFail(),
+                static::RELEVANCE_WEIGHT_REPEAT_COUNT,
             );
 
-            $this->deleteSyntheticQuery($idQueryScenario1);
+            foreach ($queryIdsScenario1 as $idQuery) {
+                $this->deleteSyntheticQuery($idQuery);
+            }
 
-            // Scenario 2: same index state, ratings flipped -- now the business signal is correct, and only
-            // a relevanceWeight BELOW the tipping point ranks it first.
-            $idQueryScenario2 = $this->insertSyntheticQuery($searchTerm);
-            $this->insertSyntheticRating($idQueryScenario2, $textRelevanceLoser, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
-            $this->insertSyntheticRating($idQueryScenario2, $textRelevanceWinner, SearchRankingOptimizerConfig::RATING_TYPE_X);
+            // Scenario 2: same index state, ratings flipped on every pair -- now the business signal is
+            // correct everywhere, and only a relevanceWeight BELOW the main pair's own tipping point ranks
+            // it first.
+            $queryIdsScenario2 = $this->insertRelevanceWeightScenarioQueries(
+                $searchTerm,
+                $textRelevanceWinner,
+                $textRelevanceLoser,
+                $fillerPairs,
+                isTextSideCorrect: false,
+            );
 
             $relevanceWeightWhenBusinessSignalDisagrees = $this->runRealOptimizationRepeatedMedian(
                 fn (SearchRankingOptimizerRunTransfer $runTransfer) => $runTransfer->getBestRelevanceWeightOrFail(),
+                static::RELEVANCE_WEIGHT_REPEAT_COUNT,
             );
 
-            $this->deleteSyntheticQuery($idQueryScenario2);
+            foreach ($queryIdsScenario2 as $idQuery) {
+                $this->deleteSyntheticQuery($idQuery);
+            }
 
             $this->assertGreaterThan(
                 $relevanceWeightWhenBusinessSignalDisagrees,
@@ -389,10 +491,126 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
             );
         } finally {
             $this->getSearchRankingFacade()->saveRelevanceWeight(static::STORE_NAME, static::LOCALE_NAME, $originalRelevanceWeight);
-            $this->overrideScores($textRelevanceWinner, $originalScoresWinner);
-            $this->overrideScores($textRelevanceLoser, $originalScoresLoser);
+
+            foreach ($originalScoresByProductId as $idProductAbstract => $scores) {
+                $this->overrideScores($idProductAbstract, $scores);
+            }
+
             $this->refreshIndex();
         }
+    }
+
+    /**
+     * Up to {@see RELEVANCE_WEIGHT_FILLER_PAIR_COUNT} additional pairs from
+     * {@see AbstractGroundTruthTest::discoverAllMarginalTextRelevancePairs()}, spread evenly across the gap
+     * distribution, excluding any pair sharing a product with `$excludedProductIds` (the main pair) --
+     * same selection shape as {@see AbstractGroundTruthTest::selectFillerMarginalTextRelevancePairs()}, but
+     * keeping each pair's own gap (needed to size its own uniform signal below) rather than dropping it.
+     *
+     * @param string $searchTerm
+     * @param array<int> $excludedProductIds
+     *
+     * @return array<array{0: int, 1: int, 2: float}> [idProductAbstractTextLoser, idProductAbstractTextWinner, gap] pairs.
+     */
+    protected function selectRelevanceWeightFillerPairs(string $searchTerm, array $excludedProductIds): array
+    {
+        $candidates = array_values(array_filter(
+            $this->discoverAllMarginalTextRelevancePairs($searchTerm),
+            static fn (array $pair): bool => !in_array($pair[0], $excludedProductIds, true) && !in_array($pair[1], $excludedProductIds, true),
+        ));
+
+        $candidateCount = count($candidates);
+        $desiredCount = min(static::RELEVANCE_WEIGHT_FILLER_PAIR_COUNT, $candidateCount);
+
+        if ($desiredCount === 0) {
+            return [];
+        }
+
+        $selectedByIndex = [];
+
+        for ($k = 0; $k < $desiredCount; $k++) {
+            $index = $desiredCount > 1
+                ? (int)round($k * ($candidateCount - 1) / ($desiredCount - 1))
+                : intdiv($candidateCount, 2);
+            $selectedByIndex[$index] = $candidates[$index];
+        }
+
+        return array_values($selectedByIndex);
+    }
+
+    /**
+     * One uniform business signal per filler pair, each sized so that pair's OWN tipping point
+     * (`relevanceWeight = s / (gap + s)`) lands at a DIFFERENT point spread evenly across
+     * {@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN}/{@see RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX}
+     * -- solving that same formula for `s` given a target tipping point `t`: `s = t * gap / (1 - t)`.
+     * Deliberately NOT all sized to tip at 0.5 like the main pair (which would just superimpose every
+     * filler's own step on top of the main pair's, still one giant flat step, not a graduated one) -- see
+     * this class's own docblock on {@see testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()}
+     * for why a graduated landscape is the actual fix.
+     *
+     * @param array<array{0: int, 1: int, 2: float}> $fillerPairs
+     *
+     * @return array<int, array<string, float>> Index (matching $fillerPairs' own) => uniform signal.
+     */
+    protected function buildRelevanceWeightFillerUniformSignals(array $fillerPairs): array
+    {
+        $fillerCount = count($fillerPairs);
+        $signalsByIndex = [];
+
+        foreach ($fillerPairs as $index => [, , $gap]) {
+            $targetTippingPoint = $fillerCount > 1
+                ? static::RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN + $index * (static::RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX - static::RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN) / ($fillerCount - 1)
+                : (static::RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MIN + static::RELEVANCE_WEIGHT_FILLER_TIPPING_POINT_BAND_MAX) / 2;
+
+            $signalsByIndex[$index] = $this->buildAllActiveMetricsSetTo($targetTippingPoint * $gap / (1 - $targetTippingPoint));
+        }
+
+        return $signalsByIndex;
+    }
+
+    /**
+     * Inserts one synthetic query+rating for the main pair plus one per filler pair, all in the SAME
+     * direction for a given scenario -- every pair's text winner rated heart/loser x when
+     * `$isTextSideCorrect` is true (scenario 1), flipped when false (scenario 2). Distinct suffixes keep
+     * every pair's own synthetic query row unique despite sharing the same base search term.
+     *
+     * @param string $searchTerm
+     * @param int $idTextRelevanceWinner
+     * @param int $idTextRelevanceLoser
+     * @param array<array{0: int, 1: int, 2: float}> $fillerPairs
+     * @param bool $isTextSideCorrect
+     *
+     * @return array<int> Every synthetic query id inserted, for the caller to delete once this scenario's
+     *   run is done.
+     */
+    protected function insertRelevanceWeightScenarioQueries(
+        string $searchTerm,
+        int $idTextRelevanceWinner,
+        int $idTextRelevanceLoser,
+        array $fillerPairs,
+        bool $isTextSideCorrect,
+    ): array {
+        $heartRatedId = $isTextSideCorrect ? $idTextRelevanceWinner : $idTextRelevanceLoser;
+        $xRatedId = $isTextSideCorrect ? $idTextRelevanceLoser : $idTextRelevanceWinner;
+
+        $idQueryMain = $this->insertSyntheticQuery($searchTerm, 'main');
+        $this->insertSyntheticRating($idQueryMain, $heartRatedId, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+        $this->insertSyntheticRating($idQueryMain, $xRatedId, SearchRankingOptimizerConfig::RATING_TYPE_X);
+
+        $queryIds = [$idQueryMain];
+
+        foreach ($fillerPairs as $index => [$idFillerLoser, $idFillerWinner]) {
+            $fillerHeartRatedId = $isTextSideCorrect ? $idFillerWinner : $idFillerLoser;
+            $fillerXRatedId = $isTextSideCorrect ? $idFillerLoser : $idFillerWinner;
+
+            $idQueryFiller = $this->insertSyntheticQuery($searchTerm, 'filler' . $index);
+            $this->insertSyntheticRating($idQueryFiller, $fillerHeartRatedId, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
+            $this->insertSyntheticRating($idQueryFiller, $fillerXRatedId, SearchRankingOptimizerConfig::RATING_TYPE_X);
+
+            $queryIds[] = $idQueryFiller;
+        }
+
+        return $queryIds;
     }
 
     /**
