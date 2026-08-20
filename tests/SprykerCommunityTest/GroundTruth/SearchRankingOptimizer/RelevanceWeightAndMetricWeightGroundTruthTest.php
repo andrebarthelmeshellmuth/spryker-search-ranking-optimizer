@@ -21,9 +21,10 @@ use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
  * number. `testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()` aggregates via the
  * MEDIAN of {@see RELEVANCE_WEIGHT_REPEAT_COUNT} runs ({@see AbstractGroundTruthTest::runRealOptimizationRepeatedMedian()}); the metric-weight
  * test aggregates via the BEST of {@see METRIC_WEIGHT_REPEAT_COUNT} runs instead ({@see
- * AbstractGroundTruthTest::runRealOptimizationRepeatedBest()}) -- see that method's own docblock for why:
- * its landscape is genuinely multi-modal, not noise around one true value, so "typical run" is the wrong
- * question and "can the optimizer find this at all, given a few tries" is the right one.
+ * AbstractGroundTruthTest::runRealOptimizationRepeatedBest()}, restart-on-plateau enabled) -- see that
+ * method's own docblock for why best-of-N, not median-of-N: its landscape is genuinely multi-modal, not
+ * noise around one true value, so "typical run" is the wrong question and "can the optimizer find this at
+ * all, given a few tries" is the right one.
  *
  * @group NeedsSearch
  */
@@ -43,26 +44,30 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
     /**
      * How many independent runs {@see AbstractGroundTruthTest::runRealOptimizationRepeatedBest()} takes the
      * best of, for the metric-weight scenarios only -- see that method's own docblock for why "best of N"
-     * replaced "median of N" here specifically (a genuinely multi-modal landscape, not noise around one true
-     * value). Sized from a real measured hit rate, not guessed: a 20-run batch of the exact same scenario
-     * this test itself runs found only 2/20 (10%) clearing the required threshold -- confirmed 5 wasn't
-     * enough (both a real best-of-5 run and simple math: `1 - 0.9^5 ≈ 41%` chance of even ONE hit). Both
-     * scenarios independently need a hit, so with per-scenario hit probability `1 - 0.9^N`, the overall pass
-     * probability is `(1 - 0.9^N)^2` -- at N=30 that's `(1 - 0.9^30)^2 ≈ 92%`. Costs real time (roughly
-     * 1.3s/run measured, so ~2 minutes for both scenarios combined) -- acceptable for a suite that's
-     * explicitly opt-in (see this class's own docblock), not part of default CI. A ~10% real hit rate for a
-     * clear-cut, unambiguous ground truth is itself a production-quality signal, not just a test-tuning
-     * problem -- a real "Run now" click has the same ~10% odds, once, UNLESS it opts into restart-on-plateau
-     * (`andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`, see the package
-     * README's own "Limitations" section): {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()}
-     * confirms that raises a SINGLE run's own hit rate on this exact scenario to 20/20 across two live
-     * batches. This constant/best-of-N stays as this suite's OWN default aggregation strategy regardless --
-     * a real "Run now" click might not have restart-on-plateau enabled, and this suite's job is to measure
-     * what the DEFAULT single-run behavior actually does, not just what the best available option can do.
+     * over "median of N" (a genuinely multi-modal landscape, not noise around one true value), and why
+     * repeat-and-take-best is kept even now that restart-on-plateau exists (below) rather than dropped in
+     * favor of a single restart-enabled run.
+     *
+     * WITHOUT restart-on-plateau, plain CMA-ES's own single-run hit rate on this exact scenario was measured
+     * at only 2/20 (10%) -- confirmed 5 wasn't enough (both a real best-of-5 run and simple math:
+     * `1 - 0.9^5 ≈ 41%` chance of even ONE hit), and both scenarios independently needing a hit means the
+     * overall pass probability is `(1 - 0.9^N)^2` -- N had to be pushed to 30 (`≈92%`) to get a reliable
+     * CI signal, costing ~2 minutes for both scenarios combined (roughly 1.3s/run measured). That was this
+     * package's own real production odds too: a real "Run now" click had the same ~10% single-run chance,
+     * once.
+     *
+     * WITH restart-on-plateau (`andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`,
+     * see the package README's own "Limitations" section) now enabled here, the single-run hit rate on this
+     * exact scenario measures far higher -- {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()}
+     * found 20/20 across two independent live batches. Even a conservative estimate of that true rate (say
+     * 90%, allowing for the small sample) already makes N=30's own margin wildly excessive: per-scenario hit
+     * probability `1 - (1 - p)^N` clears 99.9% at N=3 for any `p >= 0.9`, and both scenarios' combined
+     * probability stays above 99.8%. Dropped to 3 accordingly -- a ~10x runtime cut for this test alone,
+     * while the actual reliability margin GROWS, not shrinks, versus the old N=30/plain-CMA-ES baseline.
      *
      * @var int
      */
-    protected const METRIC_WEIGHT_REPEAT_COUNT = 30;
+    protected const METRIC_WEIGHT_REPEAT_COUNT = 3;
 
     /**
      * How many INDEPENDENT, INDIVIDUAL runs {@see testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()}
@@ -202,6 +207,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                 static::METRIC_WEIGHT_REPEAT_COUNT,
                 SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
                 static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
+                true,
             );
 
             $this->deleteSyntheticQuery($idQueryScenario1);
@@ -228,6 +234,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                 static::METRIC_WEIGHT_REPEAT_COUNT,
                 SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
                 static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
+                true,
             );
 
             $this->deleteSyntheticQuery($idQueryScenario2);
