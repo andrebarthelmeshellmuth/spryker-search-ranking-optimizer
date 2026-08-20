@@ -512,7 +512,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
 
         try {
             $responseData = $this->elasticaClient->request(sprintf('%s/_alias', $indexName), Request::GET)->getData();
-            $concreteIndexName = is_array($responseData) ? array_key_first($responseData) : null;
+            $concreteIndexName = array_key_first($responseData);
         } catch (Throwable) {
             $concreteIndexName = null;
         }
