@@ -121,7 +121,7 @@ class CheckInstallationController extends AbstractController
             'remedy' => $missingFunctionNames === []
                 ? null
                 : sprintf(
-                    'Register SearchRankingOptimizerWidgetTwigPlugin in src/Pyz/Yves/Twig/TwigDependencyProvider.php (see README step 3b). Missing: %s.',
+                    'Register SearchRankingOptimizerWidgetTwigPlugin in src/Pyz/Yves/Twig/TwigDependencyProvider.php (see README step 3c). Missing: %s.',
                     implode(', ', $missingFunctionNames),
                 ),
         ];
@@ -184,7 +184,7 @@ class CheckInstallationController extends AbstractController
             'remedy' => $missingRouteNames === []
                 ? null
                 : sprintf(
-                    'Register SearchRankingOptimizerWidgetRouteProviderPlugin in src/Pyz/Yves/Router/RouterDependencyProvider.php (see README step 3b). Missing: %s.',
+                    'Register SearchRankingOptimizerWidgetRouteProviderPlugin in src/Pyz/Yves/Router/RouterDependencyProvider.php (see README step 3c). Missing: %s.',
                     implode(', ', $missingRouteNames),
                 ),
         ];
@@ -277,7 +277,7 @@ class CheckInstallationController extends AbstractController
             'remedy' => $isTranslated
                 ? null
                 : sprintf(
-                    'Copy this package\'s data/glossary.csv into your project\'s glossary data and run "vendor/bin/console data:import glossary" (see README step 3b). Until then "%s" renders as its own raw key.',
+                    'Copy this package\'s data/glossary.csv into your project\'s glossary data and run "vendor/bin/console data:import glossary" (see README step 3c). Until then "%s" renders as its own raw key.',
                     static::GLOSSARY_KEY_PROBE,
                 ),
         ];

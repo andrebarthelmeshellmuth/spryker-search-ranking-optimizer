@@ -671,7 +671,33 @@ anyone loads `spryker/permission`'s own Zed landing page (`Spryker\Zed\Permissio
 — visit it once in Zed (wire up its route/navigation entry if your project doesn't have one already) and
 every registered-but-unsynced permission plugin, this one included, gets its row.
 
-### 3b. Register the Yves widget plugins
+### 3b. Exclude `check-installation` from the console command cache
+
+If your project's `ConsoleConfig` has `isConsoleCommandCacheEnabled()` returning `true` (Spryker's own
+default, added to reduce per-command bootstrap time by instantiating only the invoked command instead of
+every registered one), `search-ranking-optimizer:check-installation`'s own sibling-command check will
+falsely report `search-ranking-optimizer:calibrate`/`auto-tune`/`optimize` as unregistered — the cache only
+populates the live `Application` instance with the ONE command actually invoked, so the check's own
+`$application->has($commandName)` calls never find them, even though `console list` and running each
+sibling directly both prove they're registered correctly. Spryker's own `ConsoleConfig` documents exactly
+this scenario via `getCacheExcludedConsoleCommandNames()`; add this command to it in your project's
+`Pyz\Zed\Console\ConsoleConfig`:
+
+```php
+protected const array CACHE_EXCLUDED_CONSOLE_COMMAND_NAMES = [
+    'search-ranking-optimizer:check-installation',
+];
+
+public function getCacheExcludedConsoleCommandNames(): array
+{
+    return array_merge(parent::getCacheExcludedConsoleCommandNames(), static::CACHE_EXCLUDED_CONSOLE_COMMAND_NAMES);
+}
+```
+
+No cache clear needed — the exclusion is checked before the cache lookup, so it takes effect on the next
+run.
+
+### 3c. Register the Yves widget plugins
 
 In `Pyz\Yves\Router\RouterDependencyProvider::getRouteProviderPlugins()`:
 
@@ -839,7 +865,7 @@ vendor/bin/console propel:install       # creates all eight tables + builds ORM 
 vendor/bin/console router:cache:warm-up:backoffice
 ```
 
-If you wired the Yves widget (step 3b), also warm up the **BackendGateway** router — its cache is separate
+If you wired the Yves widget (step 3c), also warm up the **BackendGateway** router — its cache is separate
 from the Backoffice one above and is not covered by it, so a fresh install of just this package's Gateway
 controller will 404 with "No route found" until this runs too:
 
@@ -915,7 +941,7 @@ package's module. Restricting these pages to root-style admins is a perfectly or
 cannot know which roles you meant to grant, so it asks you to confirm rather than telling you to fix.
 
 It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
-and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below
+and Twig plugin registration (step 3c) is in place, or that the rating widget actually renders below
 product tiles and submits successfully on a live storefront page — those need a real browser request, not
 a CLI probe.
 
