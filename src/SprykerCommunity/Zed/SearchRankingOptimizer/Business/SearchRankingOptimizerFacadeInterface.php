@@ -351,15 +351,11 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
-     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`
-     *   -- a single choice replacing what used to be 3 independent booleans
-     *   (isTerminationCriteriaTrusted/isRestartOnPlateauEnabled/isRestartBudgetTrusted), only 4 of whose 8
-     *   combinations were ever actually valid. Defaults to `OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`,
-     *   preserving the original fixed-budget behavior. See `AlgorithmFactoryInterface::create()`'s own
-     *   docblock for what each value does.
+     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`.
+     *   Defaults to `OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`. See `AlgorithmFactoryInterface::create()`'s
+     *   own docblock for what each value does.
      * @param float $warmStartFraction How much of the search is seeded from the live configuration instead
-     *   of starting cold, between 0.0 and 1.0. Defaults to 0.0, preserving the original from-scratch
-     *   behavior.
+     *   of starting cold, between 0.0 and 1.0. Defaults to 0.0.
      * @param float|null $fixedRelevanceWeight A human's own choice, made on the run form's parameter
      *   checklist, to pin relevanceWeight at exactly this value instead of searching it. Null (the default)
      *   preserves the original always-free behavior.

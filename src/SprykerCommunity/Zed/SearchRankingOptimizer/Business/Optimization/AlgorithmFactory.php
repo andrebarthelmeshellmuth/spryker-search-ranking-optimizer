@@ -74,8 +74,6 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface $algorithm
      * @param int $populationSize
      * @param int $maxGenerations
-     *
-     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
      */
     protected function configureFixedBudget(
         OptimizerAlgorithmInterface $algorithm,
@@ -93,8 +91,6 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface $algorithm
      * @param int $populationSize
      * @param int $maxGenerations
-     *
-     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
      */
     protected function configureTrustedSingleRun(
         OptimizerAlgorithmInterface $algorithm,
@@ -115,8 +111,6 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param int $populationSize
      * @param int $maxGenerations
      * @param bool $trustRestartBudget
-     *
-     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
      */
     protected function configureRestartOnPlateau(
         OptimizerAlgorithmInterface $algorithm,

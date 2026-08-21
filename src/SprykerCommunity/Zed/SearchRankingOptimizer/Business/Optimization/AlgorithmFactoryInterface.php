@@ -31,17 +31,15 @@ interface AlgorithmFactoryInterface
 
     /**
      * A single instance configured and ready for an actual run. An unrecognized $algorithmName falls back
-     * to CMA-ES, the same default the mapping this replaces used; an unrecognized $terminationMode falls
-     * back to `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET` the same way.
+     * to CMA-ES; an unrecognized $terminationMode falls back to
+     * `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET` the same way.
      *
      * @param string $algorithmName One of `SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*`.
      * @param int $populationSize
      * @param int $maxGenerations
-     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`
-     *   -- a single choice replacing what used to be 3 independent booleans
-     *   (isTerminationCriteriaTrusted/isRestartOnPlateauEnabled/isRestartBudgetTrusted), only 4 of whose 8
-     *   combinations were ever actually valid. See that config class's own docblocks for exactly what each
-     *   value does; in short: `FIXED_BUDGET` (the default) is a single run capped at $maxGenerations,
+     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`.
+     *   See that config class's own docblocks for exactly what each value does; in short: `FIXED_BUDGET`
+     *   (the default) is a single run capped at $maxGenerations,
      *   `TRUSTED_SINGLE_RUN` is a single run governed by the algorithm's own convergence/divergence/plateau
      *   detection instead, `RESTART_ON_PLATEAU` wraps the algorithm in
      *   `blackbox-optimizer`'s `RestartingOptimizerDecorator`, and `RESTART_ON_PLATEAU_TRUSTED_BUDGET` does

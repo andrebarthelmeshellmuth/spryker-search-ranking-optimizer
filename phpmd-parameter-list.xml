@@ -6,12 +6,14 @@
          xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd">
 
     <description>
-        Parameter-count check, exempting Facades, Facade interfaces, and Mappers: a module Facade's public
-        API grows one parameter per orthogonal, independently-optional run configuration a feature adds
-        over time (queueOptimizationRun's own docblock documents each one individually), and a Mapper's
+        Parameter-count check, exempting Facades, Facade interfaces, EntityManagers, EntityManager
+        interfaces, and Mappers: a module Facade's public API grows one parameter per orthogonal,
+        independently-optional run configuration a feature adds over time (queueOptimizationRun's own
+        docblock documents each one individually), an EntityManager method takes one parameter per column
+        it persists (completeOptimizerRun's own docblock documents each one individually), and a Mapper's
         constructor takes one parameter per input a mapping genuinely depends on (ParameterVectorMapper
         takes one float per tunable dimension it maps into the search vector, plus that dimension's
-        optional pinned value). Collapsing either into a single options array/DTO would trade a
+        optional pinned value). Collapsing any of these into a single options array/DTO would trade a
         self-documenting, individually-typed parameter list for an equally large but less discoverable
         one, not actually reduce complexity. Run as its own phpmd invocation, separate from phpmd.xml —
         see that file's description for why.
@@ -19,6 +21,8 @@
 
     <exclude-pattern>*Facade.php</exclude-pattern>
     <exclude-pattern>*FacadeInterface.php</exclude-pattern>
+    <exclude-pattern>*EntityManager.php</exclude-pattern>
+    <exclude-pattern>*EntityManagerInterface.php</exclude-pattern>
     <exclude-pattern>*Mapper.php</exclude-pattern>
     <exclude-pattern>*/src/Generated/*</exclude-pattern>
 

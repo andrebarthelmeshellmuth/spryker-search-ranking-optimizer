@@ -376,12 +376,8 @@
         <property name="improvedOverallBest" type="bool"/>
     </transfer>
 
-    <!-- terminationMode: one of SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_* — a single
-         choice replacing what used to be 3 independent booleans (isTerminationCriteriaTrusted/
-         isRestartOnPlateauEnabled/isRestartBudgetTrusted), only 4 of whose 8 combinations were ever
-         actually valid (2 mutually exclusive with each other, 1 meaningless without another set). A single
-         value makes the other 4 combinations unrepresentable at the type level instead of merely rejected
-         by AlgorithmFactory's own runtime validation — see that class's own docblock for what each value
+    <!-- terminationMode: one of SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_* — see that
+         config class's own docblocks, and AlgorithmFactory::create()'s own docblock, for what each value
          does. -->
     <transfer name="SearchRankingOptimizerRun" strict="true">
         <property name="idSearchRankingOptimizerRun" type="int"/>
