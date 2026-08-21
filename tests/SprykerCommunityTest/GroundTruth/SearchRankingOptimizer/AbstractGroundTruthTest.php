@@ -852,8 +852,9 @@ abstract class AbstractGroundTruthTest extends Unit
      *   value for the run -- lets a ground truth remove relevanceWeight as a confound OUTRIGHT (see
      *   {@see discoverMarginalTextRelevancePair()}) rather than merely reasoning about the worst case it
      *   could reach.
-     * @param bool $isRestartOnPlateauEnabled False (the default): a single run, same as every ground truth
-     *   scenario before this parameter existed. True: wraps the run's algorithm in `blackbox-optimizer`'s
+     * @param string $terminationMode `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`
+     *   (the default): a single run, same as every ground truth scenario before this parameter existed.
+     *   `OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU`: wraps the run's algorithm in `blackbox-optimizer`'s
      *   `RestartingOptimizerDecorator` -- see {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()},
      *   which measures exactly what this buys a single "Run now" click against the same scenario
      *   {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT}'s
@@ -862,13 +863,13 @@ abstract class AbstractGroundTruthTest extends Unit
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
-        bool $isRestartOnPlateauEnabled = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
     ): SearchRankingOptimizerRunTransfer {
         $queuedRunTransfer = $this->getFacade()->queueOptimizationRun(
             static::STORE_NAME,
             static::LOCALE_NAME,
             $algorithm,
-            false,
+            $terminationMode,
             0.0,
             $fixedRelevanceWeight,
             null,
@@ -876,7 +877,6 @@ abstract class AbstractGroundTruthTest extends Unit
             null,
             null,
             [],
-            $isRestartOnPlateauEnabled,
         );
         $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
@@ -960,7 +960,7 @@ abstract class AbstractGroundTruthTest extends Unit
      * The deeper fix this docblock used to call for -- a restart strategy that would make a SINGLE
      * `runRealOptimization()` call already robust to this, making repeat-and-take-best unnecessary -- now
      * exists (`andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`, via
-     * $isRestartOnPlateauEnabled below). This method's own repeat-and-take-best is kept anyway, not made
+     * $terminationMode below). This method's own repeat-and-take-best is kept anyway, not made
      * redundant by it: restart-on-plateau is measured (see `testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()`)
      * to raise a SINGLE run's hit rate dramatically, not guarantee it every time, and $times gives this
      * caller's own margin on top of that -- see {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT}'s
@@ -972,7 +972,7 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $times
      * @param string $algorithm
      * @param float|null $fixedRelevanceWeight Passed straight through to {@see runRealOptimization()}.
-     * @param bool $isRestartOnPlateauEnabled Passed straight through to {@see runRealOptimization()}.
+     * @param string $terminationMode Passed straight through to {@see runRealOptimization()}.
      */
     protected function runRealOptimizationRepeatedBest(
         callable $extractor,
@@ -980,12 +980,12 @@ abstract class AbstractGroundTruthTest extends Unit
         int $times = 5,
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
-        bool $isRestartOnPlateauEnabled = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
     ): float {
         $values = [];
 
         for ($i = 0; $i < $times; $i++) {
-            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight, $isRestartOnPlateauEnabled));
+            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight, $terminationMode));
         }
 
         return $preferMax ? max($values) : min($values);

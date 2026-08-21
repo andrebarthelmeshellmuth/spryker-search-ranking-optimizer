@@ -475,43 +475,49 @@ Three black-box algorithms ship, selectable per run:
 As of `blackbox-optimizer` 1.2, all three also stop before `maxGenerations` on their own once they've
 converged, diverged, or plateaued (each algorithm's own criteria — see that package's own README for the
 per-algorithm detail), and expose a `trustTerminationCriteria()` escape hatch to trust that over an
-arbitrary generation-count guess. That escape hatch is wired up here as a per-run choice: the
-**Automated Weight Optimization** form carries a "trust the algorithm's own termination criteria"
-option, and `OptimizationRunner` passes it through to `AlgorithmFactory`, which calls
-`trustTerminationCriteria()` on the algorithm it builds.
+arbitrary generation-count guess. As of `blackbox-optimizer` 4.2, there's also `RestartingOptimizerDecorator`:
+when a run stops early on a genuine fitness plateau (not converged, not diverged — just stuck), it restarts
+from a fresh random point with a **doubled** population rather than accepting whichever local optimum that
+one random initialization happened to land in. And as of `blackbox-optimizer` 5.0, the two compose:
+`RestartingOptimizerDecorator::trustRestartBudget()` gives every restart the same generous
+safety-ceiling-sized room `trustTerminationCriteria()` gives a single run, instead of a shrinking
+`maxGenerations` share.
 
-Leave it off — the default — and a run stops at the fixed `getOptimizationMaxGenerations()` budget
-(150), which is predictable and bounds how long a run can take. Turn it on and the generation cap is
-replaced by the algorithm's own convergence test, so a run stops when it stops improving rather than
-when it runs out of budget: better optima on problems that need more generations, and less wasted
-work on ones that converge early, at the cost of a run whose length you cannot predict up front.
+That's three independent library-level capabilities, but only four of the eight boolean combinations they'd
+naively suggest are actually meaningful (`trustTerminationCriteria()` only exists on a plain algorithm,
+`trustRestartBudget()` only exists once you've already wrapped it in `RestartingOptimizerDecorator`).
+Rather than expose three checkboxes and reject the other four combinations at runtime, the **Automated
+Weight Optimization** form carries a single **Termination mode** choice, and `OptimizationRunner` passes
+the chosen mode straight through to `AlgorithmFactory::create()`, which `match`es it to the right call
+sequence:
 
-As of `blackbox-optimizer` 4.2, there's a second, independent form option: **restart on plateau**. Where
-"trust termination criteria" changes how long a single run is *allowed* to search, restart-on-plateau
-changes what happens when a run stops early on a genuine fitness plateau (not converged, not diverged —
-just stuck): rather than accepting whichever local optimum that one random initialization happened to land
-in, `RestartingOptimizerDecorator` restarts from a fresh random point with a **doubled** population, within
-the exact same total evaluation budget the run already had (`populationSize * maxGenerations`) — never more
-evaluations, just spent differently across restarts instead of one longer run. The two options are
-mutually exclusive on this form (`AlgorithmFactory` rejects a run with both set): restart-on-plateau's own
-budget discipline requires a fixed `maxGenerations` to divide up across restarts, which "trust termination
-criteria" replaces with a much larger safety ceiling instead.
+- **Fixed budget** (the default) — a run stops at the fixed `getOptimizationMaxGenerations()` budget (150),
+  which is predictable and bounds how long a run can take.
+- **Trusted single run** — the generation cap is replaced by the algorithm's own convergence test, so a run
+  stops when it stops improving rather than when it runs out of budget: better optima on problems that need
+  more generations, and less wasted work on ones that converge early, at the cost of a run whose length you
+  cannot predict up front.
+- **Restart on plateau** — wraps the algorithm in `RestartingOptimizerDecorator`. On a genuine plateau, it
+  restarts from a fresh point with a doubled population, within the exact same total evaluation budget the
+  run already had (`populationSize * maxGenerations`) — never more evaluations, just spent differently
+  across restarts instead of one longer run.
+- **Restart on plateau, trusted budget** — the same restart mechanism, but every restart also gets
+  `trustRestartBudget()`'s generous safety-ceiling-sized room instead of a shrinking share of the fixed
+  budget. In practice a restart that also plateaus still exits in roughly the same generation count as the
+  original run — the real effect is mostly removing the *artificial* truncation where the shrinking
+  fixed-budget share would otherwise cut a restart off before it reached its own natural plateau. Actually
+  burning a large share of the safety ceiling needs a restart landing in a genuinely slow-converging
+  regime — a different fitness shape than "plateau again" — so the much larger worst-case total this mode
+  allows for is a safety margin, not the typical realized cost.
 
 This exists because CMA-ES's own early-termination criteria (see above) converge fast on this package's
-low-dimensional, discretely multi-modal `rank_eval` objective and then stop wherever that landed — a single
-run without this option has real, measured odds of settling for a mediocre local optimum instead of the
-best one available (see [Limitations](#limitations) below for the numbers). A run's own restart history
-(population size, generations used, why it stopped, and its own best score per restart) is shown on the run
-detail page once a restart-enabled run completes.
+low-dimensional, discretely multi-modal `rank_eval` objective and then stop wherever that landed — a plain
+fixed-budget run has real, measured odds of settling for a mediocre local optimum instead of the best one
+available (see [Limitations](#limitations) below for the numbers). A run's own restart history (population
+size, generations used, why it stopped, and its own best score per restart) is shown on the run detail page
+once a restart-enabled run completes.
 
-`blackbox-optimizer` 5.0 adds a genuine combination of the two — `RestartingOptimizerDecorator::trustRestartBudget()`,
-giving every restart the same generous safety-ceiling-sized room `trustTerminationCriteria()` gives a single
-run, instead of a fixed `maxGenerations` share (see that package's own README for why a smaller, separate
-per-restart ceiling on its own wouldn't have worked). Not wired up as a form option here yet — this run
-form's own mutual-exclusion choice above is still the only way to pick between the two — but worth knowing
-the underlying library already supports it, for whoever picks this up next.
-
-![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, a restart-on-plateau run's own restart history (population/generations/why it stopped/best score per restart), when it was applied, and a form to queue a new run against a chosen store/locale/algorithm/restart-on-plateau setting](docs/screenshots/automated-weight-optimization.png)
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, a restart-on-plateau run's own restart history (population/generations/why it stopped/best score per restart), when it was applied, and a form to queue a new run against a chosen store/locale/algorithm/termination mode](docs/screenshots/automated-weight-optimization.png)
 
 The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 

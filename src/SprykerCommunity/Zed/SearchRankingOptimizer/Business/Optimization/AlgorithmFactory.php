@@ -14,7 +14,6 @@ use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
 use BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface;
 use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
 use BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator;
-use InvalidArgumentException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 class AlgorithmFactory implements AlgorithmFactoryInterface
@@ -39,47 +38,100 @@ class AlgorithmFactory implements AlgorithmFactoryInterface
      * @param string $algorithmName
      * @param int $populationSize
      * @param int $maxGenerations
-     * @param bool $isTerminationCriteriaTrusted
+     * @param string $terminationMode
      * @param array<int, float>|null $warmStartVector
      * @param float $warmStartFraction
-     * @param bool $isRestartOnPlateauEnabled
-     *
-     * @throws \InvalidArgumentException
      */
     public function create(
         string $algorithmName,
         int $populationSize,
         int $maxGenerations,
-        bool $isTerminationCriteriaTrusted = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
         ?array $warmStartVector = null,
         float $warmStartFraction = 0.0,
-        bool $isRestartOnPlateauEnabled = false,
     ): OptimizerAlgorithmInterface {
-        if ($isTerminationCriteriaTrusted && $isRestartOnPlateauEnabled) {
-            throw new InvalidArgumentException(
-                'isTerminationCriteriaTrusted and isRestartOnPlateauEnabled are mutually exclusive -- '
-                . 'RestartingOptimizerDecorator does not support trusting an inner algorithm\'s own safety '
-                . 'ceiling, since it would blow through the decorator\'s own evaluation-budget accounting.',
-            );
-        }
-
         $algorithm = $this->createAll()[$algorithmName] ?? $this->createCmaEs();
 
-        if ($isRestartOnPlateauEnabled) {
-            $algorithm = new RestartingOptimizerDecorator($algorithm);
-        }
-
-        $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
-
-        if ($isTerminationCriteriaTrusted) {
-            $algorithm->trustTerminationCriteria();
-        }
+        $algorithm = match ($terminationMode) {
+            SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN => $this->configureTrustedSingleRun($algorithm, $populationSize, $maxGenerations),
+            SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU => $this->configureRestartOnPlateau($algorithm, $populationSize, $maxGenerations, false),
+            SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET => $this->configureRestartOnPlateau($algorithm, $populationSize, $maxGenerations, true),
+            default => $this->configureFixedBudget($algorithm, $populationSize, $maxGenerations),
+        };
 
         if ($warmStartVector !== null && $warmStartFraction > 0.0) {
             $algorithm->setWarmStart($warmStartVector, $warmStartFraction);
         }
 
         return $algorithm;
+    }
+
+    /**
+     * `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET` (and the fallback for an
+     * unrecognized $terminationMode, the same posture `createAll()[$algorithmName] ?? $this->createCmaEs()`
+     * already takes for an unrecognized algorithm name).
+     *
+     * @param \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface $algorithm
+     * @param int $populationSize
+     * @param int $maxGenerations
+     *
+     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
+     */
+    protected function configureFixedBudget(
+        OptimizerAlgorithmInterface $algorithm,
+        int $populationSize,
+        int $maxGenerations,
+    ): OptimizerAlgorithmInterface {
+        $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
+
+        return $algorithm;
+    }
+
+    /**
+     * `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN`.
+     *
+     * @param \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface $algorithm
+     * @param int $populationSize
+     * @param int $maxGenerations
+     *
+     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
+     */
+    protected function configureTrustedSingleRun(
+        OptimizerAlgorithmInterface $algorithm,
+        int $populationSize,
+        int $maxGenerations,
+    ): OptimizerAlgorithmInterface {
+        $algorithm->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
+        $algorithm->trustTerminationCriteria();
+
+        return $algorithm;
+    }
+
+    /**
+     * `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU`/
+     * `OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET`.
+     *
+     * @param \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface $algorithm
+     * @param int $populationSize
+     * @param int $maxGenerations
+     * @param bool $trustRestartBudget
+     *
+     * @return \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface
+     */
+    protected function configureRestartOnPlateau(
+        OptimizerAlgorithmInterface $algorithm,
+        int $populationSize,
+        int $maxGenerations,
+        bool $trustRestartBudget,
+    ): OptimizerAlgorithmInterface {
+        $decorator = new RestartingOptimizerDecorator($algorithm);
+        $decorator->setPopulationSize($populationSize)->setMaxIterations($maxGenerations);
+
+        if ($trustRestartBudget) {
+            $decorator->trustRestartBudget();
+        }
+
+        return $decorator;
     }
 
     protected function createCmaEs(): CmaEsAlgorithm

@@ -295,8 +295,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $optimizerRunEntity->setStoreName('DE');
         $optimizerRunEntity->setLocaleName('en_US');
         $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
-        $optimizerRunEntity->setIsTerminationCriteriaTrusted(true);
-        $optimizerRunEntity->setIsRestartOnPlateauEnabled(true);
+        $optimizerRunEntity->setTerminationMode(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET);
         $optimizerRunEntity->setWarmStartFraction(0.5);
         $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
         $optimizerRunEntity->setTotalCount(400);
@@ -323,8 +322,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame('DE', $optimizerRunTransfer->getStoreName());
         $this->assertSame('en_US', $optimizerRunTransfer->getLocaleName());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, $optimizerRunTransfer->getAlgorithm());
-        $this->assertTrue($optimizerRunTransfer->getIsTerminationCriteriaTrusted());
-        $this->assertTrue($optimizerRunTransfer->getIsRestartOnPlateauEnabled());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET, $optimizerRunTransfer->getTerminationMode());
         $this->assertSame(0.5, $optimizerRunTransfer->getWarmStartFraction());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $optimizerRunTransfer->getStatus());
         $this->assertSame(400, $optimizerRunTransfer->getTotalCount());

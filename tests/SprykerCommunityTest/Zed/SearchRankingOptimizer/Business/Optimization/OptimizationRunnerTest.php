@@ -353,18 +353,18 @@ class OptimizationRunnerTest extends Unit
     }
 
     /**
-     * Proves isTerminationCriteriaTrusted actually reaches the built algorithm, not just that
-     * AlgorithmFactory::create() itself honors the flag (already covered by AlgorithmFactoryTest) --
-     * createRunner()'s deliberately tiny maxGenerations=2 override must be ignored once this run's own
-     * isTerminationCriteriaTrusted is true, the same "exceeds the tiny budget" proof
+     * Proves terminationMode actually reaches the built algorithm, not just that AlgorithmFactory::create()
+     * itself honors it (already covered by AlgorithmFactoryTest) -- createRunner()'s deliberately tiny
+     * maxGenerations=2 override must be ignored once this run's own terminationMode is
+     * OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN, the same "exceeds the tiny budget" proof
      * blackbox-optimizer's own algorithm tests use for trustTerminationCriteria() itself.
      */
-    public function testRunNextPassesIsTerminationCriteriaTrustedFromTheQueuedRunToTheAlgorithm(): void
+    public function testRunNextPassesTrustedSingleRunTerminationModeFromTheQueuedRunToTheAlgorithm(): void
     {
         // Arrange
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
         $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
-            $this->createQueuedRunTransfer(isTerminationCriteriaTrusted: true),
+            $this->createQueuedRunTransfer(terminationMode: SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN),
         );
         $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
 
@@ -403,12 +403,12 @@ class OptimizationRunnerTest extends Unit
         $runner->runNext();
 
         // Assert
-        $this->assertGreaterThan(3, $capturedGenerationsUsed, 'The 2-generation cap from maxGenerations must be ignored once this run\'s own isTerminationCriteriaTrusted is true.');
+        $this->assertGreaterThan(3, $capturedGenerationsUsed, 'The 2-generation cap from maxGenerations must be ignored once this run\'s own terminationMode is OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN.');
     }
 
     /**
      * Structural, not statistical, the same way {@see testRunNextPassesWarmStartFractionFromTheQueuedRunToTheAlgorithmWithoutError()}
-     * is: proves isRestartOnPlateauEnabled reaches AlgorithmFactory::create() (which wraps the built
+     * is: proves the restart_on_plateau terminationMode reaches AlgorithmFactory::create() (which wraps the built
      * algorithm in RestartingOptimizerDecorator -- already proven at AlgorithmFactoryTest's own level) and
      * that the decorator's own OptimizationResult::getRestartHistory() reaches completeOptimizerRun()'s new
      * 10th argument, end to end through the real orchestration -- not that an actual restart happens (this
@@ -417,12 +417,12 @@ class OptimizationRunnerTest extends Unit
      * RestartingOptimizerDecorator::optimize() always reports at least one entry (covering the very first,
      * non-restarted run), so a non-empty array here is itself the proof the decorator ran at all.
      */
-    public function testRunNextPassesIsRestartOnPlateauEnabledFromTheQueuedRunToTheAlgorithmAndPersistsTheRestartHistory(): void
+    public function testRunNextPassesRestartOnPlateauTerminationModeFromTheQueuedRunToTheAlgorithmAndPersistsTheRestartHistory(): void
     {
         // Arrange
         $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
         $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn(
-            $this->createQueuedRunTransfer(isRestartOnPlateauEnabled: true),
+            $this->createQueuedRunTransfer(terminationMode: SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU),
         );
         $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
 
@@ -787,8 +787,7 @@ class OptimizationRunnerTest extends Unit
 
     /**
      * @param string|null $algorithm
-     * @param bool $isTerminationCriteriaTrusted
-     * @param bool $isRestartOnPlateauEnabled
+     * @param string $terminationMode
      * @param float $warmStartFraction
      * @param float|null $fixedRelevanceWeight
      * @param float|null $fixedSpecificityCurveExponent
@@ -799,8 +798,7 @@ class OptimizationRunnerTest extends Unit
      */
     protected function createQueuedRunTransfer(
         ?string $algorithm = null,
-        bool $isTerminationCriteriaTrusted = false,
-        bool $isRestartOnPlateauEnabled = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
         float $warmStartFraction = 0.0,
         ?float $fixedRelevanceWeight = null,
         ?float $fixedSpecificityCurveExponent = null,
@@ -815,8 +813,7 @@ class OptimizationRunnerTest extends Unit
             ->setLocaleName('en_US')
             ->setAlgorithm($algorithm ?? SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION)
             ->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED)
-            ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
-            ->setIsRestartOnPlateauEnabled($isRestartOnPlateauEnabled)
+            ->setTerminationMode($terminationMode)
             ->setWarmStartFraction($warmStartFraction)
             ->setFixedRelevanceWeight($fixedRelevanceWeight)
             ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)

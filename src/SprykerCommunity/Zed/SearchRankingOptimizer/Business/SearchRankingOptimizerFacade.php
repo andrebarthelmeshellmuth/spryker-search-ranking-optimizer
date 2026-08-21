@@ -22,6 +22,7 @@ use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 /**
  * @method \SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerBusinessFactory getFactory()
@@ -324,7 +325,8 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm
-     * @param bool $isTerminationCriteriaTrusted
+     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`
+     *   -- see `AlgorithmFactoryInterface::create()`'s own docblock for what each value does.
      * @param float $warmStartFraction
      * @param float|null $fixedRelevanceWeight
      * @param float|null $fixedSpecificityCurveExponent
@@ -332,15 +334,12 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param float|null $fixedSpecificityWeightShiftMagnitude
      * @param float|null $fixedSpecificityBlendWeight
      * @param array<\Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer> $fixedMetricWeights
-     * @param bool $isRestartOnPlateauEnabled Appended as the last parameter (rather than grouped next to
-     *   $isTerminationCriteriaTrusted, which it's mutually exclusive with) to keep every existing positional
-     *   call to this method valid unchanged.
      */
     public function queueOptimizationRun(
         string $storeName,
         string $localeName,
         string $algorithm,
-        bool $isTerminationCriteriaTrusted = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
         float $warmStartFraction = 0.0,
         ?float $fixedRelevanceWeight = null,
         ?float $fixedSpecificityCurveExponent = null,
@@ -348,14 +347,12 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
         ?float $fixedSpecificityWeightShiftMagnitude = null,
         ?float $fixedSpecificityBlendWeight = null,
         array $fixedMetricWeights = [],
-        bool $isRestartOnPlateauEnabled = false,
     ): SearchRankingOptimizerRunTransfer {
         $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setStoreName($storeName)
             ->setLocaleName($localeName)
             ->setAlgorithm($algorithm)
-            ->setIsTerminationCriteriaTrusted($isTerminationCriteriaTrusted)
-            ->setIsRestartOnPlateauEnabled($isRestartOnPlateauEnabled)
+            ->setTerminationMode($terminationMode)
             ->setWarmStartFraction($warmStartFraction)
             ->setFixedRelevanceWeight($fixedRelevanceWeight)
             ->setFixedSpecificityCurveExponent($fixedSpecificityCurveExponent)

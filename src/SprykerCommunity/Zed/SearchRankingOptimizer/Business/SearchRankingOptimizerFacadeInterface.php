@@ -21,6 +21,7 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 interface SearchRankingOptimizerFacadeInterface
 {
@@ -350,9 +351,12 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
-     * @param bool $isTerminationCriteriaTrusted Governs the run by the algorithm's own convergence/
-     *   divergence/plateau detection instead of the fixed maxGenerations budget. Defaults to false,
-     *   preserving the original fixed-budget behavior.
+     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`
+     *   -- a single choice replacing what used to be 3 independent booleans
+     *   (isTerminationCriteriaTrusted/isRestartOnPlateauEnabled/isRestartBudgetTrusted), only 4 of whose 8
+     *   combinations were ever actually valid. Defaults to `OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`,
+     *   preserving the original fixed-budget behavior. See `AlgorithmFactoryInterface::create()`'s own
+     *   docblock for what each value does.
      * @param float $warmStartFraction How much of the search is seeded from the live configuration instead
      *   of starting cold, between 0.0 and 1.0. Defaults to 0.0, preserving the original from-scratch
      *   behavior.
@@ -368,18 +372,12 @@ interface SearchRankingOptimizerFacadeInterface
      *   Metrics a human chose to pin at queue time, at whatever value they entered (not necessarily the
      *   live one). A metric NOT listed here can still end up held constant anyway if its own formula turns
      *   out non-deterministic — that's {@see runNextOptimization()}'s own orthogonal decision.
-     * @param bool $isRestartOnPlateauEnabled Wraps the run's algorithm in `blackbox-optimizer`'s own
-     *   `RestartingOptimizerDecorator`: on a genuine fitness plateau, restarts from a fresh random point
-     *   with a doubled population, within the SAME total evaluation budget a non-restarting run already
-     *   uses. Mutually exclusive with $isTerminationCriteriaTrusted. Defaults to false, preserving the
-     *   original single-run behavior. Appended last (not grouped with $isTerminationCriteriaTrusted) to
-     *   keep every existing positional call to this method valid unchanged.
      */
     public function queueOptimizationRun(
         string $storeName,
         string $localeName,
         string $algorithm,
-        bool $isTerminationCriteriaTrusted = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
         float $warmStartFraction = 0.0,
         ?float $fixedRelevanceWeight = null,
         ?float $fixedSpecificityCurveExponent = null,
@@ -387,7 +385,6 @@ interface SearchRankingOptimizerFacadeInterface
         ?float $fixedSpecificityWeightShiftMagnitude = null,
         ?float $fixedSpecificityBlendWeight = null,
         array $fixedMetricWeights = [],
-        bool $isRestartOnPlateauEnabled = false,
     ): SearchRankingOptimizerRunTransfer;
 
     /**

@@ -42,12 +42,7 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
     /**
      * @var string
      */
-    public const FIELD_IS_TERMINATION_CRITERIA_TRUSTED = 'isTerminationCriteriaTrusted';
-
-    /**
-     * @var string
-     */
-    public const FIELD_IS_RESTART_ON_PLATEAU_ENABLED = 'isRestartOnPlateauEnabled';
+    public const FIELD_TERMINATION_MODE = 'terminationMode';
 
     /**
      * @var string
@@ -98,28 +93,29 @@ class AutomatedWeightOptimizationRunForm extends AbstractType
             'constraints' => [new NotBlank()],
         ]);
 
-        $builder->add(static::FIELD_IS_TERMINATION_CRITERIA_TRUSTED, ChoiceType::class, [
-            'label' => 'Trust termination criteria',
-            'help' => 'The algorithm\'s own convergence/divergence/plateau detection runs every generation '
-                . 'either way — this only changes the generation-count ceiling it\'s allowed to stop early '
-                . 'against. Off (default): capped at the normal ~150-generation budget, so most runs never '
-                . 'get close enough to reach that detection at all. On: the ceiling jumps to a 10,000-'
-                . 'generation safety limit instead, for a search that needs real room to keep converging '
-                . 'past the normal budget — slower per run, not faster, since it can now run far longer '
-                . 'before that detection (or the higher ceiling itself) finally stops it.',
-            'choices' => ['Off' => false, 'On' => true],
-            'data' => false,
-        ]);
-
-        $builder->add(static::FIELD_IS_RESTART_ON_PLATEAU_ENABLED, ChoiceType::class, [
-            'label' => 'Restart on plateau',
-            'help' => 'Off (default): a single run, same as always. On: when the search stops on a genuine '
-                . 'fitness plateau (not converged, not diverged — just stuck), restart from a fresh random '
-                . 'point with a doubled population, within the SAME total evaluation budget this run already '
-                . 'uses — never more evaluations, just spent differently across restarts instead of one '
-                . 'longer run. Mutually exclusive with "Trust termination criteria" above.',
-            'choices' => ['Off' => false, 'On' => true],
-            'data' => false,
+        $builder->add(static::FIELD_TERMINATION_MODE, ChoiceType::class, [
+            'label' => 'Termination mode',
+            'help' => 'How long a run is allowed to search, and what happens if it stops early. '
+                . 'Fixed budget (default): capped at the normal ~150-generation budget — predictable, bounds '
+                . 'how long a run can take. Trusted single run: the algorithm\'s own convergence/divergence/'
+                . 'plateau detection (which runs every generation either way) is trusted with a much bigger '
+                . '~10,000-generation ceiling instead of the fixed budget — for a search that needs real room '
+                . 'to keep converging, at the cost of an unpredictable run length. Restart on plateau: when '
+                . 'the search stops on a genuine fitness plateau (not converged, not diverged — just stuck), '
+                . 'restart from a fresh random point with a doubled population, within the SAME total '
+                . 'evaluation budget a fixed-budget run already uses — never more evaluations, just spent '
+                . 'differently across restarts. Restart on plateau, trusted budget: the same restart '
+                . 'mechanism, but every restart gets the same generous ~10,000-generation room a trusted '
+                . 'single run gets instead of a shrinking share of the fixed budget — the total budget grows '
+                . 'to match, so this can use far more evaluations than the fixed-budget default ever would.',
+            'choices' => [
+                'Fixed budget' => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
+                'Trusted single run' => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN,
+                'Restart on plateau' => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
+                'Restart on plateau, trusted budget' => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET,
+            ],
+            'data' => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
+            'constraints' => [new NotBlank()],
         ]);
 
         $builder->add(static::FIELD_WARM_START_FRACTION_PERCENT, IntegerType::class, [

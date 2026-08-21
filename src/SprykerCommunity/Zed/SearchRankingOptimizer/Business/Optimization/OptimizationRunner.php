@@ -135,10 +135,9 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $algorithmName,
             $populationSize,
             $maxGenerations,
-            $queuedRunTransfer->getIsTerminationCriteriaTrusted() ?? false,
+            $queuedRunTransfer->getTerminationMode() ?? SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
             $warmStartVector,
             $warmStartFraction,
-            $queuedRunTransfer->getIsRestartOnPlateauEnabled() ?? false,
         );
 
         $this->entityManager->startOptimizerRun(

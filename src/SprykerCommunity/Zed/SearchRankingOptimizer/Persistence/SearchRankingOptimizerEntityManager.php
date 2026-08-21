@@ -397,8 +397,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
         $optimizerRunEntity->setStoreName($optimizerRunTransfer->getStoreNameOrFail());
         $optimizerRunEntity->setLocaleName($optimizerRunTransfer->getLocaleNameOrFail());
         $optimizerRunEntity->setAlgorithm($optimizerRunTransfer->getAlgorithmOrFail());
-        $optimizerRunEntity->setIsTerminationCriteriaTrusted($optimizerRunTransfer->getIsTerminationCriteriaTrusted() ?? false);
-        $optimizerRunEntity->setIsRestartOnPlateauEnabled($optimizerRunTransfer->getIsRestartOnPlateauEnabled() ?? false);
+        $optimizerRunEntity->setTerminationMode($optimizerRunTransfer->getTerminationMode() ?? SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET);
         $optimizerRunEntity->setWarmStartFraction($optimizerRunTransfer->getWarmStartFraction() ?? 0.0);
         $optimizerRunEntity->setFixedRelevanceWeight($optimizerRunTransfer->getFixedRelevanceWeight());
         $optimizerRunEntity->setFixedSpecificityCurveExponent($optimizerRunTransfer->getFixedSpecificityCurveExponent());

@@ -207,7 +207,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                 static::METRIC_WEIGHT_REPEAT_COUNT,
                 SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
                 static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
-                true,
+                SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
             );
 
             $this->deleteSyntheticQuery($idQueryScenario1);
@@ -234,7 +234,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                 static::METRIC_WEIGHT_REPEAT_COUNT,
                 SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
                 static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
-                true,
+                SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
             );
 
             $this->deleteSyntheticQuery($idQueryScenario2);
@@ -336,7 +336,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
                 $runTransfer = $this->runRealOptimization(
                     SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
                     static::METRIC_WEIGHT_TEST_FIXED_RELEVANCE_WEIGHT,
-                    true,
+                    SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
                 );
                 $lead = $this->extractMetricWeight($runTransfer, $metricA) - $this->extractMetricWeight($runTransfer, $metricB);
 

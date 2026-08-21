@@ -141,8 +141,7 @@ class AutomatedWeightOptimizationController extends AbstractController
         $storeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME];
         $localeName = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME];
         $algorithm = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM];
-        $isTerminationCriteriaTrusted = (bool)$formData[AutomatedWeightOptimizationRunForm::FIELD_IS_TERMINATION_CRITERIA_TRUSTED];
-        $isRestartOnPlateauEnabled = (bool)$formData[AutomatedWeightOptimizationRunForm::FIELD_IS_RESTART_ON_PLATEAU_ENABLED];
+        $terminationMode = (string)$formData[AutomatedWeightOptimizationRunForm::FIELD_TERMINATION_MODE];
         $warmStartFraction = (int)$formData[AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT] / 100;
 
         $fixedScalars = $this->parseFixedScalarsFromRequest($request);
@@ -164,19 +163,11 @@ class AutomatedWeightOptimizationController extends AbstractController
             return $redirectResponse;
         }
 
-        if ($isTerminationCriteriaTrusted && $isRestartOnPlateauEnabled) {
-            $this->addErrorMessage(
-                '"Trust termination criteria" and "Restart on plateau" are mutually exclusive — nothing was queued. Turn one off.',
-            );
-
-            return $redirectResponse;
-        }
-
         $this->getFacade()->queueOptimizationRun(
             $storeName,
             $localeName,
             $algorithm,
-            $isTerminationCriteriaTrusted,
+            $terminationMode,
             $warmStartFraction,
             $fixedScalars['relevanceWeight'],
             $fixedScalars['specificityCurveExponent'],
@@ -184,7 +175,6 @@ class AutomatedWeightOptimizationController extends AbstractController
             $fixedScalars['specificityWeightShiftMagnitude'],
             $fixedScalars['specificityBlendWeight'],
             $fixedMetricWeightTransfers,
-            $isRestartOnPlateauEnabled,
         );
 
         $this->addSuccessMessage(
