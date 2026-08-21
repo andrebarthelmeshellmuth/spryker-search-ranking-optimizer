@@ -16,6 +16,10 @@ use Codeception\Test\Unit;
 use ReflectionMethod;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationRunForm;
+use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
+use Symfony\Component\Form\FormFactoryInterface;
+use Symfony\Component\Form\Forms;
+use Symfony\Component\Validator\Validation;
 
 /**
  * @group SprykerCommunityTest
@@ -99,5 +103,113 @@ class AutomatedWeightOptimizationRunFormTest extends Unit
             mb_strpos($help, 'CMA-ES'),
             'CMA-ES was given first, so its sentence must come first in the joined help text.',
         );
+    }
+
+    /**
+     * Drives the real `buildForm()`/`configureOptions()` through an actual Symfony `FormFactory` (same
+     * pattern as this package's sibling repos' own Form tests) -- covers the field-wiring/defaults/
+     * constraints these two methods are otherwise the only thing exercising, since the reflection-based
+     * tests above only reach the two private helpers they delegate to.
+     */
+    public function testSubmittingWithAllFieldsPresentIsValid(): void
+    {
+        $form = $this->createFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
+            AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => ['DE' => 'DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => ['de_DE' => 'de_DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_ALGORITHMS => [
+                SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
+            ],
+        ]);
+
+        $form->submit([
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME => 'DE',
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME => 'de_DE',
+            AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+            AutomatedWeightOptimizationRunForm::FIELD_TERMINATION_MODE => SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
+            AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT => '25',
+        ]);
+
+        $this->assertTrue($form->isValid());
+        $this->assertSame('DE', $form->getData()[AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME]);
+        $this->assertSame('de_DE', $form->getData()[AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME]);
+        $this->assertSame(
+            SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+            $form->getData()[AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM],
+        );
+        $this->assertSame(25, $form->getData()[AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT]);
+    }
+
+    /**
+     * `terminationMode`'s `'data' => ...FIXED_BUDGET` option only pre-fills the WIDGET on an unsubmitted
+     * render -- `submit()` still clears an omitted field to blank first (Symfony's normal `clearMissing`
+     * behavior), which then fails this field's own `NotBlank` constraint. Documents that real behavior
+     * rather than assuming the option acts as a submit-time fallback.
+     */
+    public function testOmittingTerminationModeFromSubmittedDataIsInvalidRatherThanFallingBackToTheDefault(): void
+    {
+        $form = $this->createFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
+            AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => ['DE' => 'DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => ['de_DE' => 'de_DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_ALGORITHMS => [
+                SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
+            ],
+        ]);
+
+        $form->submit([
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME => 'DE',
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME => 'de_DE',
+            AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+            AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT => '25',
+        ]);
+
+        $this->assertFalse($form->isValid());
+    }
+
+    public function testWarmStartFractionPercentAboveOneHundredIsInvalid(): void
+    {
+        $form = $this->createFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
+            AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => ['DE' => 'DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => ['de_DE' => 'de_DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_ALGORITHMS => [
+                SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
+            ],
+        ]);
+
+        $form->submit([
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME => 'DE',
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME => 'de_DE',
+            AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
+            AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT => '101',
+        ]);
+
+        $this->assertFalse($form->isValid());
+        $this->assertGreaterThan(0, $form->getErrors(true)->count());
+    }
+
+    public function testSubmittingAnAlgorithmNotInTheGivenChoicesIsInvalid(): void
+    {
+        $form = $this->createFormFactory()->create(AutomatedWeightOptimizationRunForm::class, null, [
+            AutomatedWeightOptimizationRunForm::OPTION_STORE_CHOICES => ['DE' => 'DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_LOCALE_CHOICES => ['de_DE' => 'de_DE'],
+            AutomatedWeightOptimizationRunForm::OPTION_ALGORITHMS => [
+                SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES => new CmaEsAlgorithm(),
+            ],
+        ]);
+
+        $form->submit([
+            AutomatedWeightOptimizationRunForm::FIELD_STORE_NAME => 'DE',
+            AutomatedWeightOptimizationRunForm::FIELD_LOCALE_NAME => 'de_DE',
+            AutomatedWeightOptimizationRunForm::FIELD_ALGORITHM => SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_DIFFERENTIAL_EVOLUTION,
+            AutomatedWeightOptimizationRunForm::FIELD_WARM_START_FRACTION_PERCENT => '0',
+        ]);
+
+        $this->assertFalse($form->isValid());
+    }
+
+    protected function createFormFactory(): FormFactoryInterface
+    {
+        return Forms::createFormFactoryBuilder()
+            ->addExtension(new ValidatorExtension(Validation::createValidator()))
+            ->getFormFactory();
     }
 }
