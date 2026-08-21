@@ -54,7 +54,7 @@ php tests/_ci-standalone/generate-index-map.php
 vendor/bin/codecept run -c tests/codeception.portable.yml -g Portable
 ```
 
-**322 tests, 1100 assertions** across three Codeception suites (`Zed/SearchRankingOptimizer`,
+**209 tests, 757 assertions** across three Codeception suites (`Zed/SearchRankingOptimizer`,
 `Client/SearchRankingOptimizer`, `Yves/SearchRankingOptimizerWidget`) — down from a prior count that included `CmaEsAlgorithm`/
 `DifferentialEvolutionAlgorithm`/`SymmetricEigenDecomposition`'s own tests, which moved along with the code
 they cover to [andrebarthelmeshellmuth/blackbox-optimizer](https://github.com/andrebarthelmeshellmuth/blackbox-optimizer)'s
