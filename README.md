@@ -475,18 +475,49 @@ Three black-box algorithms ship, selectable per run:
 As of `blackbox-optimizer` 1.2, all three also stop before `maxGenerations` on their own once they've
 converged, diverged, or plateaued (each algorithm's own criteria — see that package's own README for the
 per-algorithm detail), and expose a `trustTerminationCriteria()` escape hatch to trust that over an
-arbitrary generation-count guess. That escape hatch is wired up here as a per-run choice: the
-**Automated Weight Optimization** form carries a "trust the algorithm's own termination criteria"
-option, and `OptimizationRunner` passes it through to `AlgorithmFactory`, which calls
-`trustTerminationCriteria()` on the algorithm it builds.
+arbitrary generation-count guess. As of `blackbox-optimizer` 4.2, there's also `RestartingOptimizerDecorator`:
+when a run stops early on a genuine fitness plateau (not converged, not diverged — just stuck), it restarts
+from a fresh random point with a **doubled** population rather than accepting whichever local optimum that
+one random initialization happened to land in. And as of `blackbox-optimizer` 5.0, the two compose:
+`RestartingOptimizerDecorator::trustRestartBudget()` gives every restart the same generous
+safety-ceiling-sized room `trustTerminationCriteria()` gives a single run, instead of a shrinking
+`maxGenerations` share.
 
-Leave it off — the default — and a run stops at the fixed `getOptimizationMaxGenerations()` budget
-(150), which is predictable and bounds how long a run can take. Turn it on and the generation cap is
-replaced by the algorithm's own convergence test, so a run stops when it stops improving rather than
-when it runs out of budget: better optima on problems that need more generations, and less wasted
-work on ones that converge early, at the cost of a run whose length you cannot predict up front.
+That's three independent library-level capabilities, but only four of the eight boolean combinations they'd
+naively suggest are actually meaningful (`trustTerminationCriteria()` only exists on a plain algorithm,
+`trustRestartBudget()` only exists once you've already wrapped it in `RestartingOptimizerDecorator`).
+Rather than expose three checkboxes and reject the other four combinations at runtime, the **Automated
+Weight Optimization** form carries a single **Termination mode** choice, and `OptimizationRunner` passes
+the chosen mode straight through to `AlgorithmFactory::create()`, which `match`es it to the right call
+sequence:
 
-![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, when it was applied, and a form to queue a new run against a chosen store/locale/algorithm](docs/screenshots/automated-weight-optimization.png)
+- **Fixed budget** (the default) — a run stops at the fixed `getOptimizationMaxGenerations()` budget (150),
+  which is predictable and bounds how long a run can take.
+- **Trusted single run** — the generation cap is replaced by the algorithm's own convergence test, so a run
+  stops when it stops improving rather than when it runs out of budget: better optima on problems that need
+  more generations, and less wasted work on ones that converge early, at the cost of a run whose length you
+  cannot predict up front.
+- **Restart on plateau** — wraps the algorithm in `RestartingOptimizerDecorator`. On a genuine plateau, it
+  restarts from a fresh point with a doubled population, within the exact same total evaluation budget the
+  run already had (`populationSize * maxGenerations`) — never more evaluations, just spent differently
+  across restarts instead of one longer run.
+- **Restart on plateau, trusted budget** — the same restart mechanism, but every restart also gets
+  `trustRestartBudget()`'s generous safety-ceiling-sized room instead of a shrinking share of the fixed
+  budget. In practice a restart that also plateaus still exits in roughly the same generation count as the
+  original run — the real effect is mostly removing the *artificial* truncation where the shrinking
+  fixed-budget share would otherwise cut a restart off before it reached its own natural plateau. Actually
+  burning a large share of the safety ceiling needs a restart landing in a genuinely slow-converging
+  regime — a different fitness shape than "plateau again" — so the much larger worst-case total this mode
+  allows for is a safety margin, not the typical realized cost.
+
+This exists because CMA-ES's own early-termination criteria (see above) converge fast on this package's
+low-dimensional, discretely multi-modal `rank_eval` objective and then stop wherever that landed — a plain
+fixed-budget run has real, measured odds of settling for a mediocre local optimum instead of the best one
+available (see [Limitations](#limitations) below for the numbers). A run's own restart history (population
+size, generations used, why it stopped, and its own best score per restart) is shown on the run detail page
+once a restart-enabled run completes.
+
+![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, a restart-on-plateau run's own restart history (population/generations/why it stopped/best score per restart), when it was applied, and a form to queue a new run against a chosen store/locale/algorithm/termination mode](docs/screenshots/automated-weight-optimization.png)
 
 The workflow, from the **Search Ranking Optimizer → Automated Weight Optimization** Zed page:
 
@@ -640,7 +671,33 @@ anyone loads `spryker/permission`'s own Zed landing page (`Spryker\Zed\Permissio
 — visit it once in Zed (wire up its route/navigation entry if your project doesn't have one already) and
 every registered-but-unsynced permission plugin, this one included, gets its row.
 
-### 3b. Register the Yves widget plugins
+### 3b. Exclude `check-installation` from the console command cache
+
+If your project's `ConsoleConfig` has `isConsoleCommandCacheEnabled()` returning `true` (Spryker's own
+default, added to reduce per-command bootstrap time by instantiating only the invoked command instead of
+every registered one), `search-ranking-optimizer:check-installation`'s own sibling-command check will
+falsely report `search-ranking-optimizer:calibrate`/`auto-tune`/`optimize` as unregistered — the cache only
+populates the live `Application` instance with the ONE command actually invoked, so the check's own
+`$application->has($commandName)` calls never find them, even though `console list` and running each
+sibling directly both prove they're registered correctly. Spryker's own `ConsoleConfig` documents exactly
+this scenario via `getCacheExcludedConsoleCommandNames()`; add this command to it in your project's
+`Pyz\Zed\Console\ConsoleConfig`:
+
+```php
+protected const array CACHE_EXCLUDED_CONSOLE_COMMAND_NAMES = [
+    'search-ranking-optimizer:check-installation',
+];
+
+public function getCacheExcludedConsoleCommandNames(): array
+{
+    return array_merge(parent::getCacheExcludedConsoleCommandNames(), static::CACHE_EXCLUDED_CONSOLE_COMMAND_NAMES);
+}
+```
+
+No cache clear needed — the exclusion is checked before the cache lookup, so it takes effect on the next
+run.
+
+### 3c. Register the Yves widget plugins
 
 In `Pyz\Yves\Router\RouterDependencyProvider::getRouteProviderPlugins()`:
 
@@ -808,7 +865,7 @@ vendor/bin/console propel:install       # creates all eight tables + builds ORM 
 vendor/bin/console router:cache:warm-up:backoffice
 ```
 
-If you wired the Yves widget (step 3b), also warm up the **BackendGateway** router — its cache is separate
+If you wired the Yves widget (step 3c), also warm up the **BackendGateway** router — its cache is separate
 from the Backoffice one above and is not covered by it, so a fresh install of just this package's Gateway
 controller will 404 with "No route found" until this runs too:
 
@@ -884,7 +941,7 @@ package's module. Restricting these pages to root-style admins is a perfectly or
 cannot know which roles you meant to grant, so it asks you to confirm rather than telling you to fix.
 
 It is explicit about its own blind spots: running in Zed, it cannot confirm the Yves-side route-provider
-and Twig plugin registration (step 3b) is in place, or that the rating widget actually renders below
+and Twig plugin registration (step 3c) is in place, or that the rating widget actually renders below
 product tiles and submits successfully on a live storefront page — those need a real browser request, not
 a CLI probe.
 
@@ -902,18 +959,19 @@ a CLI probe.
 
 ## Limitations
 
-- **CMA-ES has no restart strategy, so a single run can converge to a real but low-quality local optimum.**
+- **A single run without restart-on-plateau can converge to a real but low-quality local optimum.**
   Measured on the metric-weight ground truth suite (`tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer/`):
   a clear-cut, unambiguous ground truth was only correctly discovered by ~10% of independent runs (2/20 in
-  one measured batch), because the algorithm's own early-termination criteria (TolX/TolFun, see
-  `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm`) converge fast on a low-dimensional,
-  discretely multi-modal `rank_eval` objective and then stop, wherever that landed. A production run is a
-  single such attempt, with the same odds. **Intend to fix this soonish** with a restart-on-plateau strategy
-  (IPOP-CMA-ES style: on early termination, restart from a fresh point, optionally with a larger population,
-  keep the best across restarts) in the algorithm itself, so a single run becomes reliable without the
-  caller needing to work around it. Until then, the ground truth test compensates by taking the best of many
-  repeated runs (see `RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT`) — a
-  test-only workaround, not a fix for real "Run now" usage.
+  one measured batch) WITHOUT restart-on-plateau, because CMA-ES's own early-termination criteria
+  (TolX/TolFun, see `andrebarthelmeshellmuth/blackbox-optimizer`'s `CmaEsAlgorithm`) converge fast on a
+  low-dimensional, discretely multi-modal `rank_eval` objective and then stop, wherever that landed. **Fixed**
+  by enabling restart-on-plateau (see [Automated weight optimization](#automated-weight-optimization--searching-relevanceweight-and-metric-weights-algorithmically)
+  above, and `andrebarthelmeshellmuth/blackbox-optimizer`'s own `RestartingOptimizerDecorator`): the SAME
+  scenario, restart-on-plateau enabled, cleared the threshold on 20/20 individual runs across two independent
+  10-run batches (`RelevanceWeightAndMetricWeightGroundTruthTest::testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()`).
+  Restart-on-plateau is opt-in, not the default (mutually exclusive with "trust termination criteria" — see
+  above), so a run queued without it still has the original ~10% single-run odds; enabling it is the fix, not
+  automatic.
 - **Optimization runs are local search, not global search.** `relevanceWeight` is bounded to a trust region
   around its current live value (`±0.15` by default) specifically so one run can't propose something wild
   and untested in a single shot — but that means a systematically wrong starting point is never escaped in

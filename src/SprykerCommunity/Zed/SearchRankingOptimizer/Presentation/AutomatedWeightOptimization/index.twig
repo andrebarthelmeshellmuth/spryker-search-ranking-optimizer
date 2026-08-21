@@ -14,15 +14,15 @@
                     <p>
                         Run #{{ inProgressOptimizerRun.idSearchRankingOptimizerRun }} ({{ inProgressOptimizerRun.algorithm }}):
                         <span data-role="processed">{{ inProgressOptimizerRun.processedCount }}</span>
-                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
+                        {% if inProgressOptimizerRun.terminationMode in ['trusted_single_run', 'restart_on_plateau_trusted_budget'] %}
                             {{ 'of up to' | trans }}
                         {% else %}
                             /
                         {% endif %}
                         <span data-role="total">{{ inProgressOptimizerRun.totalCount }}</span>
                         {{ 'candidates evaluated' | trans }}
-                        {% if inProgressOptimizerRun.isTerminationCriteriaTrusted %}
-                            <span class="text-muted" style="font-size: 11px;">(trusting termination criteria — likely to stop well short of this ceiling)</span>
+                        {% if inProgressOptimizerRun.terminationMode in ['trusted_single_run', 'restart_on_plateau_trusted_budget'] %}
+                            <span class="text-muted" style="font-size: 11px;">(trusting a safety-ceiling budget — likely to stop well short of this ceiling)</span>
                         {% endif %}
                     </p>
                     <progress data-role="progress-bar" value="{{ inProgressOptimizerRun.processedCount }}" max="{{ inProgressOptimizerRun.totalCount|default(1) }}" style="width: 100%;"></progress>
@@ -64,13 +64,13 @@
                             <tr>
                                 <th>Generations used</th>
                                 <td>
-                                    {# The "/budget" denominator is deliberately omitted for a trusted-termination
-                                       run: that run was never capped at optimizationMaxGenerations at all, but
+                                    {# The "/budget" denominator is deliberately omitted for either trusted-budget
+                                       mode: that run was never capped at optimizationMaxGenerations at all, but
                                        at the algorithm's own far higher safety ceiling, so printing this budget
                                        next to it would read as a nonsensical over-100% figure. #}
-                                    {{ latestOptimizerRun.generationsUsed }}{% if not latestOptimizerRun.isTerminationCriteriaTrusted %}/{{ optimizationMaxGenerations }}{% endif %}
-                                    {% if latestOptimizerRun.isTerminationCriteriaTrusted %}
-                                        <span class="text-muted" style="font-size: 11px;">(trusted termination criteria — stopped on convergence/divergence/plateau, not a fixed budget)</span>
+                                    {{ latestOptimizerRun.generationsUsed }}{% if latestOptimizerRun.terminationMode not in ['trusted_single_run', 'restart_on_plateau_trusted_budget'] %}/{{ optimizationMaxGenerations }}{% endif %}
+                                    {% if latestOptimizerRun.terminationMode in ['trusted_single_run', 'restart_on_plateau_trusted_budget'] %}
+                                        <span class="text-muted" style="font-size: 11px;">(trusted safety-ceiling budget — stopped on convergence/divergence/plateau, not a fixed budget)</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -112,6 +112,54 @@
                         {% endif %}
                     </tbody>
                 </table>
+
+                {% if latestOptimizerRun.status == 'done' and latestOptimizerRun.restartHistory %}
+                    <table class="table">
+                        <caption>
+                            Restart history — restarted on a genuine fitness plateau, doubling the population
+                            each time, within the same total evaluation budget this run already used.
+                        </caption>
+                        <thead>
+                            <tr>
+                                <th>Restart</th>
+                                <th>Population</th>
+                                <th>Generations</th>
+                                <th>Stopped because</th>
+                                <th>Best score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for restart in latestOptimizerRun.restartHistory %}
+                                <tr>
+                                    <td>{{ restart.restartIndex }}</td>
+                                    <td>{{ restart.populationSize }}</td>
+                                    <td>{{ restart.generationsUsed }}/{{ restart.generationsAllowed }}</td>
+                                    <td>
+                                        {% if restart.terminationReason == 'TOL_FUN' %}
+                                            plateau
+                                        {% elseif restart.terminationReason == 'NONE' %}
+                                            budget exhausted
+                                        {% elseif restart.terminationReason == 'TOL_X' %}
+                                            converged
+                                        {% elseif restart.terminationReason == 'TOL_X_UP' %}
+                                            diverged
+                                        {% elseif restart.terminationReason == 'CONDITION_COV' %}
+                                            numerically degenerate
+                                        {% else %}
+                                            {{ restart.terminationReason }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ restart.bestScore }}
+                                        {% if restart.improvedOverallBest %}
+                                            <span class="label label-success">improved</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
 
                 {% if latestOptimizerRun.status == 'done' and latestOptimizerRun.bestMetricWeights %}
                     <table class="table">
@@ -175,7 +223,7 @@
             {{ form_row(optimizeRunForm.storeName) }}
             {{ form_row(optimizeRunForm.localeName) }}
             {{ form_row(optimizeRunForm.algorithm) }}
-            {{ form_row(optimizeRunForm.isTerminationCriteriaTrusted) }}
+            {{ form_row(optimizeRunForm.terminationMode) }}
             {{ form_row(optimizeRunForm.warmStartFractionPercent) }}
 
             <h4>{{ 'Parameters' | trans }}</h4>

@@ -399,25 +399,25 @@ class SearchRankingOptimizerEntityManagerTest extends Unit
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_QUEUED, $resultTransfer->getStatus());
         $this->assertSame(0, $resultTransfer->getTotalCount());
         $this->assertSame(0, $resultTransfer->getProcessedCount());
-        $this->assertFalse($resultTransfer->getIsTerminationCriteriaTrusted(), 'Defaults to false when the given transfer never set it.');
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET, $resultTransfer->getTerminationMode(), 'Defaults to fixed_budget when the given transfer never set it.');
         $this->assertSame(0.0, $resultTransfer->getWarmStartFraction(), 'Defaults to 0.0 when the given transfer never set it.');
     }
 
-    public function testCreateOptimizerRunPersistsAnExplicitTrustAndWarmStartFraction(): void
+    public function testCreateOptimizerRunPersistsAnExplicitTerminationModeAndWarmStartFraction(): void
     {
         // Arrange
         $optimizerRunTransfer = (new SearchRankingOptimizerRunTransfer())
             ->setStoreName('DE')
             ->setLocaleName('en_US')
             ->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES)
-            ->setIsTerminationCriteriaTrusted(true)
+            ->setTerminationMode(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN)
             ->setWarmStartFraction(0.5);
 
         // Act
         $resultTransfer = (new SearchRankingOptimizerEntityManager())->createOptimizerRun($optimizerRunTransfer);
 
         // Assert
-        $this->assertTrue($resultTransfer->getIsTerminationCriteriaTrusted());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN, $resultTransfer->getTerminationMode());
         $this->assertSame(0.5, $resultTransfer->getWarmStartFraction());
     }
 

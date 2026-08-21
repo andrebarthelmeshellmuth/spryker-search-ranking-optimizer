@@ -852,18 +852,31 @@ abstract class AbstractGroundTruthTest extends Unit
      *   value for the run -- lets a ground truth remove relevanceWeight as a confound OUTRIGHT (see
      *   {@see discoverMarginalTextRelevancePair()}) rather than merely reasoning about the worst case it
      *   could reach.
+     * @param string $terminationMode `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`
+     *   (the default): a single run, same as every ground truth scenario before this parameter existed.
+     *   `OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU`: wraps the run's algorithm in `blackbox-optimizer`'s
+     *   `RestartingOptimizerDecorator` -- see {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()},
+     *   which measures exactly what this buys a single "Run now" click against the same scenario
+     *   {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT}'s
+     *   own docblock measured the ~10% baseline hit rate on.
      */
     protected function runRealOptimization(
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
     ): SearchRankingOptimizerRunTransfer {
         $queuedRunTransfer = $this->getFacade()->queueOptimizationRun(
             static::STORE_NAME,
             static::LOCALE_NAME,
             $algorithm,
-            false,
+            $terminationMode,
             0.0,
             $fixedRelevanceWeight,
+            null,
+            null,
+            null,
+            null,
+            [],
         );
         $idQueuedRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
 
@@ -934,22 +947,24 @@ abstract class AbstractGroundTruthTest extends Unit
      * `maxGenerations` cap or to how many rated pairs the objective has -- see
      * {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::testMetricWeightConvergesTowardWhicheverMetricTheGroundTruthFavors()}'s
      * own docblock for the full trace), but WHICH of several real local optima of very different quality it
-     * lands in is essentially decided by its own random initialization. Confirmed empirically: 3 independent
-     * runs of the exact same scenario landed leads of -0.17, +0.02, and +0.30 -- the correct answer is
-     * genuinely reachable (+0.30 clears the required threshold comfortably), a MEDIAN of those 3 just as
-     * easily reports the -0.17 or +0.02 run as "typical," actively hiding that the optimizer CAN find it.
-     * Best-of-N is not a weaker bar chosen to dodge that failure -- "can the optimizer find this ground
-     * truth given a few tries" is the more honest question for a real user who would re-run an unsatisfying
-     * result via the same "Run now" button anyway; median-of-N was only ever the right statistic under the
-     * assumption (since falsified for metric weights) that failures are Gaussian noise around one true
-     * value rather than a genuinely different basin.
+     * lands in is essentially decided by its own random initialization. Confirmed empirically (before
+     * restart-on-plateau existed): 3 independent runs of the exact same scenario landed leads of -0.17,
+     * +0.02, and +0.30 -- the correct answer is genuinely reachable (+0.30 clears the required threshold
+     * comfortably), a MEDIAN of those 3 just as easily reports the -0.17 or +0.02 run as "typical," actively
+     * hiding that the optimizer CAN find it. Best-of-N is not a weaker bar chosen to dodge that failure --
+     * "can the optimizer find this ground truth given a few tries" is the more honest question for a real
+     * user who would re-run an unsatisfying result via the same "Run now" button anyway; median-of-N was
+     * only ever the right statistic under the assumption (since falsified for metric weights) that failures
+     * are Gaussian noise around one true value rather than a genuinely different basin.
      *
-     * The real, deeper fix is one level down in the algorithm itself: a restart strategy (IPOP-CMA-ES style
-     * -- on early termination, restart from a fresh point, optionally with a larger population, keep the
-     * best across restarts) would make a SINGLE `runRealOptimization()` call already robust to this, and
-     * this method's own repeat-and-take-best would become unnecessary. Not implemented here -- that's a
-     * change to `andrebarthelmeshellmuth/blackbox-optimizer` itself, a separate, bigger piece of work than
-     * this test suite's own scope.
+     * The deeper fix this docblock used to call for -- a restart strategy that would make a SINGLE
+     * `runRealOptimization()` call already robust to this, making repeat-and-take-best unnecessary -- now
+     * exists (`andrebarthelmeshellmuth/blackbox-optimizer`'s `RestartingOptimizerDecorator`, via
+     * $terminationMode below). This method's own repeat-and-take-best is kept anyway, not made
+     * redundant by it: restart-on-plateau is measured (see `testRestartOnPlateauRaisesSingleRunHitRateForMetricWeight()`)
+     * to raise a SINGLE run's hit rate dramatically, not guarantee it every time, and $times gives this
+     * caller's own margin on top of that -- see {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::METRIC_WEIGHT_REPEAT_COUNT}'s
+     * own docblock for the combined math.
      *
      * @param callable(\Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer): float $extractor
      * @param bool $preferMax True: return the largest value found (e.g. "metricA should outweigh metricB").
@@ -957,6 +972,7 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $times
      * @param string $algorithm
      * @param float|null $fixedRelevanceWeight Passed straight through to {@see runRealOptimization()}.
+     * @param string $terminationMode Passed straight through to {@see runRealOptimization()}.
      */
     protected function runRealOptimizationRepeatedBest(
         callable $extractor,
@@ -964,11 +980,12 @@ abstract class AbstractGroundTruthTest extends Unit
         int $times = 5,
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
     ): float {
         $values = [];
 
         for ($i = 0; $i < $times; $i++) {
-            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight));
+            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight, $terminationMode));
         }
 
         return $preferMax ? max($values) : min($values);

@@ -21,6 +21,7 @@ use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingSaturationPointCalibrationTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 interface SearchRankingOptimizerFacadeInterface
 {
@@ -350,12 +351,11 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $storeName
      * @param string $localeName
      * @param string $algorithm SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_*.
-     * @param bool $isTerminationCriteriaTrusted Governs the run by the algorithm's own convergence/
-     *   divergence/plateau detection instead of the fixed maxGenerations budget. Defaults to false,
-     *   preserving the original fixed-budget behavior.
+     * @param string $terminationMode One of `SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_*`.
+     *   Defaults to `OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET`. See `AlgorithmFactoryInterface::create()`'s
+     *   own docblock for what each value does.
      * @param float $warmStartFraction How much of the search is seeded from the live configuration instead
-     *   of starting cold, between 0.0 and 1.0. Defaults to 0.0, preserving the original from-scratch
-     *   behavior.
+     *   of starting cold, between 0.0 and 1.0. Defaults to 0.0.
      * @param float|null $fixedRelevanceWeight A human's own choice, made on the run form's parameter
      *   checklist, to pin relevanceWeight at exactly this value instead of searching it. Null (the default)
      *   preserves the original always-free behavior.
@@ -373,7 +373,7 @@ interface SearchRankingOptimizerFacadeInterface
         string $storeName,
         string $localeName,
         string $algorithm,
-        bool $isTerminationCriteriaTrusted = false,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
         float $warmStartFraction = 0.0,
         ?float $fixedRelevanceWeight = null,
         ?float $fixedSpecificityCurveExponent = null,

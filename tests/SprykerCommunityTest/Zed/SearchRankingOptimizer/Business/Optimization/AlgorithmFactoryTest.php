@@ -12,6 +12,7 @@ namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Optimization;
 use BlackboxOptimizer\Algorithm\CmaEsAlgorithm;
 use BlackboxOptimizer\Algorithm\DifferentialEvolutionAlgorithm;
 use BlackboxOptimizer\Algorithm\RechenbergSchwefelEsAlgorithm;
+use BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator;
 use BlackboxOptimizer\Problem\CallableProblem;
 use Codeception\Test\Unit;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -76,9 +77,9 @@ class AlgorithmFactoryTest extends Unit
      * trustTerminationCriteria() has actually been called -- the cleanest way to prove create() applied the
      * flag, mirroring how the existing tests above prove populationSize/maxGenerations were applied.
      */
-    public function testCreateCallsTrustTerminationCriteriaWhenIsTerminationCriteriaTrustedIsTrue(): void
+    public function testCreateCallsTrustTerminationCriteriaWhenTerminationModeIsTrustedSingleRun(): void
     {
-        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, true);
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN);
 
         $this->assertGreaterThan(60, $algorithm->estimateEvaluationCount(), 'estimateEvaluationCount() must reflect the safety-ceiling once trustTerminationCriteria() was applied, not populationSize * maxGenerations.');
     }
@@ -105,7 +106,7 @@ class AlgorithmFactoryTest extends Unit
             SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
             4,
             1,
-            false,
+            SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
             [10.0, 10.0],
             1.0,
         );
@@ -143,7 +144,7 @@ class AlgorithmFactoryTest extends Unit
             SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
             4,
             1,
-            false,
+            SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
             [10.0, 10.0],
             0.0,
         );
@@ -152,5 +153,31 @@ class AlgorithmFactoryTest extends Unit
         $result = $algorithm->optimize($problem);
 
         $this->assertLessThan(1.0, $result->getBestValue(), 'fraction=0.0 must leave the bounds-midpoint default fully in effect, ignoring the given warm-start vector.');
+    }
+
+    public function testCreateWrapsInRestartingOptimizerDecoratorWhenTerminationModeIsRestartOnPlateau(): void
+    {
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU);
+
+        $this->assertInstanceOf(RestartingOptimizerDecorator::class, $algorithm);
+        // RestartingOptimizerDecorator::estimateEvaluationCount() is populationSize * maxIterations, same
+        // formula as a plain CmaEsAlgorithm -- proves create() applied both arguments to the DECORATOR, not
+        // just to the algorithm it wraps (which has no public getter to check directly).
+        $this->assertSame(60, $algorithm->estimateEvaluationCount());
+    }
+
+    public function testCreateWrapsInRestartingOptimizerDecoratorAndTrustsTheRestartBudgetWhenTerminationModeIsRestartOnPlateauTrustedBudget(): void
+    {
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5, SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET);
+
+        $this->assertInstanceOf(RestartingOptimizerDecorator::class, $algorithm);
+        $this->assertGreaterThan(60, $algorithm->estimateEvaluationCount(), 'estimateEvaluationCount() must reflect trustRestartBudget()\'s grown total budget, not populationSize * maxGenerations.');
+    }
+
+    public function testCreateDoesNotWrapInRestartingOptimizerDecoratorByDefault(): void
+    {
+        $algorithm = (new AlgorithmFactory())->create(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, 12, 5);
+
+        $this->assertNotInstanceOf(RestartingOptimizerDecorator::class, $algorithm);
     }
 }

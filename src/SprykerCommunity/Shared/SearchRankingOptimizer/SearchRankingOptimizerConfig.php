@@ -571,4 +571,60 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const OPTIMIZATION_ALGORITHM_RECHENBERG_SCHWEFEL_ES = 'rechenberg_schwefel_es';
+
+    /**
+     * One of the 4 `OPTIMIZATION_TERMINATION_MODE_*` values below. `blackbox-optimizer` itself exposes this
+     * as 3 separately composable capabilities (`trustTerminationCriteria()`, `RestartingOptimizerDecorator`,
+     * `trustRestartBudget()`) rather than an enum, because its own API makes invalid combinations
+     * unrepresentable by construction already -- `trustRestartBudget()` simply doesn't exist without a
+     * decorator instance to call it on. This package serializes the choice across a form -> transfer -> DB ->
+     * facade pipeline instead, where that same composition would collapse back into flat booleans and lose
+     * that guarantee, so it's modeled as one enum-like value here.
+     *
+     * Specification:
+     * - A single, non-restarting run stopped by the fixed `maxGenerations` budget -- the original behavior,
+     *   and the default.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET = 'fixed_budget';
+
+    /**
+     * Specification:
+     * - A single, non-restarting run, but governed by the algorithm's own convergence/divergence/plateau
+     *   detection instead of a fixed `maxGenerations` budget -- {@see \BlackboxOptimizer\Algorithm\OptimizerAlgorithmInterface::trustTerminationCriteria()}.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN = 'trusted_single_run';
+
+    /**
+     * Specification:
+     * - Wraps the algorithm in {@see \BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator}: on a
+     *   genuine fitness plateau, restarts from a fresh random point with a doubled population, within the
+     *   SAME total evaluation budget (`populationSize * maxGenerations`) a fixed-budget run already uses.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU = 'restart_on_plateau';
+
+    /**
+     * Specification:
+     * - Same restart-on-plateau mechanism as {@see OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU}, but
+     *   also calls the decorator's own {@see \BlackboxOptimizer\Algorithm\RestartingOptimizerDecorator::trustRestartBudget()}:
+     *   the total budget grows to `populationSize * getSafetyIterationCeiling()` instead, giving every
+     *   restart the same generous room {@see OPTIMIZATION_TERMINATION_MODE_TRUSTED_SINGLE_RUN} gives a
+     *   single run.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET = 'restart_on_plateau_trusted_budget';
 }

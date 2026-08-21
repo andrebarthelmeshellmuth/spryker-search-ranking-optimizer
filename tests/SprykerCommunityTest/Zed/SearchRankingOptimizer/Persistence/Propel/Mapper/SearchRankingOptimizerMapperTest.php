@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Persistence\Propel\Mapper;
 
+use BlackboxOptimizer\Algorithm\Internal\TerminationReason;
+use BlackboxOptimizer\Algorithm\RestartHistoryEntry;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
@@ -293,7 +295,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $optimizerRunEntity->setStoreName('DE');
         $optimizerRunEntity->setLocaleName('en_US');
         $optimizerRunEntity->setAlgorithm(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES);
-        $optimizerRunEntity->setIsTerminationCriteriaTrusted(true);
+        $optimizerRunEntity->setTerminationMode(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET);
         $optimizerRunEntity->setWarmStartFraction(0.5);
         $optimizerRunEntity->setStatus(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE);
         $optimizerRunEntity->setTotalCount(400);
@@ -302,6 +304,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $optimizerRunEntity->setBaselineScore(0.65);
         $optimizerRunEntity->setBestRelevanceWeight(0.8);
         $optimizerRunEntity->setBestMetricWeights('[{"idSearchRankingMetric":1,"name":"top_seller","weight":0.6}]');
+        $optimizerRunEntity->setRestartHistory('[{"restartIndex":0,"populationSize":6,"generationsAllowed":150,"generationsUsed":30,"terminationReason":"TOL_FUN","bestScore":0.75,"evaluationsConsumed":180,"improvedOverallBest":true}]');
         $optimizerRunEntity->setBestScore(0.91);
         $optimizerRunEntity->setBestSpecificityBlendWeight(0.75);
         $optimizerRunEntity->setBestSpecificityWeightExponent(1.2);
@@ -319,7 +322,7 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertSame('DE', $optimizerRunTransfer->getStoreName());
         $this->assertSame('en_US', $optimizerRunTransfer->getLocaleName());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES, $optimizerRunTransfer->getAlgorithm());
-        $this->assertTrue($optimizerRunTransfer->getIsTerminationCriteriaTrusted());
+        $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET, $optimizerRunTransfer->getTerminationMode());
         $this->assertSame(0.5, $optimizerRunTransfer->getWarmStartFraction());
         $this->assertSame(SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE, $optimizerRunTransfer->getStatus());
         $this->assertSame(400, $optimizerRunTransfer->getTotalCount());
@@ -337,6 +340,17 @@ class SearchRankingOptimizerMapperTest extends Unit
         $this->assertCount(1, $bestMetricWeights);
         $this->assertSame('top_seller', $bestMetricWeights[0]->getName());
         $this->assertSame(0.6, $bestMetricWeights[0]->getWeight());
+
+        $restartHistory = iterator_to_array($optimizerRunTransfer->getRestartHistory());
+        $this->assertCount(1, $restartHistory);
+        $this->assertSame(0, $restartHistory[0]->getRestartIndex());
+        $this->assertSame(6, $restartHistory[0]->getPopulationSize());
+        $this->assertSame(150, $restartHistory[0]->getGenerationsAllowed());
+        $this->assertSame(30, $restartHistory[0]->getGenerationsUsed());
+        $this->assertSame('TOL_FUN', $restartHistory[0]->getTerminationReason());
+        $this->assertSame(0.75, $restartHistory[0]->getBestScore());
+        $this->assertSame(180, $restartHistory[0]->getEvaluationsConsumed());
+        $this->assertTrue($restartHistory[0]->getImprovedOverallBest());
     }
 
     public function testMapsAnOptimizerRunWithNoBestMetricWeightsYetToAnEmptyCollection(): void
@@ -357,5 +371,38 @@ class SearchRankingOptimizerMapperTest extends Unit
 
         // Assert
         $this->assertCount(0, iterator_to_array($optimizerRunTransfer->getBestMetricWeights()));
+        $this->assertCount(0, iterator_to_array($optimizerRunTransfer->getRestartHistory()));
+    }
+
+    public function testEncodeRestartHistoryReturnsNullForAnEmptyArray(): void
+    {
+        // Act
+        $encoded = (new SearchRankingOptimizerMapper())->encodeRestartHistory([]);
+
+        // Assert
+        $this->assertNull($encoded);
+    }
+
+    public function testEncodeRestartHistoryEncodesEachEntryIncludingTheNegatedBestValue(): void
+    {
+        // Arrange
+        $restartHistoryEntry = new RestartHistoryEntry(1, 12, 60, 40, TerminationReason::TOL_FUN, -0.752, 480, true);
+
+        // Act
+        $encoded = (new SearchRankingOptimizerMapper())->encodeRestartHistory([$restartHistoryEntry]);
+        $decoded = json_decode((string)$encoded, true);
+
+        // Assert
+        $this->assertCount(1, $decoded);
+        $this->assertSame(1, $decoded[0]['restartIndex']);
+        $this->assertSame(12, $decoded[0]['populationSize']);
+        $this->assertSame(60, $decoded[0]['generationsAllowed']);
+        $this->assertSame(40, $decoded[0]['generationsUsed']);
+        $this->assertSame('TOL_FUN', $decoded[0]['terminationReason']);
+        // Every blackbox-optimizer algorithm MINIMIZES, so a negative bestValueAtStop (a real, "good" nDCG
+        // once negated back) must come out POSITIVE here -- see this method's own docblock.
+        $this->assertSame(0.752, $decoded[0]['bestScore']);
+        $this->assertSame(480, $decoded[0]['evaluationsConsumed']);
+        $this->assertTrue($decoded[0]['improvedOverallBest']);
     }
 }

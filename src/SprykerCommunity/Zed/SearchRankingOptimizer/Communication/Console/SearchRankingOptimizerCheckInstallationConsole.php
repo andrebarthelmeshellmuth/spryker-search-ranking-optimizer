@@ -43,7 +43,7 @@ use Throwable;
  *
  * Deliberately honest about its own limits, same posture as
  * {@see \SprykerCommunity\Zed\SearchRanking\Communication\Console\SearchRankingCheckInstallationConsole}:
- * it cannot confirm the Yves-side route-provider/Twig-plugin registration (step 3b) or that the widget
+ * it cannot confirm the Yves-side route-provider/Twig-plugin registration (step 3c) or that the widget
  * actually renders and submits correctly on a live storefront page — those need a real browser request to
  * verify, not a CLI probe.
  *
@@ -221,7 +221,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
 
         $output->writeln('<info>Everything checkable from the CLI is in place.</info>');
         $output->writeln('Not verifiable from here — these need a real browser request, not a CLI probe:');
-        $output->writeln('  - the Yves route-provider and Twig plugins are registered (step 3b)');
+        $output->writeln('  - the Yves route-provider and Twig plugins are registered (step 3c)');
         $output->writeln('  - the rating widget actually renders below product tiles and submits successfully');
 
         return static::CODE_SUCCESS;

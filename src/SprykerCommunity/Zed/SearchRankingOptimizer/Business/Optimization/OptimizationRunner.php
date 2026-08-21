@@ -125,21 +125,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $localeName,
             $userFixedMetricWeights,
         );
-        $mapper = new ParameterVectorMapper(
-            $optimizableMetrics,
-            $fixedMetricWeights,
-            $liveConfigurationTransfer->getRelevanceWeightOrFail(),
-            $liveConfigurationTransfer->getSpecificityCurveExponentOrFail(),
-            $liveConfigurationTransfer->getSpecificityWeightExponentOrFail(),
-            $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
-            $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
-            $this->searchRankingFacade->isSpecificityWeightingEnabled(),
-            $queuedRunTransfer->getFixedRelevanceWeight(),
-            $queuedRunTransfer->getFixedSpecificityCurveExponent(),
-            $queuedRunTransfer->getFixedSpecificityWeightExponent(),
-            $queuedRunTransfer->getFixedSpecificityWeightShiftMagnitude(),
-            $queuedRunTransfer->getFixedSpecificityBlendWeight(),
-        );
+        $mapper = $this->buildParameterVectorMapper($queuedRunTransfer, $liveConfigurationTransfer, $optimizableMetrics, $fixedMetricWeights);
         $populationSize = $this->computePopulationSize($mapper->getDimensionCount());
         $maxGenerations = $this->maxGenerations ?? SearchRankingOptimizerConfig::getOptimizationMaxGenerations();
         $algorithmName = $queuedRunTransfer->getAlgorithmOrFail();
@@ -149,7 +135,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $algorithmName,
             $populationSize,
             $maxGenerations,
-            $queuedRunTransfer->getIsTerminationCriteriaTrusted() ?? false,
+            $queuedRunTransfer->getTerminationMode() ?? SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
             $warmStartVector,
             $warmStartFraction,
         );
@@ -187,6 +173,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
             $bestConfigurationTransfer->getSpecificityWeightExponentOrFail(),
             $bestConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
             count($result->getBestValueHistory()),
+            $result->getRestartHistory(),
         );
     }
 
@@ -204,6 +191,35 @@ class OptimizationRunner implements OptimizationRunnerInterface
     protected function buildLiveConfiguration(string $storeName, string $localeName): SearchRankingConfigurationStorageTransfer
     {
         return $this->searchRankingFacade->getConfiguration($storeName, $localeName);
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer
+     * @param array<int, array{idSearchRankingMetric: int, name: string, isLocaleScoped: bool}> $optimizableMetrics
+     * @param array<string, float> $fixedMetricWeights
+     */
+    protected function buildParameterVectorMapper(
+        SearchRankingOptimizerRunTransfer $queuedRunTransfer,
+        SearchRankingConfigurationStorageTransfer $liveConfigurationTransfer,
+        array $optimizableMetrics,
+        array $fixedMetricWeights,
+    ): ParameterVectorMapperInterface {
+        return new ParameterVectorMapper(
+            $optimizableMetrics,
+            $fixedMetricWeights,
+            $liveConfigurationTransfer->getRelevanceWeightOrFail(),
+            $liveConfigurationTransfer->getSpecificityCurveExponentOrFail(),
+            $liveConfigurationTransfer->getSpecificityWeightExponentOrFail(),
+            $liveConfigurationTransfer->getSpecificityWeightShiftMagnitudeOrFail(),
+            $liveConfigurationTransfer->getSpecificityBlendWeightOrFail(),
+            $this->searchRankingFacade->isSpecificityWeightingEnabled(),
+            $queuedRunTransfer->getFixedRelevanceWeight(),
+            $queuedRunTransfer->getFixedSpecificityCurveExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightExponent(),
+            $queuedRunTransfer->getFixedSpecificityWeightShiftMagnitude(),
+            $queuedRunTransfer->getFixedSpecificityBlendWeight(),
+        );
     }
 
     /**
