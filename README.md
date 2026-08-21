@@ -493,8 +493,8 @@ just stuck): rather than accepting whichever local optimum that one random initi
 in, `RestartingOptimizerDecorator` restarts from a fresh random point with a **doubled** population, within
 the exact same total evaluation budget the run already had (`populationSize * maxGenerations`) — never more
 evaluations, just spent differently across restarts instead of one longer run. The two options are
-mutually exclusive (`AlgorithmFactory` rejects a run with both set): restart-on-plateau's own budget
-discipline requires a fixed `maxGenerations` to divide up across restarts, which "trust termination
+mutually exclusive on this form (`AlgorithmFactory` rejects a run with both set): restart-on-plateau's own
+budget discipline requires a fixed `maxGenerations` to divide up across restarts, which "trust termination
 criteria" replaces with a much larger safety ceiling instead.
 
 This exists because CMA-ES's own early-termination criteria (see above) converge fast on this package's
@@ -503,6 +503,13 @@ run without this option has real, measured odds of settling for a mediocre local
 best one available (see [Limitations](#limitations) below for the numbers). A run's own restart history
 (population size, generations used, why it stopped, and its own best score per restart) is shown on the run
 detail page once a restart-enabled run completes.
+
+`blackbox-optimizer` 5.0 adds a genuine combination of the two — `RestartingOptimizerDecorator::trustRestartBudget()`,
+giving every restart the same generous safety-ceiling-sized room `trustTerminationCriteria()` gives a single
+run, instead of a fixed `maxGenerations` share (see that package's own README for why a smaller, separate
+per-restart ceiling on its own wouldn't have worked). Not wired up as a form option here yet — this run
+form's own mutual-exclusion choice above is still the only way to pick between the two — but worth knowing
+the underlying library already supports it, for whoever picks this up next.
 
 ![The Automated Weight Optimization page: the latest run's baseline vs. winning nDCG@10 score, the winning relevanceWeight and per-metric weights, a restart-on-plateau run's own restart history (population/generations/why it stopped/best score per restart), when it was applied, and a form to queue a new run against a chosen store/locale/algorithm/restart-on-plateau setting](docs/screenshots/automated-weight-optimization.png)
 
