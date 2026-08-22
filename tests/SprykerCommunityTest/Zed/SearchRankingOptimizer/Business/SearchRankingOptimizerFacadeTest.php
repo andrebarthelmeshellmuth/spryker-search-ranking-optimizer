@@ -334,14 +334,12 @@ class SearchRankingOptimizerFacadeTest extends Unit
 
         $entityManagerMock->expects($this->once())
             ->method('createOptimizerRun')
-            ->with($this->callback(function (SearchRankingOptimizerRunTransfer $optimizerRunTransfer): bool {
-                return $optimizerRunTransfer->getStoreName() === 'DE'
-                    && $optimizerRunTransfer->getLocaleName() === 'de_DE'
-                    && $optimizerRunTransfer->getAlgorithm() === 'cma_es'
-                    && $optimizerRunTransfer->getTerminationMode() === 'fixed_budget'
-                    && $optimizerRunTransfer->getWarmStartFraction() === 0.25
-                    && $optimizerRunTransfer->getFixedRelevanceWeight() === 0.5;
-            }))
+            ->with($this->callback(fn (SearchRankingOptimizerRunTransfer $optimizerRunTransfer): bool => $optimizerRunTransfer->getStoreName() === 'DE'
+                && $optimizerRunTransfer->getLocaleName() === 'de_DE'
+                && $optimizerRunTransfer->getAlgorithm() === 'cma_es'
+                && $optimizerRunTransfer->getTerminationMode() === 'fixed_budget'
+                && $optimizerRunTransfer->getWarmStartFraction() === 0.25
+                && $optimizerRunTransfer->getFixedRelevanceWeight() === 0.5))
             ->willReturnArgument(0);
 
         $facade = new SearchRankingOptimizerFacade();
