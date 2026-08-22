@@ -9,13 +9,16 @@ declare(strict_types = 1);
 
 namespace SprykerCommunityTest\Zed\SearchRankingOptimizer\Business\Checkpoint;
 
+use Closure;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use Generated\Shared\Transfer\SearchRankingWeightCheckpointTransfer;
+use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
 /**
@@ -44,7 +47,7 @@ class WeightCheckpointRestorerTest extends Unit
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->expects($this->never())->method('record');
 
-        $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
+        $restorer = $this->createRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
         $result = $restorer->restore(999, 'DE', 'de_DE');
@@ -99,7 +102,7 @@ class WeightCheckpointRestorerTest extends Unit
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
         $recorderMock->expects($this->once())->method('record')->with('manual', 'DE', 'de_DE')->willReturn($newCheckpointTransfer);
 
-        $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
+        $restorer = $this->createRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
         $result = $restorer->restore(7, 'DE', 'de_DE');
@@ -108,7 +111,15 @@ class WeightCheckpointRestorerTest extends Unit
         $this->assertSame($newCheckpointTransfer, $result);
     }
 
-    public function testRestoreSkipsAMetricWeightThatNoLongerExistsWithoutFailing(): void
+    /**
+     * A metric a checkpoint wants to restore a weight for can be deleted between when the checkpoint was
+     * recorded and when it's restored. Proves the whole restore rolls back — including the relevanceWeight/
+     * specificity settings and any earlier metric weight in this same checkpoint, and the fresh checkpoint
+     * that would otherwise be recorded of the result — rather than silently restoring only some of the
+     * checkpointed values with no indication anything was incomplete. Same all-or-nothing posture
+     * OptimizationApplier already takes for the identical write sequence.
+     */
+    public function testRestoreRollsBackEverythingAndReturnsNullWhenAMetricNoLongerExists(): void
     {
         // Arrange
         $checkpointTransfer = (new SearchRankingWeightCheckpointTransfer())
@@ -137,14 +148,44 @@ class WeightCheckpointRestorerTest extends Unit
             ->willReturn(false);
 
         $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
-        $recorderMock->method('record')->willReturn(new SearchRankingWeightCheckpointTransfer());
+        $recorderMock->expects($this->never())->method('record');
 
-        $restorer = new WeightCheckpointRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
+        $restorer = $this->createRestorer($repositoryMock, $searchRankingFacadeMock, $recorderMock);
 
         // Act
         $result = $restorer->restore(7, 'DE', 'de_DE');
 
         // Assert
-        $this->assertNotNull($result);
+        $this->assertNull($result);
+    }
+
+    protected function createRestorer(
+        SearchRankingOptimizerRepositoryInterface $repository,
+        SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
+        WeightCheckpointRecorderInterface $recorder,
+    ): WeightCheckpointRestorer {
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->method('getTransactionHandler')->willReturn($this->createPassThroughTransactionHandler());
+
+        return new WeightCheckpointRestorer($repository, $searchRankingFacade, $recorder, $entityManagerMock);
+    }
+
+    /**
+     * A real transaction handler needs a live Propel connection this unit test has none of — this fake
+     * just invokes the callback directly (no real transaction), which is all `WeightCheckpointRestorer`
+     * needs from it: the callback runs, and any exception it throws propagates same as the real handler
+     * would after its own rollback.
+     */
+    protected function createPassThroughTransactionHandler(): TransactionHandlerInterface
+    {
+        return new class implements TransactionHandlerInterface {
+            /**
+             * @param \Closure $callback
+             */
+            public function handleTransaction(Closure $callback): mixed
+            {
+                return $callback();
+            }
+        };
     }
 }

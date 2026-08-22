@@ -193,7 +193,10 @@ class CheckpointController extends AbstractController
         $newWeightCheckpointTransfer = $this->getFacade()->restoreWeightCheckpoint($idSearchRankingWeightCheckpoint, $storeName, $localeName);
 
         if ($newWeightCheckpointTransfer === null) {
-            $this->addErrorMessage(sprintf('Checkpoint #%d no longer exists.', $idSearchRankingWeightCheckpoint));
+            $this->addErrorMessage(sprintf(
+                'Could not restore checkpoint #%d — it no longer exists, or references a metric that has since been deleted (nothing was changed).',
+                $idSearchRankingWeightCheckpoint,
+            ));
         } else {
             $this->addSuccessMessage(sprintf(
                 'Restored checkpoint #%d into %s/%s — recorded as new checkpoint #%d.',

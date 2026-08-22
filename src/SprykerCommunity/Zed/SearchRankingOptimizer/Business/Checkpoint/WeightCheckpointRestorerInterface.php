@@ -18,15 +18,21 @@ interface WeightCheckpointRestorerInterface
      * - Writes a past checkpoint's relevanceWeight, metric weights, and 4 specificity knobs back through
      *   `search-ranking`'s own facade — the SAME operation Calibration's own "Apply" already is (write
      *   current values + record the result as a new checkpoint), not a special "undo" mechanism.
-     * - A metric referenced by the checkpoint that no longer exists is skipped silently — a safe,
-     *   best-effort restore, not an all-or-nothing transaction.
+     * - All-or-nothing, inside one transaction — same posture
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface}
+     *   already takes for the identical write sequence. A metric referenced by the checkpoint that no
+     *   longer exists rolls back every write this call made (including the fresh checkpoint it would have
+     *   recorded) and returns null, rather than silently restoring only some of the checkpointed values —
+     *   restoring is meant to be a reliable, known-good rollback point, not a best-effort one a caller
+     *   cannot tell apart from a complete success.
      * - `isSpecificityWeightingEnabled` is NEVER written back — it's a pure code-level project flag with no
      *   corresponding save method on `search-ranking`'s facade, captured on checkpoints only for
      *   historical transparency.
      * - Records a NEW checkpoint (source `SearchRankingOptimizerConfig::CHECKPOINT_SOURCE_MANUAL`) of the
      *   resulting state and returns it — restoring IS applying, so it gets its own checkpoint like any
      *   other applied change.
-     * - Returns null (writes nothing) when the given id doesn't exist.
+     * - Returns null (writes nothing) when the given id doesn't exist, or when any referenced metric no
+     *   longer exists.
      *
      * @param int $idSearchRankingWeightCheckpoint
      * @param string $storeName
