@@ -159,6 +159,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getRepository(),
             $this->getSearchRankingFacade(),
             $this->createWeightCheckpointRecorder(),
+            $this->getEntityManager(),
         );
     }
 

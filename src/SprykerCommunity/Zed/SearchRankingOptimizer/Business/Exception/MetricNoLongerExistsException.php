@@ -12,11 +12,13 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception;
 use RuntimeException;
 
 /**
- * Thrown mid-apply when {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier}
- * finds a winning candidate's metric was deleted between when its optimization run finished and when an
- * admin clicked Apply — inside the same transaction the rest of the apply runs in, so throwing this rolls
- * back every write already made for this run rather than leaving a partially-applied, sub-1.0 metric
- * weight total live.
+ * Thrown mid-write when a metric a caller is about to save a weight for no longer exists. Two callers,
+ * same reasoning: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier}
+ * (a winning candidate's metric deleted between when its optimization run finished and when an admin
+ * clicked Apply) and {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer}
+ * (a checkpointed metric deleted between when the checkpoint was recorded and when it's restored). Both
+ * throw inside the same transaction the rest of their writes run in, so throwing rolls back every write
+ * already made rather than leaving a partially-applied/-restored, sub-1.0 metric weight total live.
  */
 class MetricNoLongerExistsException extends RuntimeException
 {
