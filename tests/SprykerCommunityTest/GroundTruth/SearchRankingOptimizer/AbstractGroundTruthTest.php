@@ -921,17 +921,24 @@ abstract class AbstractGroundTruthTest extends Unit
      * @param int $times
      * @param string $algorithm
      * @param float|null $fixedRelevanceWeight Passed straight through to {@see runRealOptimization()}.
+     * @param string $terminationMode Passed straight through to {@see runRealOptimization()}. Defaults to
+     *   plain fixed-budget CMA-ES for backward compatibility with every existing caller; pass
+     *   `OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU` for a scenario whose per-run noise floor is high
+     *   enough that even a median-of-N still occasionally misses -- see
+     *   {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::RELEVANCE_WEIGHT_REPEAT_COUNT}'s
+     *   own docblock for a concrete case.
      */
     protected function runRealOptimizationRepeatedMedian(
         callable $extractor,
         int $times = 3,
         string $algorithm = SearchRankingOptimizerConfig::OPTIMIZATION_ALGORITHM_CMA_ES,
         ?float $fixedRelevanceWeight = null,
+        string $terminationMode = SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_FIXED_BUDGET,
     ): float {
         $values = [];
 
         for ($i = 0; $i < $times; $i++) {
-            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight));
+            $values[] = $extractor($this->runRealOptimization($algorithm, $fixedRelevanceWeight, $terminationMode));
         }
 
         sort($values);

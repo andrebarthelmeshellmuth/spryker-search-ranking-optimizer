@@ -461,6 +461,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
             $relevanceWeightWhenTextAgrees = $this->runRealOptimizationRepeatedMedian(
                 fn (SearchRankingOptimizerRunTransfer $runTransfer) => $runTransfer->getBestRelevanceWeightOrFail(),
                 static::RELEVANCE_WEIGHT_REPEAT_COUNT,
+                terminationMode: SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
             );
 
             foreach ($queryIdsScenario1 as $idQuery) {
@@ -481,6 +482,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
             $relevanceWeightWhenBusinessSignalDisagrees = $this->runRealOptimizationRepeatedMedian(
                 fn (SearchRankingOptimizerRunTransfer $runTransfer) => $runTransfer->getBestRelevanceWeightOrFail(),
                 static::RELEVANCE_WEIGHT_REPEAT_COUNT,
+                terminationMode: SearchRankingOptimizerConfig::OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU,
             );
 
             foreach ($queryIdsScenario2 as $idQuery) {
@@ -578,8 +580,30 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
     /**
      * Inserts one synthetic query+rating for the main pair plus one per filler pair, all in the SAME
      * direction for a given scenario -- every pair's text winner rated heart/loser x when
-     * `$isTextSideCorrect` is true (scenario 1), flipped when false (scenario 2). Distinct suffixes keep
-     * every pair's own synthetic query row unique despite sharing the same base search term.
+     * `$isTextSideCorrect` is true (scenario 1), flipped when false (scenario 2).
+     *
+     * Every suffix here is PUNCTUATION-only (`.`, `..`, `...`, ...), never a real word -- unlike
+     * {@see AbstractGroundTruthTest::applyFillerPairsForScenario()}'s `'filler' . $index` suffixes, which
+     * are safe there only because that method's queries aren't measured by pair-position (the metric-weight
+     * ground truth's own main query still uses the plain `.` default). Confirmed live (2026-08-23) via
+     * {@see AbstractGroundTruthTest::fetchRawTextRelevanceScores()}: appending a real word like `'main'` to
+     * this shop's search term changes which real catalog documents the LIVE query built from that stored
+     * term actually matches -- `discoverAdjacentTextRelevancePair()` picks the main pair using the BARE
+     * term, but {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner::buildRankEvalRequests()}
+     * fires the STORED (suffixed) term, so a word suffix can silently push both rated products from
+     * rank 1/2 (bare term) to rank 10/11 -- past `SearchRankingOptimizerConfig::getRankEvalCutoff()`'s
+     * cutoff of 10 -- for THIS shop's real "chair" data. `_rank_eval` only scores hits it actually returns:
+     * once both rated products fall outside the cutoff, their rating (whichever way it's flipped) never
+     * enters the DCG calculation at all, producing a near-zero, rating-direction-INSENSITIVE score for that
+     * query -- exactly the degenerate 9-decimal-place tie between scenarios that made
+     * {@see \SprykerCommunityTest\GroundTruth\SearchRankingOptimizer\RelevanceWeightAndMetricWeightGroundTruthTest::testRelevanceWeightConvergesTowardWhicheverSignalTheGroundTruthFavors()}
+     * flaky in the first place: with the main pair's own signal neutralized this way, only the filler
+     * pairs' aggregate contribution was left to decide the outcome, at the mercy of run-to-run CMA-ES noise.
+     * A punctuation suffix is confirmed (same live check) to leave rank 1/2 unchanged for every length used
+     * below, matching {@see AbstractGroundTruthTest::insertSyntheticQuery()}'s own docblock ("most analyzers
+     * strip it as noise, not merely trailing whitespace") -- each suffix still needs to be a DISTINCT string
+     * (not just distinct trailing whitespace, which MariaDB's PAD SPACE collation treats as equal) to avoid
+     * colliding with another synthetic query on the same unique `(search_term, store_name, locale_name)` key.
      *
      * @param string $searchTerm
      * @param int $idTextRelevanceWinner
@@ -600,7 +624,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
         $heartRatedId = $isTextSideCorrect ? $idTextRelevanceWinner : $idTextRelevanceLoser;
         $xRatedId = $isTextSideCorrect ? $idTextRelevanceLoser : $idTextRelevanceWinner;
 
-        $idQueryMain = $this->insertSyntheticQuery($searchTerm, 'main');
+        $idQueryMain = $this->insertSyntheticQuery($searchTerm, '.');
         $this->insertSyntheticRating($idQueryMain, $heartRatedId, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
         $this->insertSyntheticRating($idQueryMain, $xRatedId, SearchRankingOptimizerConfig::RATING_TYPE_X);
 
@@ -610,7 +634,7 @@ class RelevanceWeightAndMetricWeightGroundTruthTest extends AbstractGroundTruthT
             $fillerHeartRatedId = $isTextSideCorrect ? $idFillerWinner : $idFillerLoser;
             $fillerXRatedId = $isTextSideCorrect ? $idFillerLoser : $idFillerWinner;
 
-            $idQueryFiller = $this->insertSyntheticQuery($searchTerm, 'filler' . $index);
+            $idQueryFiller = $this->insertSyntheticQuery($searchTerm, str_repeat('.', $index + 2));
             $this->insertSyntheticRating($idQueryFiller, $fillerHeartRatedId, SearchRankingOptimizerConfig::RATING_TYPE_HEART);
             $this->insertSyntheticRating($idQueryFiller, $fillerXRatedId, SearchRankingOptimizerConfig::RATING_TYPE_X);
 
