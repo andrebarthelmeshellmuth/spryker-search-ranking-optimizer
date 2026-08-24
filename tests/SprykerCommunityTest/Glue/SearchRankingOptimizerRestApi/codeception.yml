@@ -1,0 +1,26 @@
+namespace: SprykerCommunityTest\Glue\SearchRankingOptimizerRestApi
+
+paths:
+    tests: .
+    data: _data
+    support: _support
+    output: _output
+
+coverage:
+    enabled: true
+    remote: false
+    include:
+        - 'packages/spryker-community/search-ranking-optimizer/src/*'
+
+suites:
+    Glue:
+        path: .
+        actor: SearchRankingOptimizerRestApiGlueTester
+        modules:
+            enabled:
+                - \PyzTest\Shared\Testify\Helper\Environment
+                - \SprykerTest\Shared\Testify\Helper\ConfigHelper
+                - \SprykerTest\Shared\Testify\Helper\LocatorHelper:
+                    projectNamespaces: ['Pyz']
+                    coreNamespaces: ['SprykerShop', 'Spryker', 'SprykerEco', 'SprykerSdk', 'SprykerFeature', 'SprykerCommunity']
+                - \SprykerTest\Shared\Testify\Helper\DependencyHelper

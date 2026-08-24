@@ -1,0 +1,16 @@
+post:
+    searchTerm:
+        - NotBlank: ~
+        - Length:
+              max: 255
+
+    idProductAbstract:
+        - NotNull: ~
+        - Type:
+              type: integer
+        - Positive: ~
+
+    ratingType:
+        - NotBlank: ~
+        - Choice:
+              choices: ['heart', 'check', 'x']
