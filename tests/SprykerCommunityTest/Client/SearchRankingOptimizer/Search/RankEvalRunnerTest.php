@@ -24,12 +24,15 @@ use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\SearchRankingClient;
+use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
+use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Semantic\InMemorySemanticQueryEmbeddingCache;
 use SprykerCommunity\Client\SearchRankingStorage\SearchRankingStorageClient;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
@@ -368,6 +371,114 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
+     * Proves the P4 graceful-degradation contract end to end: a candidate configuration with `alpha < 1.0`
+     * (hybrid) whose embedding client is unavailable must produce EXACTLY the same score a plain
+     * `alpha = 1.0` (lexical-only) baseline produces for the same query — i.e. the failure genuinely
+     * degrades all the way down to the pre-existing lexical formula, not some broken half-state (a vector
+     * silently left partially applied, a script that errors, or a script that CAN'T degrade because
+     * `FunctionScoreBuilder`'s own `$queryVector === null` guard was never reached). This is the exact
+     * scenario this shop is in right now (P4's `embeddings` Docker service not yet booted — see this
+     * package's own README) and the one Step 3's `evaluate-hybrid` console command depends on being
+     * airtight before any real embedding service exists to test the non-degraded path against.
+     */
+    public function testEvaluateDegradesToLexicalOnlyWhenTheEmbeddingClientIsUnavailable(): void
+    {
+        // Arrange
+        $buildRequestTransfer = (fn (): SearchRankingEvaluationRequestTransfer => (new SearchRankingEvaluationRequestTransfer())
+            ->setStoreName('DE')
+            ->setLocaleName('en_US')
+            ->setCutoff(100)
+            ->addQuery(
+                (new SearchRankingEvaluationQueryTransfer())
+                    ->setIdSearchRankingQuery(1)
+                    ->setSearchTerm('chair')
+                    ->setImportanceWeight(1.0)
+                    ->addProductGain(
+                        (new SearchRankingEvaluationProductGainTransfer())
+                            ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_BESUCHERSTUHL)
+                            ->setGain(3.0),
+                    )
+                    ->addProductGain(
+                        (new SearchRankingEvaluationProductGainTransfer())
+                            ->setIdProductAbstract(static::ID_PRODUCT_ABSTRACT_KONFERENZSTUHL)
+                            ->setGain(1.0),
+                    ),
+            ));
+
+        $sharedConfiguration = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.5)
+            ->setRelevanceSaturationPoint(12.0)
+            ->setMetricWeights(['pdp_impressions' => 1.0]);
+
+        $lexicalConfigurationTransfer = (clone $sharedConfiguration)->setAlpha(1.0);
+        $hybridConfigurationWithBrokenEmbeddingClientTransfer = (clone $sharedConfiguration)->setAlpha(0.5);
+
+        $lexicalRunner = $this->createRankEvalRunner();
+        $hybridRunnerWithThrowingEmbeddingClient = $this->createRankEvalRunnerWithThrowingEmbeddingClient();
+
+        // Act
+        $lexicalResponseTransfer = $lexicalRunner->evaluate($buildRequestTransfer()->setRankingConfiguration($lexicalConfigurationTransfer));
+        $hybridResponseTransfer = $hybridRunnerWithThrowingEmbeddingClient->evaluate($buildRequestTransfer()->setRankingConfiguration($hybridConfigurationWithBrokenEmbeddingClientTransfer));
+
+        // Assert
+        $lexicalScore = iterator_to_array($lexicalResponseTransfer->getQueryScores())[0]->getMetricScoreOrFail();
+        $hybridScore = iterator_to_array($hybridResponseTransfer->getQueryScores())[0]->getMetricScoreOrFail();
+        $this->assertSame(
+            $lexicalScore,
+            $hybridScore,
+            'An unavailable embedding service must degrade a hybrid candidate to EXACTLY the lexical-only score -- if it doesn\'t, graceful degradation is broken.',
+        );
+    }
+
+    /**
+     * The unit-level counterpart to {@see testEvaluateDegradesToLexicalOnlyWhenTheEmbeddingClientIsUnavailable()}:
+     * proves `embed()` is never even attempted once `alpha >= 1.0` — the exact short-circuit
+     * {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin::resolveQueryVector()}
+     * itself applies. Uses a spying stub rather than the real `evaluate()` path so a bug that fires an
+     * unnecessary embedding call (wasted latency/cost against a real embedding service, once one exists)
+     * is caught even though it wouldn't currently change any score.
+     *
+     * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
+     */
+    public function testResolveQueryVectorNeverCallsEmbedWhenAlphaIsAtOrAboveOne(): void
+    {
+        // Arrange
+        $spyingEmbeddingClient = new class implements EmbeddingClientInterface {
+            public int $embedCallCount = 0;
+
+            // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+            //   interface this test double implements; never actually reached by this test.
+            /**
+             * @param string $text
+             *
+             * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
+             */
+            public function embed(string $text): array
+            {
+                // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+                $this->embedCallCount++;
+
+                throw new EmbeddingUnavailableException('Should never be called for alpha >= 1.0.');
+            }
+        };
+
+        $runner = $this->createRankEvalRunnerWithEmbeddingClient($spyingEmbeddingClient);
+        $resolveQueryVector = new ReflectionMethod($runner, 'resolveQueryVector');
+
+        $lexicalConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())->setAlpha(1.0);
+        $unsetAlphaConfigurationTransfer = new SearchRankingConfigurationStorageTransfer();
+
+        // Act
+        $resultForAlphaOne = $resolveQueryVector->invoke($runner, 'chair', $lexicalConfigurationTransfer);
+        $resultForUnsetAlpha = $resolveQueryVector->invoke($runner, 'chair', $unsetAlphaConfigurationTransfer);
+
+        // Assert
+        $this->assertNull($resultForAlphaOne);
+        $this->assertNull($resultForUnsetAlpha);
+        $this->assertSame(0, $spyingEmbeddingClient->embedCallCount, 'embed() must never be called when alpha >= 1.0 or unset -- there is no vector to blend in either case.');
+    }
+
+    /**
      * Same composition `SearchRankingOptimizerFactory::createRankEvalRunner()` uses in production —
      * including the real `SearchRankingOptimizerToSearchRankingClientBridge`, so this exercises the actual
      * project-override-aware `isSpecificityWeightingEnabled()` resolution (off by default, since nothing in
@@ -387,6 +498,57 @@ class RankEvalRunnerTest extends Unit
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
             new QuerySpecificityCalculator(),
             new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
+        );
+    }
+
+    /**
+     * A `RankEvalRunner` wired with a real embedding-client stub that ALWAYS throws
+     * {@see \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException} — the exact
+     * "embedding service unreachable" state this shop is in right now (P4's `embeddings` Docker service
+     * not yet booted), used to prove {@see testEvaluateDegradesToLexicalOnlyWhenTheEmbeddingClientIsUnavailable()}'s
+     * graceful-degradation contract.
+     *
+     * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
+     */
+    protected function createRankEvalRunnerWithThrowingEmbeddingClient(): RankEvalRunner
+    {
+        $throwingEmbeddingClient = new class implements EmbeddingClientInterface {
+            // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
+            //   interface this test double implements; never actually reached by this test.
+            /**
+             * @param string $text
+             *
+             * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
+             */
+            public function embed(string $text): array
+            {
+                // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
+                throw new EmbeddingUnavailableException('Embedding service unavailable (test double).');
+            }
+        };
+
+        return $this->createRankEvalRunnerWithEmbeddingClient($throwingEmbeddingClient);
+    }
+
+    /**
+     * @param \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface $embeddingClient
+     */
+    protected function createRankEvalRunnerWithEmbeddingClient(EmbeddingClientInterface $embeddingClient): RankEvalRunner
+    {
+        $searchElasticsearchConfig = new SearchElasticsearchConfig();
+        $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
+        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
+
+        return new RankEvalRunner(
+            $elasticaClient,
+            $indexNameResolver,
+            new LiveCatalogSearchQueryBuilder(),
+            new FunctionScoreBuilder(),
+            new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
+            new QuerySpecificityCalculator(),
+            new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
+            $embeddingClient,
+            new InMemorySemanticQueryEmbeddingCache(),
         );
     }
 

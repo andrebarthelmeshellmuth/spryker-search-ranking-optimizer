@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneNotificationDiagnosisTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingHybridComparisonTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
@@ -184,6 +185,37 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $localeName
      */
     public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer;
+
+    /**
+     * Specification:
+     * - P4's own lexical-vs-hybrid comparison (`search-ranking-optimizer:evaluate-hybrid`): runs the SAME
+     *   judged query set for (storeName, localeName) through two ranking configurations, both cloned from
+     *   the LIVE synced configuration — one with `alpha` forced to `1.0` ("lexical", an unambiguous
+     *   baseline regardless of what the live config's own alpha currently is), one with `alpha` set to
+     *   `$alpha` ("hybrid").
+     * - Never persists anything (unlike {@see runRankEvaluation()}) — this is a read-only, on-demand
+     *   comparison report.
+     * - Returns an EMPTY transfer (empty `queryComparisons`, `0.0` aggregates), never `null`, when there is
+     *   nothing to evaluate for that store/locale.
+     *
+     * - $fusionMode selects the "hybrid" side's own fusion mode (see
+     *   `SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::FUSION_MODE_*`) —
+     *   defaults to `FUSION_MODE_LINEAR`, matching every pre-RRF caller unchanged. The "lexical" baseline
+     *   is ALWAYS `FUSION_MODE_LINEAR` with alpha forced to `1.0`, regardless of $fusionMode.
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $alpha
+     * @param string $fusionMode
+     */
+    public function compareLexicalVsHybrid(
+        string $storeName,
+        string $localeName,
+        float $alpha,
+        string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+    ): SearchRankingHybridComparisonTransfer;
 
     /**
      * Specification:

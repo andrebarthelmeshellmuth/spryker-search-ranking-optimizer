@@ -11,6 +11,7 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer\Search;
 
 use Elastica\Client;
 use Elastica\Query\AbstractQuery;
+use Elastica\Query\MatchAll;
 use Elastica\Request;
 use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryScoreTransfer;
@@ -19,8 +20,13 @@ use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
+use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
+use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException;
+use SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilderInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculatorInterface;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Throwable;
@@ -121,6 +127,8 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
      * @param \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface $querySpecificityCalculator
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
+     * @param \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface|null $embeddingClient
+     * @param \SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface|null $semanticQueryEmbeddingCache
      */
     public function __construct(
         Client $elasticaClient,
@@ -130,6 +138,10 @@ class RankEvalRunner implements RankEvalRunnerInterface
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
         protected QuerySpecificityCalculatorInterface $querySpecificityCalculator,
         ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
+        protected ?EmbeddingClientInterface $embeddingClient = null,
+        protected ?SemanticQueryEmbeddingCacheInterface $semanticQueryEmbeddingCache = null,
+        protected ?RrfScoreCalculatorInterface $rrfScoreCalculator = null,
+        protected ?RrfCandidateQueryBuilderInterface $rrfCandidateQueryBuilder = null,
     ) {
         $this->elasticaClient = $elasticaClient;
         $this->indexNameResolver = $indexNameResolver;
@@ -203,6 +215,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
     ): array {
         $rankEvalRequests = [];
         $concreteIndexName = $this->resolveConcreteIndexName($indexName);
+        $queryVectorsBySearchTerm = [];
+        $fusionMode = $requestTransfer->getFusionMode() ?? SearchRankingOptimizerConfig::FUSION_MODE_LINEAR;
+        $isRrfMode = $fusionMode === SearchRankingOptimizerConfig::FUSION_MODE_RRF;
 
         foreach ($requestTransfer->getQueries() as $queryTransfer) {
             $ratings = [];
@@ -220,11 +235,24 @@ class RankEvalRunner implements RankEvalRunnerInterface
             }
 
             $searchTerm = $queryTransfer->getSearchTermOrFail();
-            $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName);
-            $baseQuery = $elasticaQuery->getQuery();
-
             $perQueryConfigurationTransfer = $this->applySpecificityWeighting($indexName, $searchTerm, $configurationTransfer);
-            $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer);
+
+            if (!array_key_exists($searchTerm, $queryVectorsBySearchTerm)) {
+                // RRF mode always attempts a vector regardless of alpha (see resolveQueryVector()'s own
+                // docblock) -- alpha only governs the LINEAR blend's own gating.
+                $queryVectorsBySearchTerm[$searchTerm] = $this->resolveQueryVector($searchTerm, $configurationTransfer, $isRrfMode);
+            }
+
+            if ($isRrfMode) {
+                $wrappedQuery = $this->buildRrfWrappedQuery($searchTerm, $storeName, $localeName, $indexName, $queryVectorsBySearchTerm[$searchTerm]);
+                // RRF already fused the semantic signal in at the retrieval stage -- passing a query
+                // vector here too would double-count it, see this class's own RRF docblock.
+                $queryClause = $this->applyRankingFormula($wrappedQuery, $perQueryConfigurationTransfer, null);
+            } else {
+                $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName);
+                $baseQuery = $elasticaQuery->getQuery();
+                $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer, $queryVectorsBySearchTerm[$searchTerm]);
+            }
 
             $rankEvalRequests[] = [
                 'id' => (string)$queryTransfer->getIdSearchRankingQueryOrFail(),
@@ -239,6 +267,158 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
+     * RRF (Reciprocal Rank Fusion) evaluation path -- an ALTERNATIVE to the linear-blend hybrid formula
+     * `FunctionScoreBuilder` applies (`relevanceWeight * saturatedBM25 + ... alpha * saturatedBM25 +
+     * (1-alpha) * cosineSimilarity ...`), selected via `SearchRankingEvaluationRequestTransfer::getFusionMode()
+     * === SearchRankingOptimizerConfig::FUSION_MODE_RRF`. Linear blending combines two RAW SCORES (BM25
+     * unbounded, cosine bounded to `[-1;1]`) with no single alpha that calibrates well across queries — RRF
+     * instead fuses two independently-retrieved RANK-POSITION lists (lexical, semantic/kNN), a
+     * better-evidenced standard alternative.
+     *
+     * This cluster's OpenSearch 1.3.4 has no native RRF/hybrid-query support (a 2.10+ feature), so the
+     * fusion is computed here in PHP: fire the lexical candidate query and a separate kNN-only candidate
+     * query independently (each capped at {@see SearchRankingOptimizerConfig::getRrfCandidateDepth()}),
+     * compute the fused rank order via {@see RrfScoreCalculatorInterface::fuse()}, then build a NEW query
+     * via {@see RrfCandidateQueryBuilderInterface::build()} whose natural ES result order already reflects
+     * that fused order — entirely without touching `FunctionScoreBuilder` or doing any Painless
+     * doc-value/map lookup (this shop's `search-result-data.*` fields are `index:false`, and doc-value
+     * availability for a Painless map-lookup-by-product-id is uncertain — using ES's always-queryable
+     * native `_id` field instead avoids that risk entirely; see `RrfCandidateQueryBuilder`'s own docblock).
+     * That RRF-ordered query is then handed to the SAME, UNCHANGED `applyRankingFormula()`/
+     * `FunctionScoreBuilder::build()` call the linear path already makes — `FunctionScoreBuilder` needs
+     * ZERO changes, it happily saturates whatever `_score` this query produces, exactly like it already
+     * saturates BM25's `_score` today.
+     *
+     * Gracefully degrades — never throws, never aborts the whole evaluation run — in every failure mode:
+     * no `RrfScoreCalculator`/`RrfCandidateQueryBuilder` wired in at all falls back to the plain unwrapped
+     * lexical query; a failed/unavailable query vector (embedding service down) falls back to an empty
+     * semantic candidate list, which {@see RrfScoreCalculatorInterface::fuse()} itself degrades to exactly
+     * the lexical list's own order (see that interface's own docblock for why that's mathematically the
+     * lexical-only order, not an error state); a failed lexical or semantic candidate retrieval itself
+     * (transient ES error) degrades to an empty candidate list on that side only.
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $indexName
+     * @param array<int, float>|null $queryVector Already resolved via {@see resolveQueryVector()} with
+     *   `$ignoreAlphaGate = true` by the caller -- `null` when unavailable.
+     */
+    protected function buildRrfWrappedQuery(
+        string $searchTerm,
+        string $storeName,
+        string $localeName,
+        string $indexName,
+        ?array $queryVector,
+    ): AbstractQuery {
+        if ($this->rrfScoreCalculator === null || $this->rrfCandidateQueryBuilder === null) {
+            $fallbackQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName)->getQuery();
+
+            return $fallbackQuery instanceof AbstractQuery ? $fallbackQuery : new MatchAll();
+        }
+
+        $candidateDepth = SearchRankingOptimizerConfig::getRrfCandidateDepth();
+
+        $lexicalRankedDocIds = $this->fetchLexicalCandidateDocIds($searchTerm, $storeName, $localeName, $indexName, $candidateDepth);
+        $semanticRankedDocIds = $queryVector !== null
+            ? $this->fetchSemanticCandidateDocIds($queryVector, $indexName, $candidateDepth)
+            : [];
+
+        $fusedRankedDocIds = $this->rrfScoreCalculator->fuse(
+            $lexicalRankedDocIds,
+            $semanticRankedDocIds,
+            SearchRankingOptimizerConfig::getRrfK(),
+        );
+
+        return $this->rrfCandidateQueryBuilder->build($fusedRankedDocIds);
+    }
+
+    /**
+     * Fires the plain (unwrapped) live catalog query capped at $candidateDepth hits and returns just the
+     * ordered `_id` list -- the lexical half of RRF's two independent candidate retrievals. A failure here
+     * (transient ES error) degrades to an empty list rather than aborting the whole evaluation run, same
+     * discipline as {@see fetchIdfByTerm()}.
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     * @param string $indexName
+     * @param int $candidateDepth
+     *
+     * @return array<int, string>
+     */
+    protected function fetchLexicalCandidateDocIds(
+        string $searchTerm,
+        string $storeName,
+        string $localeName,
+        string $indexName,
+        int $candidateDepth,
+    ): array {
+        try {
+            $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName, $candidateDepth);
+            $resultSet = $this->elasticaClient->getIndex($indexName)->search($elasticaQuery);
+        } catch (Throwable) {
+            return [];
+        }
+
+        return array_map(
+            static fn ($result): string => $result->getId(),
+            $resultSet->getResults(),
+        );
+    }
+
+    /**
+     * Fires a pure kNN-only candidate query (no lexical component at all -- OpenSearch 1.3.4's own `knn`
+     * query type, raw request body, same raw-Elastica-request pattern already used elsewhere in this class
+     * for `_rank_eval`/`_termvectors`) and returns just the ordered `_id` list -- the semantic half of
+     * RRF's two independent candidate retrievals. A failure here (embedding index missing, transient ES
+     * error) degrades to an empty list rather than aborting the whole evaluation run.
+     *
+     * @param array<int, float> $queryVector
+     * @param string $indexName
+     * @param int $candidateDepth
+     *
+     * @return array<int, string>
+     */
+    protected function fetchSemanticCandidateDocIds(array $queryVector, string $indexName, int $candidateDepth): array
+    {
+        try {
+            $responseData = $this->elasticaClient->request(
+                sprintf('%s/_search', $indexName),
+                Request::POST,
+                [
+                    'size' => $candidateDepth,
+                    '_source' => false,
+                    'query' => [
+                        'knn' => [
+                            'embedding' => [
+                                'vector' => array_values($queryVector),
+                                'k' => $candidateDepth,
+                            ],
+                        ],
+                    ],
+                ],
+            )->getData();
+        } catch (Throwable) {
+            return [];
+        }
+
+        $hits = is_array($responseData['hits']['hits'] ?? null) ? $responseData['hits']['hits'] : [];
+
+        $docIds = [];
+
+        foreach ($hits as $hit) {
+            if (!is_array($hit) || !isset($hit['_id']) || !is_string($hit['_id'])) {
+                continue;
+            }
+
+            $docIds[] = $hit['_id'];
+        }
+
+        return $docIds;
+    }
+
+    /**
      * Wraps the base catalog query in search-ranking's own business-signal function_score — the same
      * blend `SearchRankingFunctionScoreQueryExpanderPlugin` applies to every real storefront search — so
      * this evaluation measures the ACTUAL configured (or candidate) ranking formula's quality, not raw
@@ -248,18 +428,91 @@ class RankEvalRunner implements RankEvalRunnerInterface
      *
      * @param mixed $queryClause
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
+     * @param array<int, float>|null $queryVector
      */
     protected function applyRankingFormula(
         mixed $queryClause,
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
+        ?array $queryVector = null,
     ): mixed {
         if ($configurationTransfer === null || !($queryClause instanceof AbstractQuery)) {
             return $queryClause;
         }
 
-        $functionScore = $this->functionScoreBuilder->build($queryClause, $configurationTransfer);
+        $functionScore = $this->functionScoreBuilder->build($queryClause, $configurationTransfer, $queryVector);
 
         return $functionScore ?? $queryClause;
+    }
+
+    /**
+     * Resolves `$searchTerm`'s semantic embedding for the hybrid-search blend -- mirrors
+     * {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin::resolveQueryVector()}'s
+     * exact contract (same cache-first-then-embed-with-graceful-degradation shape, same `alpha == 1.0`
+     * short-circuit), reimplemented here rather than reused directly for the same Store/Locator-context
+     * reason the rest of this class already reimplements the specificity-probe IO instead of reusing
+     * `QueryTermFrequencyFetcher` (see this class's own docblock): that plugin only runs inside a real
+     * Yves/Client request, unreachable from this package's Zed/console execution context.
+     *
+     * Returns `null` (never throws) whenever no vector can usefully be used: no configuration at all,
+     * no embedding client/cache wired in (both constructor params are optional -- a caller that omits
+     * them gets pure lexical evaluation, same as omitting `$searchRankingClient`), `alpha == null` or
+     * `alpha >= 1.0` (100% lexical, no point paying for an embedding that would never be blended in), or
+     * a cache miss followed by any {@see \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException}
+     * (embedding service down/timed out/misconfigured/not yet booted -- see this package's own README on
+     * the P4 rollout state). `FunctionScoreBuilder::build()` degrades to exactly the lexical-only formula
+     * whenever this returns `null` -- an embedding failure must never abort the whole evaluation run,
+     * exactly like the live plugin never lets it abort a real search request.
+     *
+     * @param string $searchTerm
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
+     *
+     * @return array<int, float>|null
+     */
+    protected function resolveQueryVector(
+        string $searchTerm,
+        ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
+        bool $ignoreAlphaGate = false,
+    ): ?array {
+        if ($this->embeddingClient === null || $this->semanticQueryEmbeddingCache === null) {
+            return null;
+        }
+
+        // RRF mode (see buildRrfWrappedQuery()) always needs a real vector to run its own kNN candidate
+        // query, regardless of what `alpha` is set to -- RRF is a fundamentally different fusion mode that
+        // doesn't gate semantic retrieval on alpha at all (that knob only governs the LINEAR blend). Every
+        // other caller keeps the original alpha-gated contract unchanged.
+        if (!$ignoreAlphaGate) {
+            if ($configurationTransfer === null) {
+                return null;
+            }
+
+            $alpha = $configurationTransfer->getAlpha();
+
+            // A null alpha (no explicit setAlpha() call) is treated the same as the documented default of
+            // 1.0 -- see FunctionScoreBuilder::buildTextComponent()'s own matching guard.
+            if ($alpha === null || $alpha >= 1.0) {
+                return null;
+            }
+        }
+
+        $modelId = SearchRankingOptimizerConfig::getEmbeddingModelId();
+        $cachedVector = $this->semanticQueryEmbeddingCache->get($searchTerm, $modelId);
+
+        if ($cachedVector !== null) {
+            return $cachedVector;
+        }
+
+        $queryText = SearchRankingOptimizerConfig::getEmbeddingQueryInstructionPrefix() . $searchTerm;
+
+        try {
+            $vector = $this->embeddingClient->embed($queryText);
+        } catch (EmbeddingUnavailableException) {
+            return null;
+        }
+
+        $this->semanticQueryEmbeddingCache->set($searchTerm, $modelId, $vector);
+
+        return $vector;
     }
 
     /**

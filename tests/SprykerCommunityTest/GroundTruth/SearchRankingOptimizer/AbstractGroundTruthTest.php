@@ -44,6 +44,7 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterfac
 use SprykerCommunity\Client\SearchRankingStorage\SearchRankingStorageClient;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRanking\Business\SearchRankingFacade;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
@@ -1223,7 +1224,7 @@ abstract class AbstractGroundTruthTest extends Unit
             $this->getRepository(),
             $this->getEntityManager(),
             $forcedEnabledFacade,
-            new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper()),
+            new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper(), $forcedEnabledFacade, new QueryBucketClassifier()),
             new FormulaDeterminismChecker(),
             new AlgorithmFactory(),
         );

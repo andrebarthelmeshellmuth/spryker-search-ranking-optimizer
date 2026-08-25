@@ -15,11 +15,14 @@ use Generated\Shared\Transfer\SearchRankingEvaluationQueryScoreTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingHybridComparisonTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryRatingTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryTransfer;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -228,15 +231,123 @@ class RankEvaluationRunnerTest extends Unit
         $this->assertNotNull($result);
     }
 
+    public function testCompareLexicalVsHybridReturnsAnEmptyComparisonWhenNoQueriesExistForStoreLocale(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock);
+
+        // Act
+        $result = $runner->compareLexicalVsHybrid('DE', 'en_US', 0.5);
+
+        // Assert
+        $this->assertInstanceOf(SearchRankingHybridComparisonTransfer::class, $result);
+        $this->assertCount(0, iterator_to_array($result->getQueryComparisons()));
+        $this->assertSame(0.0, $result->getLexicalWeightedAggregate());
+        $this->assertSame(0.0, $result->getHybridWeightedAggregate());
+    }
+
+    /**
+     * Proves the two defining behaviors of this method in one test: (1) "lexical" is ALWAYS forced to
+     * alpha=1.0 regardless of what the live configuration's own alpha is (here deliberately set to 0.7, a
+     * value that would leak through if the override were missing), and (2) "hybrid" gets the candidate
+     * alpha instead — i.e. the two `evaluateRankings()` calls fire against genuinely different
+     * configurations, not the same one twice.
+     */
+    public function testCompareLexicalVsHybridForcesLexicalConfigurationAlphaToOneRegardlessOfTheLiveConfiguration(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([$this->createQueryTransfer(1, 'chair', 1.0)]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $liveConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())
+            ->setRelevanceWeight(0.5)
+            ->setAlpha(0.7);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn($liveConfigurationTransfer);
+
+        $seenAlphas = [];
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->expects($this->exactly(2))
+            ->method('evaluateRankings')
+            ->with($this->callback(function (SearchRankingEvaluationRequestTransfer $requestTransfer) use (&$seenAlphas): bool {
+                $seenAlphas[] = $requestTransfer->getRankingConfigurationOrFail()->getAlpha();
+
+                return true;
+            }))
+            ->willReturn(
+                (new SearchRankingEvaluationResponseTransfer())
+                    ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.5)),
+            );
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingClientMock, $searchRankingFacadeMock);
+
+        // Act
+        $runner->compareLexicalVsHybrid('DE', 'en_US', 0.3);
+
+        // Assert
+        $this->assertSame([1.0, 0.3], $seenAlphas, 'The lexical call must always use alpha=1.0 (never the live config\'s own 0.7), and the hybrid call must use the requested candidate alpha (0.3).');
+    }
+
+    /**
+     * Proves the per-query join/bucket-tag/delta computation: two different scores for the SAME query id
+     * from the two `evaluateRankings()` calls must produce exactly one `SearchRankingQueryComparisonTransfer`
+     * with both scores, the correct bucket (via the real {@see QueryBucketClassifier}, not a mock — "office
+     * chair" is a real bucket-3 entry), and `delta = hybridScore - lexicalScore`.
+     */
+    public function testCompareLexicalVsHybridJoinsPerQueryScoresAndComputesDelta(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findQueriesByStoreLocale')->willReturn([$this->createQueryTransfer(1, 'office chair', 1.0)]);
+        $repositoryMock->method('findRatingsByStoreLocale')->willReturn([$this->createRatingTransfer(1, 100, 'heart')]);
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->method('getConfiguration')->willReturn(new SearchRankingConfigurationStorageTransfer());
+
+        $lexicalResponseTransfer = (new SearchRankingEvaluationResponseTransfer())
+            ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.4));
+        $hybridResponseTransfer = (new SearchRankingEvaluationResponseTransfer())
+            ->addQueryScore((new SearchRankingEvaluationQueryScoreTransfer())->setIdSearchRankingQuery(1)->setMetricScore(0.7));
+
+        $searchRankingClientMock = $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class);
+        $searchRankingClientMock->method('evaluateRankings')->willReturnOnConsecutiveCalls($lexicalResponseTransfer, $hybridResponseTransfer);
+
+        $runner = $this->createRunner($repositoryMock, $this->createMock(SearchRankingOptimizerEntityManagerInterface::class), $searchRankingClientMock, $searchRankingFacadeMock);
+
+        // Act
+        $result = $runner->compareLexicalVsHybrid('DE', 'en_US', 0.5);
+
+        // Assert
+        $queryComparisonTransfers = iterator_to_array($result->getQueryComparisons());
+        $this->assertCount(1, $queryComparisonTransfers);
+        $queryComparisonTransfer = $queryComparisonTransfers[0];
+        $this->assertSame(1, $queryComparisonTransfer->getIdSearchRankingQuery());
+        $this->assertSame('office chair', $queryComparisonTransfer->getSearchTerm());
+        $this->assertSame(QueryBucketClassifier::BUCKET_GENERIC_PRODUCT_TYPE, $queryComparisonTransfer->getBucket());
+        $this->assertEqualsWithDelta(0.4, $queryComparisonTransfer->getLexicalScore(), 0.0001);
+        $this->assertEqualsWithDelta(0.7, $queryComparisonTransfer->getHybridScore(), 0.0001);
+        $this->assertEqualsWithDelta(0.3, $queryComparisonTransfer->getDelta(), 0.0001);
+    }
+
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null $searchRankingFacade
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerEntityManagerInterface $entityManager,
         ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
+        ?SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade = null,
     ): RankEvaluationRunner {
         $gainMapperMock = $this->createMock(RelevanceJudgmentGainMapperInterface::class);
         $gainMapperMock->method('mapRatingType')->willReturnMap([
@@ -250,6 +361,8 @@ class RankEvaluationRunnerTest extends Unit
             $entityManager,
             $searchRankingClient ?? $this->createMock(SearchRankingOptimizerToSearchRankingClientInterface::class),
             $gainMapperMock,
+            $searchRankingFacade ?? $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class),
+            new QueryBucketClassifier(),
         );
     }
 

@@ -22,6 +22,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckp
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifier;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
@@ -142,7 +144,14 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getEntityManager(),
             $this->getSearchRankingClient(),
             $this->createRelevanceJudgmentGainMapper(),
+            $this->getSearchRankingFacade(),
+            $this->createQueryBucketClassifier(),
         );
+    }
+
+    public function createQueryBucketClassifier(): QueryBucketClassifierInterface
+    {
+        return new QueryBucketClassifier();
     }
 
     public function createWeightCheckpointRecorder(): WeightCheckpointRecorderInterface
