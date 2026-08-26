@@ -11,6 +11,7 @@ namespace SprykerCommunity\Client\SearchRankingOptimizer;
 
 use Spryker\Client\Kernel\AbstractDependencyProvider;
 use Spryker\Client\Kernel\Container;
+use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToZedRequestBridge;
@@ -33,6 +34,17 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
     public const CLIENT_SEARCH_RANKING = 'CLIENT_SEARCH_RANKING';
 
     /**
+     * The raw KV Storage client -- backs {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s
+     * Intent-Aware Alpha SKU-identifier lookup. Reuses search-ranking's own
+     * `SearchRankingToStorageClientBridge`/`SearchRankingToStorageClientInterface` directly (same posture
+     * as `CLIENT_SEARCH_RANKING` above, which reuses that package's Client interface unwrapped) rather than
+     * adding a redundant search-ranking-optimizer-specific wrapper for a two-method get/set interface.
+     *
+     * @var string
+     */
+    public const CLIENT_STORAGE = 'CLIENT_STORAGE';
+
+    /**
      * @param \Spryker\Client\Kernel\Container $container
      */
     #[\Override]
@@ -42,6 +54,7 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
         $container = $this->addZedRequestClient($container);
         $container = $this->addSearchRankingStorageClient($container);
         $container = $this->addSearchRankingClient($container);
+        $container = $this->addStorageClient($container);
 
         return $container;
     }
@@ -72,6 +85,16 @@ class SearchRankingOptimizerDependencyProvider extends AbstractDependencyProvide
     protected function addSearchRankingClient(Container $container): Container
     {
         $container->set(static::CLIENT_SEARCH_RANKING, fn (Container $container) => new SearchRankingOptimizerToSearchRankingClientBridge($container->getLocator()->searchRanking()->client()));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Client\Kernel\Container $container
+     */
+    protected function addStorageClient(Container $container): Container
+    {
+        $container->set(static::CLIENT_STORAGE, fn (Container $container) => new SearchRankingToStorageClientBridge($container->getLocator()->storage()->client()));
 
         return $container;
     }

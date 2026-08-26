@@ -15,7 +15,10 @@ use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
+use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculator;
+use SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
 use SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface;
@@ -105,12 +108,23 @@ class SearchRankingOptimizerFactory extends AbstractFactory
             $this->createSemanticQueryEmbeddingCache(),
             $this->createRrfScoreCalculator(),
             $this->createRrfCandidateQueryBuilder(),
+            $this->getStorageClient(),
+            $this->createNavigationalRelevanceWeightShiftCalculator(),
         );
     }
 
     public function createRrfScoreCalculator(): RrfScoreCalculatorInterface
     {
         return new RrfScoreCalculator();
+    }
+
+    /**
+     * Stateless/pure math (no IO, no Store-singleton dependency) — safe to construct directly here, same
+     * reasoning as {@see createEmbeddingClient()}'s own docblock.
+     */
+    public function createNavigationalRelevanceWeightShiftCalculator(): NavigationalRelevanceWeightShiftCalculatorInterface
+    {
+        return new NavigationalRelevanceWeightShiftCalculator();
     }
 
     public function createRrfCandidateQueryBuilder(): RrfCandidateQueryBuilderInterface
@@ -151,6 +165,18 @@ class SearchRankingOptimizerFactory extends AbstractFactory
     public function getSearchRankingStorageClient(): SearchRankingOptimizerToSearchRankingStorageClientInterface
     {
         return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_STORAGE);
+    }
+
+    /**
+     * Reuses search-ranking's own `SearchRankingToStorageClientInterface` directly, unwrapped -- the same
+     * "no redundant package-specific bridge for a type this package already depends on via search-ranking's
+     * Client layer" posture as {@see createFunctionScoreBuilder()}/{@see createQuerySpecificityCalculator()}
+     * above. Backs {@see RankEvalRunner}'s Intent-Aware Alpha SKU-identifier lookup — see that class's own
+     * `$storageClient` constructor docblock.
+     */
+    public function getStorageClient(): SearchRankingToStorageClientInterface
+    {
+        return $this->getProvidedDependency(SearchRankingOptimizerDependencyProvider::CLIENT_STORAGE);
     }
 
     public function getSearchRankingClient(): SearchRankingOptimizerToSearchRankingClientInterface

@@ -17,8 +17,15 @@ use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryScoreTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryContextTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
+use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface;
+use SprykerCommunity\Client\SearchRanking\Intent\BrandAnalyzer;
+use SprykerCommunity\Client\SearchRanking\Intent\CategoryAnalyzer;
+use SprykerCommunity\Client\SearchRanking\Intent\SkuIdentifierAnalyzer;
+use SprykerCommunity\Client\SearchRanking\Intent\SuggestIndexEntityLookup;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
+use SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
 use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException;
@@ -120,6 +127,37 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected static array $concreteIndexNameCache = [];
 
     /**
+     * Process-scoped cache of one {@see SkuIdentifierAnalyzer} per store name — same rationale as
+     * {@see $idfCache}/{@see $concreteIndexNameCache}: a fresh `RankEvalRunner` is built on every single
+     * `SearchRankingOptimizerFactory::createRankEvalRunner()` call, but the
+     * {@see \SprykerCommunity\Client\SearchRanking\Intent\SuggestIndexEntityLookup} each analyzer wraps
+     * fires a real OpenSearch request on every `exists()`/`suggest()` call, otherwise re-fired on every
+     * single query term of every single evaluate() call, within one run that can fire thousands of them.
+     * Store name is the only part of the entity-lookup index name that varies within one run (see
+     * {@see resolveQueryContextTransfer()}), so it's the cache key here too. Same `IDF_CACHE_TTL_SECONDS`
+     * staleness bound as the other two static caches, for the same PHP-FPM-worker-reuse reason.
+     *
+     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\SkuIdentifierAnalyzer, 1: float}>
+     */
+    protected static array $skuIdentifierAnalyzerCache = [];
+
+    /**
+     * Process-scoped cache of one {@see BrandAnalyzer} per store name — same rationale/TTL as
+     * {@see $skuIdentifierAnalyzerCache}.
+     *
+     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\BrandAnalyzer, 1: float}>
+     */
+    protected static array $brandAnalyzerCache = [];
+
+    /**
+     * Process-scoped cache of one {@see CategoryAnalyzer} per store name — same rationale/TTL as
+     * {@see $skuIdentifierAnalyzerCache}.
+     *
+     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\CategoryAnalyzer, 1: float}>
+     */
+    protected static array $categoryAnalyzerCache = [];
+
+    /**
      * @param \Elastica\Client $elasticaClient
      * @param \Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface $indexNameResolver
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
@@ -129,6 +167,20 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
      * @param \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface|null $embeddingClient
      * @param \SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface|null $semanticQueryEmbeddingCache
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculatorInterface|null $rrfScoreCalculator
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilderInterface|null $rrfCandidateQueryBuilder
+     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface|null $storageClient Backs the
+     *   Intent-Aware Alpha SKU/brand/category lookups (see {@see resolveQueryContextTransfer()}) — omitted
+     *   (the default) degrades to no identifier/brand/category detection at all, i.e. today's behavior:
+     *   `alpha` is never force-overridden to `1.0`, and `detectedBrand`/`detectedCategory` are never set,
+     *   for any query.
+     * @param \SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface|null $navigationalRelevanceWeightShiftCalculator
+     *   Backs Intent-Aware Alpha Pass 3's navigational relevanceWeight shift (see
+     *   {@see applyNavigationalShift()}) — omitted (the default) degrades to no shift applied at all, i.e.
+     *   today's behavior before this wiring existed. Stateless/pure math (no IO), so unlike
+     *   `$querySpecificityCalculator` it is NOT reused directly from a shared factory method that also
+     *   needs an IO-bound reimplementation — it's simply optional here the same way every other
+     *   Intent-Aware-Alpha-adjacent dependency in this class already is.
      */
     public function __construct(
         Client $elasticaClient,
@@ -142,6 +194,8 @@ class RankEvalRunner implements RankEvalRunnerInterface
         protected ?SemanticQueryEmbeddingCacheInterface $semanticQueryEmbeddingCache = null,
         protected ?RrfScoreCalculatorInterface $rrfScoreCalculator = null,
         protected ?RrfCandidateQueryBuilderInterface $rrfCandidateQueryBuilder = null,
+        protected ?SearchRankingToStorageClientInterface $storageClient = null,
+        protected ?NavigationalRelevanceWeightShiftCalculatorInterface $navigationalRelevanceWeightShiftCalculator = null,
     ) {
         $this->elasticaClient = $elasticaClient;
         $this->indexNameResolver = $indexNameResolver;
@@ -236,6 +290,8 @@ class RankEvalRunner implements RankEvalRunnerInterface
 
             $searchTerm = $queryTransfer->getSearchTermOrFail();
             $perQueryConfigurationTransfer = $this->applySpecificityWeighting($indexName, $searchTerm, $configurationTransfer);
+            $queryContextTransfer = $this->resolveQueryContextTransfer($searchTerm, $storeName, $localeName);
+            $perQueryConfigurationTransfer = $this->applyNavigationalShift($perQueryConfigurationTransfer, $queryContextTransfer);
 
             if (!array_key_exists($searchTerm, $queryVectorsBySearchTerm)) {
                 // RRF mode always attempts a vector regardless of alpha (see resolveQueryVector()'s own
@@ -246,12 +302,15 @@ class RankEvalRunner implements RankEvalRunnerInterface
             if ($isRrfMode) {
                 $wrappedQuery = $this->buildRrfWrappedQuery($searchTerm, $storeName, $localeName, $indexName, $queryVectorsBySearchTerm[$searchTerm]);
                 // RRF already fused the semantic signal in at the retrieval stage -- passing a query
-                // vector here too would double-count it, see this class's own RRF docblock.
-                $queryClause = $this->applyRankingFormula($wrappedQuery, $perQueryConfigurationTransfer, null);
+                // vector here too would double-count it, see this class's own RRF docblock. The query
+                // context is passed through anyway for consistency -- harmless, since the identifier-match
+                // override only ever affects the semantic term FunctionScoreBuilder builds from a
+                // non-null query vector, and that's already null on this path.
+                $queryClause = $this->applyRankingFormula($wrappedQuery, $perQueryConfigurationTransfer, null, $queryContextTransfer);
             } else {
                 $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName);
                 $baseQuery = $elasticaQuery->getQuery();
-                $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer, $queryVectorsBySearchTerm[$searchTerm]);
+                $queryClause = $this->applyRankingFormula($baseQuery, $perQueryConfigurationTransfer, $queryVectorsBySearchTerm[$searchTerm], $queryContextTransfer);
             }
 
             $rankEvalRequests[] = [
@@ -429,19 +488,188 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param mixed $queryClause
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
      * @param array<int, float>|null $queryVector
+     * @param \Generated\Shared\Transfer\SearchRankingQueryContextTransfer|null $queryContextTransfer
      */
     protected function applyRankingFormula(
         mixed $queryClause,
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
         ?array $queryVector = null,
+        ?SearchRankingQueryContextTransfer $queryContextTransfer = null,
     ): mixed {
         if ($configurationTransfer === null || !($queryClause instanceof AbstractQuery)) {
             return $queryClause;
         }
 
-        $functionScore = $this->functionScoreBuilder->build($queryClause, $configurationTransfer, $queryVector);
+        $functionScore = $this->functionScoreBuilder->build($queryClause, $configurationTransfer, $queryVector, $queryContextTransfer);
 
         return $functionScore ?? $queryClause;
+    }
+
+    /**
+     * Runs {@see SkuIdentifierAnalyzer}, {@see BrandAnalyzer}, and {@see CategoryAnalyzer} against
+     * `$searchTerm` so this evaluation harness honors Intent-Aware Alpha's identifier-match override AND
+     * Pass 3's navigational relevanceWeight shift exactly like real storefront traffic does — without this,
+     * an identifier/SKU query's measured hybrid-search quality would reflect whatever `alpha` the candidate
+     * configuration happens to specify globally, even though `FunctionScoreBuilder` itself would never
+     * actually apply that alpha to this exact query live (see {@see \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder::buildTextComponent()}),
+     * and a brand/category query's `brandMatchRelevanceWeightShift`/`categoryMatchRelevanceWeightShift`
+     * (see {@see applyNavigationalShift()}) would have nothing to act on at all.
+     *
+     * Brand/CategoryAnalyzer are now wired here (unlike when this docblock originally shipped alongside
+     * Pass 2, when both were still detection-only everywhere): Pass 3 made `detectedBrand`/`detectedCategory`
+     * a real scoring input (via {@see \SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface},
+     * applied by `SearchRankingFunctionScoreQueryExpanderPlugin` on the live storefront) — running them here
+     * too is no longer pure overhead, it's required for this harness to measure that mechanism at all.
+     *
+     * Returns `null` (never throws) whenever NONE of the three analyzers can run at all: no storage client
+     * wired in (the default — omitting the constructor param degrades to exactly today's behavior, no
+     * override/shift for any query) — each analyzer's own `analyze()` already degrades every internal
+     * failure (KV read error, malformed cached shape regex) to "no match" without throwing, so nothing
+     * further needs catching here.
+     *
+     * @param string $searchTerm
+     * @param string $storeName
+     * @param string $localeName
+     */
+    protected function resolveQueryContextTransfer(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryContextTransfer
+    {
+        $storageClient = $this->storageClient;
+
+        if ($storageClient === null) {
+            return null;
+        }
+
+        $queryContextTransfer = (new SearchRankingQueryContextTransfer())
+            ->setSearchString($searchTerm)
+            ->setStoreName($storeName)
+            ->setLocaleName($localeName);
+
+        $queryContextTransfer = $this->getSkuIdentifierAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
+        $queryContextTransfer = $this->getBrandAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
+
+        return $this->getCategoryAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
+    }
+
+    /**
+     * Composes {@see NavigationalRelevanceWeightShiftCalculatorInterface} on top of whatever
+     * `relevanceWeight` {@see applySpecificityWeighting()} already produced — mirrors
+     * `SearchRankingFunctionScoreQueryExpanderPlugin::applyNavigationalShift()`'s own composition order on
+     * the live storefront. A no-op (the same instance, unchanged) whenever there's no configuration, no
+     * query context (e.g. no storage client wired in), or no calculator wired in at all.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingQueryContextTransfer|null $queryContextTransfer
+     */
+    protected function applyNavigationalShift(
+        ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
+        ?SearchRankingQueryContextTransfer $queryContextTransfer,
+    ): ?SearchRankingConfigurationStorageTransfer {
+        if ($configurationTransfer === null || $queryContextTransfer === null || $this->navigationalRelevanceWeightShiftCalculator === null) {
+            return $configurationTransfer;
+        }
+
+        $effectiveRelevanceWeight = $this->navigationalRelevanceWeightShiftCalculator->calculateEffectiveRelevanceWeight(
+            (float)$configurationTransfer->getRelevanceWeight(),
+            $configurationTransfer,
+            $queryContextTransfer,
+        );
+
+        return (clone $configurationTransfer)->setRelevanceWeight($effectiveRelevanceWeight);
+    }
+
+    /**
+     * @see $skuIdentifierAnalyzerCache for the process-scoped caching rationale.
+     *
+     * @param string $storeName
+     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
+     */
+    protected function getSkuIdentifierAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): SkuIdentifierAnalyzer
+    {
+        $cached = static::$skuIdentifierAnalyzerCache[$storeName] ?? null;
+
+        if ($cached !== null && $cached[1] > microtime(true)) {
+            return $cached[0];
+        }
+
+        $skuEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_SKU);
+        $skuIdentifierAnalyzer = new SkuIdentifierAnalyzer($skuEntityLookup);
+
+        static::$skuIdentifierAnalyzerCache[$storeName] = [$skuIdentifierAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
+
+        return $skuIdentifierAnalyzer;
+    }
+
+    /**
+     * @see $brandAnalyzerCache for the process-scoped caching rationale. Same
+     * `{prefix}_{storeName}_entity-lookup` index-name scheme `search-ranking`'s own
+     * `SearchRankingFactory::createSuggestIndexEntityLookup()` uses (ES is the only entity-lookup backend
+     * now — see that package's README/install checker).
+     *
+     * @param string $storeName
+     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
+     */
+    protected function getBrandAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): BrandAnalyzer
+    {
+        $cached = static::$brandAnalyzerCache[$storeName] ?? null;
+
+        if ($cached !== null && $cached[1] > microtime(true)) {
+            return $cached[0];
+        }
+
+        $brandEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_BRAND);
+        // `search-ranking`'s own BrandAnalyzer takes a second, category-scoped lookup for brand/category
+        // disambiguation (a term matching both, e.g. "office", defers to category -- see BrandAnalyzer's own
+        // docblock) -- mirror that here with a fresh SuggestIndexEntityLookup instance over the same entity
+        // type {@see getCategoryAnalyzer()} uses, so this harness's brandMatchRelevanceWeightShift measurement
+        // reflects the same disambiguation real storefront traffic gets.
+        $categoryEntityLookupForBrandDisambiguation = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_CATEGORY);
+        $brandAnalyzer = new BrandAnalyzer($brandEntityLookup, $categoryEntityLookupForBrandDisambiguation);
+
+        static::$brandAnalyzerCache[$storeName] = [$brandAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
+
+        return $brandAnalyzer;
+    }
+
+    /**
+     * @see $categoryAnalyzerCache for the process-scoped caching rationale. Same index-name scheme as
+     * {@see getBrandAnalyzer()}.
+     *
+     * @param string $storeName
+     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
+     */
+    protected function getCategoryAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): CategoryAnalyzer
+    {
+        $cached = static::$categoryAnalyzerCache[$storeName] ?? null;
+
+        if ($cached !== null && $cached[1] > microtime(true)) {
+            return $cached[0];
+        }
+
+        $categoryEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_CATEGORY);
+        $categoryAnalyzer = new CategoryAnalyzer($categoryEntityLookup);
+
+        static::$categoryAnalyzerCache[$storeName] = [$categoryAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
+
+        return $categoryAnalyzer;
+    }
+
+    /**
+     * Builds a {@see SuggestIndexEntityLookup} for `$entityType`, scoped to `$storeName` — same
+     * `{prefix}_{storeName}_entity-lookup` index-name scheme `search-ranking`'s own
+     * `SearchRankingFactory::createSuggestIndexEntityLookup()` uses, resolved here via
+     * `$indexNameResolver` (already available on this class for the exact same Store-singleton-avoidance
+     * reason documented on this class itself) instead of that factory's own
+     * `getStoreClient()->getCurrentStore()`-based resolution, which is unavailable in this package's
+     * Zed/console execution context.
+     *
+     * @param string $storeName
+     * @param string $entityType
+     */
+    protected function createSuggestIndexEntityLookup(string $storeName, string $entityType): SuggestIndexEntityLookup
+    {
+        $indexName = $this->indexNameResolver->resolve(SearchRankingConfig::ENTITY_LOOKUP_SUGGEST_INDEX_SOURCE_IDENTIFIER, $storeName);
+
+        return new SuggestIndexEntityLookup($this->elasticaClient, $indexName, $entityType);
     }
 
     /**

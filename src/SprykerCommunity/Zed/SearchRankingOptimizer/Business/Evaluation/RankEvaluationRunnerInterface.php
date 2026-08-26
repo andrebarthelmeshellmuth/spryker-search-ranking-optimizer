@@ -78,16 +78,26 @@ interface RankEvaluationRunnerInterface
      *   Defaults to `FUSION_MODE_LINEAR`, matching every pre-RRF caller unchanged. The "lexical" baseline
      *   request is ALWAYS `FUSION_MODE_LINEAR` with `alpha` forced to `1.0` regardless of $fusionMode —
      *   RRF/alpha are both irrelevant to a pure-lexical baseline.
+     * - $brandShift/$categoryShift set `brandMatchRelevanceWeightShift`/`categoryMatchRelevanceWeightShift`
+     *   on the "hybrid" side's candidate configuration ONLY — measures Intent-Aware Alpha Pass 3's
+     *   navigational relevance-weight shift in isolation from the alpha/fusion question. Both default to
+     *   `0.0`, matching today's real production default (inert) and every pre-existing caller unchanged.
+     *   The "lexical" baseline is ALWAYS forced to `0.0` for both, exactly like it already forces
+     *   `alpha = 1.0` — an unambiguous baseline must never carry a candidate-only shift.
      *
      * @param string $storeName
      * @param string $localeName
      * @param float $alpha
      * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
      */
     public function compareLexicalVsHybrid(
         string $storeName,
         string $localeName,
         float $alpha,
         string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
     ): SearchRankingHybridComparisonTransfer;
 }

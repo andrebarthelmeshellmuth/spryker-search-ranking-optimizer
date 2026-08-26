@@ -116,12 +116,16 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
      * @param string $localeName
      * @param float $alpha
      * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
      */
     public function compareLexicalVsHybrid(
         string $storeName,
         string $localeName,
         float $alpha,
         string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
     ): SearchRankingHybridComparisonTransfer {
         $comparisonTransfer = (new SearchRankingHybridComparisonTransfer())
             ->setStoreName($storeName)
@@ -149,8 +153,14 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
         // currently is -- "lexical" must always be an unambiguous baseline, never accidentally inherit a
         // non-1.0 alpha left over from a prior manual test.
         $liveConfigurationTransfer = $this->searchRankingFacade->getConfiguration($storeName, $localeName);
-        $lexicalConfigurationTransfer = (clone $liveConfigurationTransfer)->setAlpha(1.0);
-        $hybridConfigurationTransfer = (clone $liveConfigurationTransfer)->setAlpha($alpha);
+        $lexicalConfigurationTransfer = (clone $liveConfigurationTransfer)
+            ->setAlpha(1.0)
+            ->setBrandMatchRelevanceWeightShift(0.0)
+            ->setCategoryMatchRelevanceWeightShift(0.0);
+        $hybridConfigurationTransfer = (clone $liveConfigurationTransfer)
+            ->setAlpha($alpha)
+            ->setBrandMatchRelevanceWeightShift($brandShift)
+            ->setCategoryMatchRelevanceWeightShift($categoryShift);
 
         // The lexical baseline is ALWAYS the unchanged linear formula with alpha forced to 1.0 -- RRF
         // (and alpha itself) are only ever relevant to the "hybrid" side of this comparison.

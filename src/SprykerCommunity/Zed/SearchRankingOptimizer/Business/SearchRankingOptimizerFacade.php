@@ -190,14 +190,18 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
      * @param string $localeName
      * @param float $alpha
      * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
      */
     public function compareLexicalVsHybrid(
         string $storeName,
         string $localeName,
         float $alpha,
         string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
     ): SearchRankingHybridComparisonTransfer {
-        return $this->getFactory()->createRankEvaluationRunner()->compareLexicalVsHybrid($storeName, $localeName, $alpha, $fusionMode);
+        return $this->getFactory()->createRankEvaluationRunner()->compareLexicalVsHybrid($storeName, $localeName, $alpha, $fusionMode, $brandShift, $categoryShift);
     }
 
     /**

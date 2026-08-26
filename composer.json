@@ -32,6 +32,7 @@
         "spryker/router": "^1.21.0",
         "spryker/search-elasticsearch": "^1.10.0",
         "spryker/serializer": "^1.0.0",
+        "spryker/storage": "^3.4.0",
         "spryker/store": "^1.0.0",
         "spryker/symfony-mailer": "^1.5.0",
         "spryker/transfer": "^3.25.0",

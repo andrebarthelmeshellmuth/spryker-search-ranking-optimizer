@@ -202,6 +202,10 @@ interface SearchRankingOptimizerFacadeInterface
      *   `SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::FUSION_MODE_*`) —
      *   defaults to `FUSION_MODE_LINEAR`, matching every pre-RRF caller unchanged. The "lexical" baseline
      *   is ALWAYS `FUSION_MODE_LINEAR` with alpha forced to `1.0`, regardless of $fusionMode.
+     * - $brandShift/$categoryShift set the "hybrid" side's candidate `brandMatchRelevanceWeightShift`/
+     *   `categoryMatchRelevanceWeightShift` ONLY — both default to `0.0` (today's real production default,
+     *   inert), matching every pre-existing caller unchanged. The "lexical" baseline is ALWAYS forced to
+     *   `0.0` for both, regardless of $brandShift/$categoryShift.
      *
      * @api
      *
@@ -209,12 +213,16 @@ interface SearchRankingOptimizerFacadeInterface
      * @param string $localeName
      * @param float $alpha
      * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
      */
     public function compareLexicalVsHybrid(
         string $storeName,
         string $localeName,
         float $alpha,
         string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
     ): SearchRankingHybridComparisonTransfer;
 
     /**
