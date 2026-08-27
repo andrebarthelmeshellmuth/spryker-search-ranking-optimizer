@@ -2,7 +2,7 @@ includes:
     - phpstan.neon
 
 # CI-only variant of phpstan.neon, run via `composer phpstan-ci` (see tests/_ci-standalone for the same
-# standalone-portability pattern already used by the Portable Codeception suite). Two categories of class
+# standalone-portability pattern already used by the Portable Codeception suite). Three categories of class
 # genuinely don't exist outside a real host shop and are excluded rather than faked:
 #
 # - `Generated\{Zed,Yves,Client,Service}\Ide\AutoCompletion` — an aggregate stub across every module in a
@@ -13,10 +13,14 @@ includes:
 #   cause surfacing through a `@var class-string<...>` docblock instead of a plain class.notFound —
 #   PHPStan can't confirm the referenced Orm\Zed\* classes are ModelCriteria subtypes without them
 #   existing to check against.
+# - `Generated\Api\*` (API Platform resource classes, e.g. `SearchRelevanceJudgmentsStorefrontResource`) —
+#   produced by `vendor/bin/glue api:generate` against a full Symfony bundle boot (spryker/api-platform's
+#   `SprykerApiPlatformBundle`), not a lightweight generator this package can drive standalone the way
+#   `tests/_ci-standalone/generate-transfers.php` drives the plain Transfer generator.
 #
-# Both are still exercised for real by this package's DB-backed Codeception suite when run from a host
-# shop (see README, "Testing and CI") — this file only relaxes what a single standalone package checkout
-# can verify about itself.
+# All three are still exercised for real by this package's DB-backed Codeception suite when run from a
+# host shop (see README, "Testing and CI") — this file only relaxes what a single standalone package
+# checkout can verify about itself.
 parameters:
     bootstrapFiles!:
         - phpstan-ci-bootstrap.php
@@ -32,3 +36,5 @@ parameters:
             message: '#Orm\\Zed\\#'
         -
             identifier: classConstant.phpDocType
+        -
+            message: '#Generated\\Api\\#'
