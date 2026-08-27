@@ -377,9 +377,7 @@ class SearchRankingOptimizerEntityManager extends AbstractEntityManager implemen
             ->filterByLocaleName($localeName)
             ->findOne();
 
-        if ($autoTuneMetricConfigEntity === null) {
-            $autoTuneMetricConfigEntity = new SpySearchRankingAutoTuneMetricConfig();
-        }
+        $autoTuneMetricConfigEntity ??= new SpySearchRankingAutoTuneMetricConfig();
 
         $mapper = $this->getFactory()->createSearchRankingOptimizerMapper();
         $mapper->mapAutoTuneMetricConfigTransferToEntity($autoTuneMetricConfigTransfer, $autoTuneMetricConfigEntity);
