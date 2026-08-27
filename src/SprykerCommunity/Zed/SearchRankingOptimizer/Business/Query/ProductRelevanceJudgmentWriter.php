@@ -85,9 +85,7 @@ class ProductRelevanceJudgmentWriter implements ProductRelevanceJudgmentWriterIn
 
         $queryTransfer = $this->repository->findQueryByTermStoreLocale($canonicalSearchTerm, $storeName, $localeName);
 
-        if ($queryTransfer === null) {
-            $queryTransfer = $this->createQueryHandlingConcurrentInsert($canonicalSearchTerm, $storeName, $localeName);
-        }
+        $queryTransfer ??= $this->createQueryHandlingConcurrentInsert($canonicalSearchTerm, $storeName, $localeName);
 
         $ratingTransfer = (new SearchRankingQueryRatingTransfer())
             ->setFkSearchRankingQuery($queryTransfer->getIdSearchRankingQueryOrFail())

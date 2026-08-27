@@ -1,0 +1,132 @@
+resource:
+    name: SearchRelevanceJudgments
+    shortName: search-relevance-judgments
+    description: 'Relevance Rater judgments: an authorized storefront customer marking how well a product matches a search term (heart/check/x), feeding search-ranking-optimizer''s rank_eval calibration.'
+
+    provider: SprykerCommunity\Glue\SearchRankingOptimizerRestApi\Api\Storefront\Provider\SearchRelevanceJudgmentsStorefrontProvider
+    processor: SprykerCommunity\Glue\SearchRankingOptimizerRestApi\Api\Storefront\Processor\SearchRelevanceJudgmentsStorefrontProcessor
+
+    securityBearerAuthRequired: true
+
+    paginationEnabled: false
+
+    operations:
+        - type: Post
+          description: 'Submit a relevance judgment for the authenticated customer'
+          security: "is_granted('ROLE_CUSTOMER')"
+          uriTemplate: '/search-relevance-judgments'
+          openapiContext:
+              summary: 'Submit a search relevance judgment'
+              description: 'Records how well the given product matches the given search term, for the authenticated customer. Real authorization (RateSearchRelevancePermissionPlugin) is re-checked server-side in Zed.'
+              responses:
+                  201:
+                      description: 'Judgment recorded.'
+                  401:
+                      description: 'Missing or invalid access token.'
+                  422:
+                      description: 'Validation failed, the product is not among the current search results for the term, or the customer is not authorized to rate search relevance.'
+
+        - type: GetCollection
+          description: 'Retrieve the authenticated customer''s relevance judgments for a search term'
+          security: "is_granted('ROLE_CUSTOMER')"
+          uriTemplate: '/search-relevance-judgments'
+          openapiContext:
+              summary: 'List my search relevance judgments'
+              description: 'Returns the relevance judgments the authenticated customer already submitted for the given `searchTerm`, restricted to the given `idProductAbstracts[]` when provided. There is no per-item id route for this resource — judgments are identified by (searchTerm, idProductAbstract, customerReference), not an addressable id — so `searchTerm` and `idProductAbstracts[]` are read from the query string rather than a path/uriVariable.'
+              parameters:
+                  - name: searchTerm
+                    in: query
+                    required: true
+                    schema:
+                        type: string
+                  - name: idProductAbstracts[]
+                    in: query
+                    required: false
+                    schema:
+                        type: array
+                        items:
+                            type: integer
+              responses:
+                  200:
+                      description: 'Judgment collection returned (possibly empty — no judgment yet is not an error).'
+                  401:
+                      description: 'Missing or invalid access token.'
+                  422:
+                      description: '`searchTerm` query parameter missing.'
+
+        - type: Delete
+          description: 'Clear the authenticated customer''s relevance judgment for a search term / product pair'
+          security: "is_granted('ROLE_CUSTOMER')"
+          uriTemplate: '/search-relevance-judgments/clear'
+          uriVariables: []
+          read: false
+          output: false
+          openapiContext:
+              summary: 'Clear a search relevance judgment'
+              description: 'Deletes the authenticated customer''s judgment for the given `searchTerm` and `idProductAbstract` query parameters. Same identification shape as the collection GET — no per-item id route exists for this resource, so this is an action-style URL (`/clear`) rather than `/search-relevance-judgments/{id}`. A bare single-segment `DELETE /search-relevance-judgments` is unconditionally rejected upstream by `Spryker\ApiPlatform\EventSubscriber\JsonApiRequestValidatorSubscriber::isMissingResourceId()` — a generic PATCH/DELETE heuristic that assumes any one-segment resource-shaped path on those verbs means a missing path id, with no way to opt out per-resource — hence the extra `/clear` segment. Clearing a judgment that does not exist is not an error (idempotent).'
+              parameters:
+                  - name: searchTerm
+                    in: query
+                    required: true
+                    schema:
+                        type: string
+                  - name: idProductAbstract
+                    in: query
+                    required: true
+                    schema:
+                        type: integer
+              responses:
+                  204:
+                      description: 'Judgment cleared (or did not exist).'
+                  401:
+                      description: 'Missing or invalid access token.'
+                  422:
+                      description: '`searchTerm` or `idProductAbstract` query parameter missing.'
+
+    properties:
+        id:
+            type: string
+            identifier: true
+            writable: false
+            readable: true
+            required: false
+            description: 'Unique identifier of the judgment row (read-only, server-assigned)'
+            openapiContext:
+                example: '17'
+
+        searchTerm:
+            type: string
+            writable: true
+            readable: true
+            required: true
+            description: 'The search term this judgment is about'
+            openapiContext:
+                example: 'garden chair'
+
+        idProductAbstract:
+            type: integer
+            writable: true
+            readable: true
+            required: true
+            description: 'The abstract product id being judged'
+            openapiContext:
+                example: 123
+
+        ratingType:
+            type: string
+            writable: true
+            readable: true
+            required: true
+            description: 'The judgment itself'
+            openapiContext:
+                example: 'heart'
+                enum: ['heart', 'check', 'x']
+
+        createdAt:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Timestamp when the judgment was first recorded'
+            openapiContext:
+                example: '2026-08-24T10:00:00+00:00'

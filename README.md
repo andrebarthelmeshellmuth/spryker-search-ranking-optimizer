@@ -957,6 +957,70 @@ a CLI probe.
 - **`SearchRankingOptimizerWidget`** (Yves) — the SRP heart/check/X rating widget: controller, router/twig
   plugins, and the TypeScript/SCSS component itself.
 
+## Glue API
+
+`spryker-community/search-ranking-optimizer` exposes one `api-platform`-era storefront REST resource,
+`search-relevance-judgments` — POST + GetCollection + DELETE, mirroring the Relevance Rater
+widget's own submit / pre-fill / clear operations. This project's Glue layer runs on
+`spryker/api-platform` (schema-driven: `resources/api/storefront/*.resource.yml` + `.validation.yml`,
+autowired `Provider`/`Processor` classes, generated `#[ApiResource]` PHP), not the legacy
+`ResourceRoutePluginInterface`/`@Glue(...)` convention. Nothing beyond declaring the schema is needed in
+a host shop — it is discovered automatically as long as the shop's
+`config/Glue/packages/spryker_api_platform.php` includes `vendor/spryker-community` in
+`sourceDirectories()`.
+
+A judgment is identified by `(searchTerm, idProductAbstract, customerReference)` — there is no exposed
+numeric/uuid id a caller can address directly (same identification shape the Yves widget's own
+`clearAction()` / `ProductRelevanceJudgmentWriter::clearJudgment()` use). Consequently the collection GET
+and the DELETE both read `searchTerm`/`idProductAbstract(s)` from the **query string**, not from
+`uriVariables`/path routing — a deliberate deviation from the more typical `/resource/{id}` shape.
+
+All three operations require a bearer token for an authenticated customer
+(`securityBearerAuthRequired: true`, `security: "is_granted('ROLE_CUSTOMER')"`).
+`customerReference`/`storeName`/`localeName` are always resolved server-side from the authenticated
+session/store context. Real authorization (`RateSearchRelevancePermissionPlugin`) is re-checked, and
+enforced, entirely server-side in Zed's `GatewayController`. The Glue processor/provider perform the same
+permission check inline via `PermissionClientInterface::can()` as a UX-level fast-fail only — same
+posture as `search-feedback`'s Glue processor.
+
+### `POST /search-relevance-judgments`
+
+Body: `searchTerm` (string, required), `idProductAbstract` (integer, required), `ratingType` (string,
+required — one of `heart`/`check`/`x`). Response (`201`): the created judgment (`id`, `searchTerm`,
+`idProductAbstract`, `ratingType`, `createdAt`). `422` on validation failure, "not logged in," "not
+authorized," or any `isSuccess: false` from `SearchRankingOptimizerClient::submitProductRelevanceJudgment()`
+— including the product-not-in-current-search-results rejection
+(`ProductNotInSearchResultsException`, surfaced as `errorMessage`).
+
+### `GET /search-relevance-judgments?searchTerm=...&idProductAbstracts[]=...`
+
+`searchTerm` is required; `idProductAbstracts[]` is optional (omit it to get every judgment for the
+term). Returns the authenticated customer's own previously-submitted judgments for the term — an empty
+collection is the ordinary, expected result for a term nobody has rated yet, never an error.
+
+### `DELETE /search-relevance-judgments/clear?searchTerm=...&idProductAbstract=...`
+
+Both query parameters are required. Clears the authenticated customer's judgment for that pair.
+Idempotent: clearing a judgment that doesn't exist still returns `204`, matching
+`ProductRelevanceJudgmentWriter::clearJudgment()`'s own no-op-if-missing behavior.
+
+The trailing `/clear` segment is deliberate, not cosmetic: a bare single-segment
+`DELETE /search-relevance-judgments` is unconditionally rejected upstream with a 400 ("Resource id is not
+specified") by `Spryker\ApiPlatform\EventSubscriber\JsonApiRequestValidatorSubscriber::isMissingResourceId()`
+— a generic heuristic that treats any one-segment resource-shaped path on PATCH/DELETE as a missing path
+id, with no per-resource opt-out. Since this resource has no addressable per-item id at all (see above),
+the extra segment is the only way to reach the endpoint.
+
+After changing either `.resource.yml` file, regenerate with `vendor/bin/glue api:generate` from the
+host shop root.
+
+**If your shop installs `spryker-community/*` packages via composer path repositories** (symlinked into
+`vendor/spryker-community/*`): see
+[spryker-community/search-debug's own README](https://github.com/spryker-shop/search-debug#glue-api),
+"Glue API" section, for a symlink-traversal gap in `spryker/api-platform`'s schema finder that otherwise
+makes this package's schema silently invisible to `api:generate` despite a correct `sourceDirectories`
+entry, and its fix.
+
 ## Limitations
 
 - **A single run without restart-on-plateau can converge to a real but low-quality local optimum.**
