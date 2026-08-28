@@ -29,6 +29,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 - [Before you start: this needs real relevance ratings](#before-you-start-this-needs-real-relevance-ratings)
 - [What it does today](#what-it-does-today)
 - [Requirements](#requirements)
+- [Search engine compatibility](#search-engine-compatibility)
 - [Installation](#installation)
 - [Modules](#modules)
 - [Limitations](#limitations)
@@ -564,6 +565,24 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   the role is not enough on its own — it also has to be assigned to a group that has users in it, or the
   email still resolves to nobody. `search-ranking-optimizer:check-installation`
   ([step 8](#8-verify-the-installation)) warns about both cases once any metric has notification enabled.
+
+## Search engine compatibility
+
+This package builds no ranking query of its own — it reaches the engine through two long-stable surfaces,
+and both are exercised by `search-ranking`'s own [engine-compatibility
+verification](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#search-engine-compatibility):
+
+- **`_rank_eval`** — the objective score behind Rank evaluation, Auto-tune and Automated weight
+  optimization. Present and behaviour-stable on OpenSearch 1.3.4 → 3.5 and Elasticsearch 8.x.
+- **`function_score` / `script_score` (painless)** — reconstructed identically to what `search-ranking`
+  applies live, so Saturation Point Calibration and every evaluation run measure the real formula.
+  Byte-identical `_score` across the same engine range.
+
+Verified end-to-end on **OpenSearch 3.5.0** (Lucene 10.3.2): a demoshop upgraded from 1.3.4, full
+re-export/reindex, calibration and evaluation re-run against the live 3.5 cluster. **No package code
+change was needed** — the migration friction is all core Spryker (the search-schema packages, ticket
+SC-25160) and project/deployment level. It is written up in `search-ranking`'s [Migrating to OpenSearch
+3.x](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/docs/opensearch-3.x-migration.md).
 
 ## Installation
 
