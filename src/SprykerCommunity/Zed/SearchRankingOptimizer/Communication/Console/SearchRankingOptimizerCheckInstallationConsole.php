@@ -168,6 +168,15 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
     protected const PATTERN_PHP_TRANS = '/->(?:trans|translate)\\(\\s*([\'"])((?:\\\\.|(?!\\1).)*)\\1/';
 
     /**
+     * This package ships its OWN Glue API Platform resource (`search-relevance-judgments`), so there is
+     * no project-level provider override to check for — the only thing that can silently be missing is
+     * `vendor/bin/glue api:generate` never having been run since this schema was added.
+     *
+     * @var string
+     */
+    protected const GLUE_API_RESOURCE_CLASS_NAME = 'Generated\\Api\\Storefront\\SearchRelevanceJudgmentsStorefrontResource';
+
+    /**
      * @var array<string>
      */
     protected array $failures = [];
@@ -204,6 +213,7 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         $this->checkNavigationRegistered($output);
         $this->checkBackOfficeAccess($output);
         $this->checkZedTranslationCatalogComplete($output);
+        $this->checkGlueApiWiring($output);
 
         $output->writeln('');
 
@@ -910,5 +920,42 @@ class SearchRankingOptimizerCheckInstallationConsole extends Console
         fclose($handle);
 
         return $keys;
+    }
+
+    /**
+     * `spryker/api-platform` is a hard composer dependency here (this package ships its own
+     * `search-relevance-judgments` resource, so there is nothing to conditionally skip), but the
+     * generated `Generated\Api\Storefront\SearchRelevanceJudgmentsStorefrontResource` class only exists
+     * once `vendor/bin/glue api:generate storefront` has actually been run against this package's
+     * schema — a project that installs/updates this package but never (re-)runs that command gets no
+     * error at all, just a `search-relevance-judgments` resource missing from the OpenAPI docs and a
+     * 404 on `POST /search-relevance-judgments`. WARNING, not a failure: a project that does not run a
+     * Glue Storefront application at all is a legitimate, common configuration, not a broken install.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkGlueApiWiring(OutputInterface $output): void
+    {
+        $resourceClassName = $this->getGlueApiResourceClassName();
+
+        if (class_exists($resourceClassName)) {
+            $output->writeln(sprintf('<info>✓</info> Glue API resource %s is generated', $resourceClassName));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'Glue API resource %s does not exist yet: run `vendor/bin/glue api:generate storefront` (see README, "Glue REST API"). POST /search-relevance-judgments will 404 until then. Skip this if your project does not run a Glue Storefront application.',
+            $resourceClassName,
+        );
+    }
+
+    /**
+     * Isolated as its own method so a test can override it to point at a fixture class name instead of
+     * this host shop's real generated Glue resource.
+     */
+    protected function getGlueApiResourceClassName(): string
+    {
+        return static::GLUE_API_RESOURCE_CLASS_NAME;
     }
 }
