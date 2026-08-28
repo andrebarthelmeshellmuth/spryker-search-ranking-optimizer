@@ -627,4 +627,109 @@ class SearchRankingOptimizerConfig
      * @var string
      */
     public const OPTIMIZATION_TERMINATION_MODE_RESTART_ON_PLATEAU_TRUSTED_BUDGET = 'restart_on_plateau_trusted_budget';
+
+    /**
+     * Specification:
+     * - Base URL of the self-hosted Text Embeddings Inference (TEI) service, used by this package's own
+     *   evaluation tooling ({@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner})
+     *   to resolve a hybrid candidate's query vectors directly. This package cannot reach
+     *   spryker-community/search-ranking's own Client-layer `SearchRankingConfig` (Locator-resolved,
+     *   project-override-aware) from its Zed/console execution context -- the same reason `RankEvalRunner`
+     *   already reimplements the specificity-probe IO instead of reusing `QueryTermFrequencyFetcher`
+     *   directly (see that class's own docblock). This is this package's OWN copy of the identical
+     *   setting, reading the SAME environment variable spryker-community/search-ranking itself reads
+     *   (`SEARCH_RANKING_EMBEDDING_SERVICE_URL`), so a project only has to set it once for both packages.
+     *
+     * @api
+     */
+    public static function getEmbeddingServiceUrl(): string
+    {
+        $envUrl = getenv('SEARCH_RANKING_EMBEDDING_SERVICE_URL');
+
+        return $envUrl !== false ? $envUrl : 'http://embeddings:80';
+    }
+
+    /**
+     * Specification:
+     * - Identifier of the embedding model this package's own evaluation tooling requests query-time
+     *   embeddings for -- MUST match spryker-community/search-ranking's own
+     *   `SprykerCommunity\Client\SearchRanking\SearchRankingConfig::getEmbeddingModelId()` (and
+     *   `SprykerCommunity\Zed\SearchRanking\SearchRankingConfig::getEmbeddingModelId()`), or a query
+     *   vector resolved here and a product's stored vector (embedded by search-ranking's own offline job)
+     *   would silently come from two different embedding spaces.
+     *
+     * @api
+     */
+    public static function getEmbeddingModelId(): string
+    {
+        return 'BAAI/bge-base-en-v1.5';
+    }
+
+    /**
+     * Specification:
+     * - MUST match spryker-community/search-ranking's own
+     *   {@see \SprykerCommunity\Client\SearchRanking\SearchRankingConfig::getEmbeddingQueryInstructionPrefix()}
+     *   for the same reason {@see getEmbeddingModelId()} must match — see that method's docblock for why
+     *   BGE-family models need this on the query side only, never the product/passage side.
+     *
+     * @api
+     */
+    public static function getEmbeddingQueryInstructionPrefix(): string
+    {
+        return 'Represent this sentence for searching relevant passages: ';
+    }
+
+    /**
+     * Specification:
+     * - RRF fusion mode identifier for `search-ranking-optimizer:evaluate-hybrid --fusion`/
+     *   {@see \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer::getFusionMode()} --
+     *   Reciprocal Rank Fusion of two independently-retrieved candidate lists (lexical + kNN), computed in
+     *   PHP (see {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s own RRF
+     *   docblock for why -- this cluster's OpenSearch 1.3.4 has no native RRF/hybrid-query support).
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const FUSION_MODE_RRF = 'rrf';
+
+    /**
+     * Specification:
+     * - The existing, unchanged linear-blend fusion mode (`alpha * saturatedBM25 + (1-alpha) *
+     *   cosineSimilarity`, applied inside `FunctionScoreBuilder`'s own script) -- the default whenever no
+     *   `fusionMode` is set at all, for backward compatibility with every pre-RRF caller/transfer shape.
+     *
+     * @api
+     *
+     * @var string
+     */
+    public const FUSION_MODE_LINEAR = 'linear';
+
+    /**
+     * Specification:
+     * - How many top hits RRF mode retrieves from EACH of the two independent candidate lists (lexical,
+     *   semantic/kNN) before fusing them -- deep enough to give both lists real fusion material, shallow
+     *   enough to keep the resulting `function_score` `functions[]` array (one entry per candidate in the
+     *   fused UNION, which is at most twice this) a reasonable size.
+     *
+     * @api
+     */
+    public static function getRrfCandidateDepth(): int
+    {
+        return 50;
+    }
+
+    /**
+     * Specification:
+     * - Reciprocal Rank Fusion's smoothing constant `k` in `1/(k + rank)` -- 60 is the standard default
+     *   from the original RRF literature, dampening the impact of a document's exact rank within each list
+     *   (a doc at rank 1 vs. rank 2 differs far less in RRF-contributed score than raw rank-position
+     *   arithmetic alone would suggest).
+     *
+     * @api
+     */
+    public static function getRrfK(): int
+    {
+        return 60;
+    }
 }

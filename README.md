@@ -29,6 +29,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 - [Before you start: this needs real relevance ratings](#before-you-start-this-needs-real-relevance-ratings)
 - [What it does today](#what-it-does-today)
 - [Requirements](#requirements)
+- [Search engine compatibility](#search-engine-compatibility)
 - [Installation](#installation)
 - [Modules](#modules)
 - [Limitations](#limitations)
@@ -235,6 +236,54 @@ Evaluated 12 rated queries: weighted nDCG@10 = 0.7123.
 Firing the query and the `_rank_eval` call both reuse the same raw-Elastica bypass pattern Saturation Point Calibration
 established (`Client\SearchRankingOptimizer\Search` component), verified live against this shop's real
 OpenSearch index and real catalog products.
+
+### Hybrid evaluation (`search-ranking-optimizer:evaluate-hybrid`) — comparing lexical vs. hybrid before making it live
+
+`search-ranking`'s hybrid search (semantic embeddings blended with lexical BM25, see that package's own
+README) is a candidate ranking formula, not something this package turns on for real traffic by itself.
+Before anyone changes what actually ranks live, `evaluate-hybrid` answers the only question that matters:
+does the hybrid formula score better than the current lexical-only baseline on THIS shop's own real
+relevance ratings? It runs the full judged query set for one `(store, locale)` through two configurations —
+a baseline forced to `alpha=1.0` ("lexical") and a candidate `alpha` ("hybrid") — via the same `_rank_eval`
+mechanism the section above uses, then prints a per-query nDCG@k breakdown by query-type bucket (identifier,
+brand/category, generic, descriptive, attribute-constrained, typo/misspelling) plus both buckets' weighted
+aggregates, so a genuine improvement in one query type isn't hidden by a regression in another when only the
+overall average is read.
+
+```
+console search-ranking-optimizer:evaluate-hybrid --store=DE --locale=en_US --alpha=0.5
+```
+
+Options:
+
+- `--alpha` — the hybrid side's blend weight (`0.0` = fully semantic, `1.0` = fully lexical). Ignored by
+  `--fusion=rrf`'s own ranking (see below); still used to label the comparison output either way.
+- `--fusion` — the hybrid side's fusion mode: `linear` (default, the alpha-blended
+  `relevanceWeight * saturatedBM25 + ... alpha * saturatedBM25 + (1-alpha) * cosineSimilarity ...` formula
+  `FunctionScoreBuilder` already applies live) or `rrf` (Reciprocal Rank Fusion of two independently-retrieved
+  candidate lists — lexical and semantic/kNN — combined by rank position rather than by blending two raw,
+  differently-scaled scores; see `Search\Rrf\RrfEvaluationQueryBuilder`'s own docblock for the full
+  mechanism). **`rrf` is an eval-only measurement mode** — nothing in `search-ranking`'s own live
+  `FunctionScoreBuilder`/query-expander plugin runs RRF fusion for a real storefront search; it exists here
+  purely so the two fusion strategies can be compared against the same judgment set before deciding whether
+  either is worth wiring into live traffic at all.
+- `--brand-shift` / `--category-shift` — set Intent-Aware Alpha Pass 3's navigational `relevanceWeight`
+  shifts (`brandMatchRelevanceWeightShift`/`categoryMatchRelevanceWeightShift`, see `search-ranking`'s own
+  README) on the **hybrid side only**; the lexical baseline always forces both to `0.0`, so a nonzero shift's
+  effect is isolated cleanly. Both default to `0.0` (inert). These measure a DIFFERENT mechanism than
+  `--alpha`/`--fusion` — a per-query relevanceWeight nudge for a detected brand/category match, not the
+  lexical/semantic blend itself — and apply regardless of which `--fusion` mode is selected.
+
+Measured, not guaranteed: on this project's own real judgment set, sweeping `--category-shift`/`--brand-shift`
+against a fixed `alpha=1.0` (isolating the navigational-shift question from the semantic-blend question
+entirely) showed a real, monotonic, positive effect — for example `--brand-shift=0.30` measured roughly
++0.062 aggregate Δ nDCG, `--category-shift=0.30` roughly +0.071 — concentrated in the query buckets you'd
+expect (identifier/brand/category matches), with individual per-query deltas well above the aggregate. That
+result is specific to this shop's own catalog, brand/category corpus, and judgment set; re-measure before
+trusting a shift magnitude on a different one. The `--alpha`/`--fusion` sweep itself, on the same judgment
+set, has so far shown the opposite: no tested alpha or fusion mode beat the lexical baseline — run your own
+sweep before assuming hybrid search is a net win on your own data; a near-null or negative result here is a
+legitimate, common outcome, not a sign the mechanism itself is broken.
 
 ### Weight checkpoints — a way back before changing anything by hand
 
@@ -564,6 +613,27 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   the role is not enough on its own — it also has to be assigned to a group that has users in it, or the
   email still resolves to nobody. `search-ranking-optimizer:check-installation`
   ([step 8](#8-verify-the-installation)) warns about both cases once any metric has notification enabled.
+
+## Search engine compatibility
+
+This package does not build its own ranking query — it talks to the engine through three surfaces, and
+each one is exercised by `search-ranking`'s own [engine-compatibility
+verification](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#search-engine-compatibility):
+
+- **`_rank_eval`** — the objective score behind Rank evaluation, Auto-tune and Automated weight
+  optimization. Present and behaviour-stable on OpenSearch 1.3.4 → 3.5 and Elasticsearch 8.x.
+- **`function_score` / `script_score` (painless)** — reconstructed identically to what `search-ranking`
+  applies live, so Saturation Point Calibration and every evaluation run measure the real formula. Byte-
+  identical `_score` across the same engine range.
+- **A raw `knn` query** — only in `search-ranking-optimizer:evaluate-hybrid`, and only when you pass a
+  non-`1.0` alpha. Needs a `knn_vector` field on the page index (the optional semantic-blend feature).
+
+Verified end-to-end on **OpenSearch 3.5.0** (Lucene 10.3.2): a demoshop upgraded from 1.3.4, full
+re-export/reindex, `evaluate-hybrid` and calibration re-run against the live 3.5 cluster. **No package
+code change was needed** — the friction is all core Spryker (search-schema packages, ticket SC-25160) and
+project/deployment level. What it means for this package specifically — the `_rank_eval` / `function_score`
+version-stability, the `evaluate-hybrid` k-NN touchpoint, and the 1.3.x → 3.5 capability delta — is in
+[Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md).
 
 ## Installation
 

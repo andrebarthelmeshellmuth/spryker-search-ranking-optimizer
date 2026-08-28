@@ -17,7 +17,9 @@ use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRan
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\UnsupportedRankingStrategyException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
@@ -57,6 +59,41 @@ class AutoTuneRunnerTest extends Unit
         // Assert
         $this->assertCount(0, $result->getMetricResults());
         $this->assertSame(0, $result->getNotifiedEmailCount());
+    }
+
+    /**
+     * A ranking strategy this package has no parameter-space mapper for is live: the whole run must
+     * abort before a single store is looked at, throwing so the console prints a red error and exits
+     * non-zero — never a partial, per-store "safe skip" that hides the misconfiguration.
+     */
+    public function testThrowsAndDoesNotTouchAnyStoreWhenTheActiveRankingStrategyIsNotTunable(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->expects($this->never())->method('findAutoTuneMetricConfigsWithThresholdSet');
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->expects($this->never())->method('saveMetricFormula');
+
+        $storeFacadeMock = $this->createMock(SearchRankingOptimizerToStoreFacadeInterface::class);
+        $storeFacadeMock->expects($this->never())->method('getAllStores');
+
+        $rankingStrategyGuardMock = $this->createMock(RankingStrategyGuardInterface::class);
+        $rankingStrategyGuardMock->method('assertActiveStrategyIsTunable')
+            ->willThrowException(new UnsupportedRankingStrategyException('Refusing to optimize: "hybrid" has no mapper.'));
+
+        $runner = $this->createRunner(
+            $repositoryMock,
+            $searchRankingFacadeMock,
+            storeFacade: $storeFacadeMock,
+            rankingStrategyGuard: $rankingStrategyGuardMock,
+        );
+
+        // Assert
+        $this->expectException(UnsupportedRankingStrategyException::class);
+
+        // Act
+        $runner->run();
     }
 
     public function testSkipsAMetricWithNoDigestYetAtTheDefaultLocale(): void
@@ -655,6 +692,7 @@ class AutoTuneRunnerTest extends Unit
         ?SearchRankingOptimizerToSymfonyMailerFacadeInterface $mailerFacade = null,
         ?SearchRankingOptimizerToStoreFacadeInterface $storeFacade = null,
         bool $stubHasStoreConfiguration = true,
+        ?RankingStrategyGuardInterface $rankingStrategyGuard = null,
     ): AutoTuneRunner {
         $recipientResolver ??= $this->createMock(AutoTuneNotificationRecipientResolverInterface::class);
         $mailerFacade ??= $this->createMock(SearchRankingOptimizerToSymfonyMailerFacadeInterface::class);
@@ -664,7 +702,15 @@ class AutoTuneRunnerTest extends Unit
             $searchRankingFacade->method('hasStoreConfiguration')->willReturn(true);
         }
 
-        return new AutoTuneRunner($repository, $searchRankingFacade, $storeFacade, $recipientResolver, $mailerFacade, new FormulaDeterminismChecker());
+        return new AutoTuneRunner(
+            $repository,
+            $searchRankingFacade,
+            $storeFacade,
+            $recipientResolver,
+            $mailerFacade,
+            new FormulaDeterminismChecker(),
+            $rankingStrategyGuard ?? $this->createMock(RankingStrategyGuardInterface::class),
+        );
     }
 
     /**

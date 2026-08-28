@@ -18,7 +18,9 @@ use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig as SharedSearchRankingConfig;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\UnsupportedRankingStrategyException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplier;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -198,6 +200,41 @@ class OptimizationApplierTest extends Unit
     }
 
     /**
+     * A non-`adaptive_formula` ranking strategy with no optimizer mapper is live: Apply must abort
+     * before it reads the run, records a checkpoint, or writes a single value through the facade — and
+     * the exception must propagate (the Zed apply controller turns it into an error flash; it is never
+     * swallowed into a plausible-looking success).
+     */
+    public function testApplyThrowsAndWritesNothingWhenTheActiveRankingStrategyIsNotTunable(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->expects($this->never())->method('findOptimizerRunById');
+
+        $searchRankingFacadeMock = $this->createMock(SearchRankingOptimizerToSearchRankingFacadeInterface::class);
+        $searchRankingFacadeMock->expects($this->never())->method('saveRelevanceWeight');
+        $searchRankingFacadeMock->expects($this->never())->method('saveMetricWeight');
+
+        $recorderMock = $this->createMock(WeightCheckpointRecorderInterface::class);
+        $recorderMock->expects($this->never())->method('record');
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->never())->method('markOptimizerRunApplied');
+
+        $rankingStrategyGuardMock = $this->createMock(RankingStrategyGuardInterface::class);
+        $rankingStrategyGuardMock->method('assertActiveStrategyIsTunable')
+            ->willThrowException(new UnsupportedRankingStrategyException('Refusing to optimize: "hybrid" has no mapper.'));
+
+        $applier = $this->createApplier($repositoryMock, $searchRankingFacadeMock, $recorderMock, $entityManagerMock, $rankingStrategyGuardMock);
+
+        // Assert
+        $this->expectException(UnsupportedRankingStrategyException::class);
+
+        // Act
+        $applier->apply(1);
+    }
+
+    /**
      * The checkpoint must snapshot the state BEFORE this run's values are written — recording it after
      * would checkpoint the just-applied state itself, useless as a way back.
      */
@@ -251,12 +288,14 @@ class OptimizationApplierTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface|null $recorder
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface|null $rankingStrategyGuard
      */
     protected function createApplier(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         ?WeightCheckpointRecorderInterface $recorder = null,
         ?SearchRankingOptimizerEntityManagerInterface $entityManager = null,
+        ?RankingStrategyGuardInterface $rankingStrategyGuard = null,
     ): OptimizationApplier {
         if ($entityManager === null) {
             $entityManager = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
@@ -268,6 +307,7 @@ class OptimizationApplierTest extends Unit
             $searchRankingFacade,
             $recorder ?? $this->createMock(WeightCheckpointRecorderInterface::class),
             $entityManager,
+            $rankingStrategyGuard ?? $this->createMock(RankingStrategyGuardInterface::class),
         );
     }
 

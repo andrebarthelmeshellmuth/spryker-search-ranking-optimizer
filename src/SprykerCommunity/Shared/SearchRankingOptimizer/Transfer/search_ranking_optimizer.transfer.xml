@@ -145,12 +145,17 @@
          When set, RankEvalRunner uses THIS configuration instead of the live one — never touching synced
          storage — so a candidate weight vector can be scored without ever being applied. This is the exact
          extension point Phase O6's optimizer needs to evaluate proposals it hasn't (and might never) apply. -->
+    <!-- fusionMode: RRF vs linear selector for RankEvalRunner's own evaluation path (hybrid-search
+         alternative), see SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig::FUSION_MODE_LINEAR
+         (default when null/omitted, matches every pre-RRF caller unchanged) or ::FUSION_MODE_RRF. Only
+         RankEvalRunner reads this; it never reaches the live storefront plugin. -->
     <transfer name="SearchRankingEvaluationRequest" strict="true">
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
         <property name="cutoff" type="int"/>
         <property name="queries" type="SearchRankingEvaluationQuery[]" singular="query"/>
         <property name="rankingConfiguration" type="SearchRankingConfigurationStorage"/>
+        <property name="fusionMode" type="string"/>
     </transfer>
 
     <!-- One query's own nDCG@cutoff, read out of _rank_eval's response `details` map (NOT the response's
@@ -166,6 +171,45 @@
          the request. -->
     <transfer name="SearchRankingEvaluationResponse" strict="true">
         <property name="queryScores" type="SearchRankingEvaluationQueryScore[]" singular="queryScore"/>
+    </transfer>
+
+    <!-- One judged query's own lexical-vs-hybrid comparison (P4's own deliverable) — lexicalScore/
+         hybridScore are that query's own nDCG@cutoff under a forced alpha=1.0 config and a
+         RankEvaluationRunner::compareLexicalVsHybrid() candidate-alpha config respectively (captured from
+         SearchRankingEvaluationQueryScore BEFORE any weighted-aggregate collapsing), delta is
+         hybridScore - lexicalScore. bucket is the hardcoded query-type-bucket tag (1-6, see
+         RankEvaluationRunner's own QueryBucketClassifier and the spike plan's own 60-query worksheet) —
+         0 means "no bucket mapping found for this searchTerm" (should never happen for the real judged
+         set, but never throws). -->
+    <transfer name="SearchRankingQueryComparison" strict="true">
+        <property name="idSearchRankingQuery" type="int"/>
+        <property name="searchTerm" type="string"/>
+        <property name="bucket" type="int"/>
+        <property name="lexicalScore" type="float"/>
+        <property name="hybridScore" type="float"/>
+        <property name="delta" type="float"/>
+    </transfer>
+
+    <!-- P4's own comparison entry point (search-ranking-optimizer:evaluate-hybrid): runs the SAME judged
+         query set through two ranking configurations — a clone of the live synced configuration with
+         alpha forced to 1.0 ("lexical", an unambiguous baseline regardless of what the live config's own
+         alpha currently is) and a clone with alpha set to the requested candidate value ("hybrid") — via
+         two RankEvaluationRunner::compareLexicalVsHybrid() calls into RankEvalRunner::evaluate(). Captures
+         per-query scores from BOTH before any weighted-aggregate collapsing (queryComparisons), plus the
+         same query-importance-weighted aggregate RankEvaluationRunner::evaluate()/evaluateCandidate()
+         already compute, for both configs. -->
+    <!-- fusionMode: which fusion mode produced the "hybrid" side of this comparison, the "lexical"
+         baseline is ALWAYS FUSION_MODE_LINEAR with alpha forced to 1.0 regardless (RRF/alpha are both
+         irrelevant to a pure-lexical baseline). Defaults to FUSION_MODE_LINEAR for backward compatibility
+         with every pre-RRF caller/test. -->
+    <transfer name="SearchRankingHybridComparison" strict="true">
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="alpha" type="float"/>
+        <property name="lexicalWeightedAggregate" type="float"/>
+        <property name="hybridWeightedAggregate" type="float"/>
+        <property name="queryComparisons" type="SearchRankingQueryComparison[]" singular="queryComparison"/>
+        <property name="fusionMode" type="string"/>
     </transfer>
 
     <!-- One persisted evaluation run: the query-importance-weighted nDCG aggregate across every rated

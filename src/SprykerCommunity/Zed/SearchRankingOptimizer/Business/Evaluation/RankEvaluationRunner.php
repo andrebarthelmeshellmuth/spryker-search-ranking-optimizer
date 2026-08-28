@@ -15,8 +15,11 @@ use Generated\Shared\Transfer\SearchRankingEvaluationQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingHybridComparisonTransfer;
+use Generated\Shared\Transfer\SearchRankingQueryComparisonTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
 
@@ -30,22 +33,32 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
 
     protected RelevanceJudgmentGainMapperInterface $gainMapper;
 
+    protected SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade;
+
+    protected QueryBucketClassifierInterface $queryBucketClassifier;
+
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapperInterface $gainMapper
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifierInterface $queryBucketClassifier
      */
     public function __construct(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerEntityManagerInterface $entityManager,
         SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient,
         RelevanceJudgmentGainMapperInterface $gainMapper,
+        SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
+        QueryBucketClassifierInterface $queryBucketClassifier,
     ) {
         $this->repository = $repository;
         $this->entityManager = $entityManager;
         $this->searchRankingClient = $searchRankingClient;
         $this->gainMapper = $gainMapper;
+        $this->searchRankingFacade = $searchRankingFacade;
+        $this->queryBucketClassifier = $queryBucketClassifier;
     }
 
     /**
@@ -94,6 +107,147 @@ class RankEvaluationRunner implements RankEvaluationRunnerInterface
         [$metricScore] = $weightedAggregate;
 
         return $metricScore;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $alpha
+     * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
+     */
+    public function compareLexicalVsHybrid(
+        string $storeName,
+        string $localeName,
+        float $alpha,
+        string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
+    ): SearchRankingHybridComparisonTransfer {
+        $comparisonTransfer = (new SearchRankingHybridComparisonTransfer())
+            ->setStoreName($storeName)
+            ->setLocaleName($localeName)
+            ->setAlpha($alpha)
+            ->setFusionMode($fusionMode)
+            ->setLexicalWeightedAggregate(0.0)
+            ->setHybridWeightedAggregate(0.0);
+
+        $queryTransfers = $this->repository->findQueriesByStoreLocale($storeName, $localeName);
+        $ratingTransfers = $this->repository->findRatingsByStoreLocale($storeName, $localeName);
+
+        if ($queryTransfers === [] || $ratingTransfers === []) {
+            return $comparisonTransfer;
+        }
+
+        $meanGainsByQueryAndProduct = $this->buildMeanGainsByQueryAndProduct($ratingTransfers);
+        $baseRequestTransfer = $this->buildEvaluationRequest($storeName, $localeName, $queryTransfers, $meanGainsByQueryAndProduct);
+
+        if (count($baseRequestTransfer->getQueries()) === 0) {
+            return $comparisonTransfer;
+        }
+
+        // A CLONE of the live config, alpha forced to 1.0 regardless of what the live config's own alpha
+        // currently is -- "lexical" must always be an unambiguous baseline, never accidentally inherit a
+        // non-1.0 alpha left over from a prior manual test.
+        $liveConfigurationTransfer = $this->searchRankingFacade->getConfiguration($storeName, $localeName);
+        $lexicalConfigurationTransfer = (clone $liveConfigurationTransfer)
+            ->setAlpha(1.0)
+            ->setBrandMatchRelevanceWeightShift(0.0)
+            ->setCategoryMatchRelevanceWeightShift(0.0);
+        $hybridConfigurationTransfer = (clone $liveConfigurationTransfer)
+            ->setAlpha($alpha)
+            ->setBrandMatchRelevanceWeightShift($brandShift)
+            ->setCategoryMatchRelevanceWeightShift($categoryShift);
+
+        // The lexical baseline is ALWAYS the unchanged linear formula with alpha forced to 1.0 -- RRF
+        // (and alpha itself) are only ever relevant to the "hybrid" side of this comparison.
+        $lexicalRequestTransfer = (clone $baseRequestTransfer)
+            ->setRankingConfiguration($lexicalConfigurationTransfer)
+            ->setFusionMode(SearchRankingOptimizerConfig::FUSION_MODE_LINEAR);
+        $hybridRequestTransfer = (clone $baseRequestTransfer)
+            ->setRankingConfiguration($hybridConfigurationTransfer)
+            ->setFusionMode($fusionMode);
+
+        $lexicalResponseTransfer = $this->searchRankingClient->evaluateRankings($lexicalRequestTransfer);
+        $hybridResponseTransfer = $this->searchRankingClient->evaluateRankings($hybridRequestTransfer);
+
+        $lexicalWeightedAggregate = $this->computeWeightedAggregate($lexicalRequestTransfer, $lexicalResponseTransfer);
+        $hybridWeightedAggregate = $this->computeWeightedAggregate($hybridRequestTransfer, $hybridResponseTransfer);
+
+        $comparisonTransfer
+            ->setLexicalWeightedAggregate($lexicalWeightedAggregate[0] ?? 0.0)
+            ->setHybridWeightedAggregate($hybridWeightedAggregate[0] ?? 0.0);
+
+        return $this->addQueryComparisons($comparisonTransfer, $baseRequestTransfer, $lexicalResponseTransfer, $hybridResponseTransfer);
+    }
+
+    /**
+     * Joins the lexical and hybrid per-query nDCG scores by `idSearchRankingQuery` (both responses cover
+     * the exact same query set, since both requests were built from the same {@see $baseRequestTransfer}
+     * — a query missing from either side is simply excluded rather than treated as an error, since that
+     * can only mean rank_eval itself dropped it, e.g. no hits at all for that search term), looks up each
+     * query's own `searchTerm` (carried on the request, not the response), tags it with its hardcoded
+     * bucket, and computes `delta = hybridScore - lexicalScore`.
+     *
+     * @param \Generated\Shared\Transfer\SearchRankingHybridComparisonTransfer $comparisonTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer $baseRequestTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer $lexicalResponseTransfer
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer $hybridResponseTransfer
+     */
+    protected function addQueryComparisons(
+        SearchRankingHybridComparisonTransfer $comparisonTransfer,
+        SearchRankingEvaluationRequestTransfer $baseRequestTransfer,
+        SearchRankingEvaluationResponseTransfer $lexicalResponseTransfer,
+        SearchRankingEvaluationResponseTransfer $hybridResponseTransfer,
+    ): SearchRankingHybridComparisonTransfer {
+        $searchTermByQueryId = [];
+
+        foreach ($baseRequestTransfer->getQueries() as $queryTransfer) {
+            $searchTermByQueryId[$queryTransfer->getIdSearchRankingQueryOrFail()] = $queryTransfer->getSearchTermOrFail();
+        }
+
+        $lexicalScoreByQueryId = $this->indexQueryScoresByQueryId($lexicalResponseTransfer);
+        $hybridScoreByQueryId = $this->indexQueryScoresByQueryId($hybridResponseTransfer);
+
+        foreach ($searchTermByQueryId as $queryId => $searchTerm) {
+            if (!isset($lexicalScoreByQueryId[$queryId]) || !isset($hybridScoreByQueryId[$queryId])) {
+                continue;
+            }
+
+            $lexicalScore = $lexicalScoreByQueryId[$queryId];
+            $hybridScore = $hybridScoreByQueryId[$queryId];
+
+            $comparisonTransfer->addQueryComparison(
+                (new SearchRankingQueryComparisonTransfer())
+                    ->setIdSearchRankingQuery($queryId)
+                    ->setSearchTerm($searchTerm)
+                    ->setBucket($this->queryBucketClassifier->classify($searchTerm))
+                    ->setLexicalScore($lexicalScore)
+                    ->setHybridScore($hybridScore)
+                    ->setDelta($hybridScore - $lexicalScore),
+            );
+        }
+
+        return $comparisonTransfer;
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer $responseTransfer
+     *
+     * @return array<int, float>
+     */
+    protected function indexQueryScoresByQueryId(SearchRankingEvaluationResponseTransfer $responseTransfer): array
+    {
+        $scoreByQueryId = [];
+
+        foreach ($responseTransfer->getQueryScores() as $queryScoreTransfer) {
+            $scoreByQueryId[$queryScoreTransfer->getIdSearchRankingQueryOrFail()] = $queryScoreTransfer->getMetricScoreOrFail();
+        }
+
+        return $scoreByQueryId;
     }
 
     /**

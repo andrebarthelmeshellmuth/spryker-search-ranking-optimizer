@@ -132,4 +132,18 @@ class SearchRankingOptimizerClient extends AbstractClient implements SearchRanki
             ->createProductSearchMatchVerifier()
             ->matches($searchTerm, $storeName, $localeName, $idProductAbstract);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array
+    {
+        return $this->getFactory()
+            ->getSearchRankingClient()
+            ->getRegisteredRankingStrategyNames();
+    }
 }

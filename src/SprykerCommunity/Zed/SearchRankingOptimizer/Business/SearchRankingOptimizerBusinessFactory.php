@@ -22,6 +22,8 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckp
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorer;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRestorerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifier;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
@@ -36,6 +38,12 @@ use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\Optimizati
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationApplierInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperRegistry;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperRegistryInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuard;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReader;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentReaderInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Query\ProductRelevanceJudgmentWriter;
@@ -142,7 +150,14 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getEntityManager(),
             $this->getSearchRankingClient(),
             $this->createRelevanceJudgmentGainMapper(),
+            $this->getSearchRankingFacade(),
+            $this->createQueryBucketClassifier(),
         );
+    }
+
+    public function createQueryBucketClassifier(): QueryBucketClassifierInterface
+    {
+        return new QueryBucketClassifier();
     }
 
     public function createWeightCheckpointRecorder(): WeightCheckpointRecorderInterface
@@ -214,6 +229,46 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->createAutoTuneNotificationRecipientResolver(),
             $this->getSymfonyMailerFacade(),
             $this->createFormulaDeterminismChecker(),
+            $this->createRankingStrategyGuard(),
+        );
+    }
+
+    public function createRankingStrategyGuard(): RankingStrategyGuardInterface
+    {
+        return new RankingStrategyGuard(
+            $this->getSearchRankingClient(),
+            $this->createParameterVectorMapperRegistry(),
+        );
+    }
+
+    public function createParameterVectorMapperRegistry(): ParameterVectorMapperRegistryInterface
+    {
+        return new ParameterVectorMapperRegistry([
+            RankingStrategyGuard::ADAPTIVE_FORMULA_STRATEGY_NAME => $this->createParameterVectorMapper(),
+        ]);
+    }
+
+    /**
+     * The `adaptive_formula` parameter-vector mapper as a strategy-identity/capability record for
+     * {@see ParameterVectorMapperRegistryInterface} — built here with neutral, run-agnostic seed values
+     * (empty metric set, specificity weighting off, midpoint relevanceWeight, the same specificity knob
+     * defaults {@see ParameterVectorMapper} itself falls back to). The instance the optimizer actually
+     * searches with is metric-set- and run-scoped and is still built per run in
+     * {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner::buildParameterVectorMapper()};
+     * this one only has to let the registry (and, through it, {@see RankingStrategyGuardInterface}) answer
+     * "can this package tune `adaptive_formula`?" without a run in hand.
+     */
+    public function createParameterVectorMapper(): ParameterVectorMapperInterface
+    {
+        return new ParameterVectorMapper(
+            [],
+            [],
+            0.5,
+            1.0,
+            1.0,
+            0.0,
+            0.7,
+            false,
         );
     }
 
@@ -239,6 +294,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->createRankEvaluationRunner(),
             $this->createFormulaDeterminismChecker(),
             $this->createAlgorithmFactory(),
+            $this->createRankingStrategyGuard(),
         );
     }
 
@@ -262,6 +318,7 @@ class SearchRankingOptimizerBusinessFactory extends AbstractBusinessFactory
             $this->getSearchRankingFacade(),
             $this->createWeightCheckpointRecorder(),
             $this->getEntityManager(),
+            $this->createRankingStrategyGuard(),
         );
     }
 }

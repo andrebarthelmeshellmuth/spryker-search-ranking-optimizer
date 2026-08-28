@@ -21,6 +21,11 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
      */
     public function getSpecificityProbeFieldSearchAnalyzers(): array;
 
+    /**
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array;
+
     public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface;
 
     public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface;

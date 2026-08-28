@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneMetricConfigTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneNotificationDiagnosisTransfer;
 use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationTransfer;
+use Generated\Shared\Transfer\SearchRankingHybridComparisonTransfer;
 use Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingProductRelevanceJudgmentBatchResponseTransfer;
@@ -178,6 +179,29 @@ class SearchRankingOptimizerFacade extends AbstractFacade implements SearchRanki
     public function runRankEvaluation(string $storeName, string $localeName): ?SearchRankingEvaluationTransfer
     {
         return $this->getFactory()->createRankEvaluationRunner()->evaluate($storeName, $localeName);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $storeName
+     * @param string $localeName
+     * @param float $alpha
+     * @param string $fusionMode
+     * @param float $brandShift
+     * @param float $categoryShift
+     */
+    public function compareLexicalVsHybrid(
+        string $storeName,
+        string $localeName,
+        float $alpha,
+        string $fusionMode = SearchRankingOptimizerConfig::FUSION_MODE_LINEAR,
+        float $brandShift = 0.0,
+        float $categoryShift = 0.0,
+    ): SearchRankingHybridComparisonTransfer {
+        return $this->getFactory()->createRankEvaluationRunner()->compareLexicalVsHybrid($storeName, $localeName, $alpha, $fusionMode, $brandShift, $categoryShift);
     }
 
     /**

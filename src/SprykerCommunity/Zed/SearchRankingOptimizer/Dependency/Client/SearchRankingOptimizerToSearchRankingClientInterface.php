@@ -43,4 +43,9 @@ interface SearchRankingOptimizerToSearchRankingClientInterface
      * @param int $idProductAbstract
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
+
+    /**
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array;
 }

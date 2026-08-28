@@ -36,19 +36,25 @@ use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStore
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
 use SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher;
+use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface as ClientSearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplier;
 use SprykerCommunity\Client\SearchRankingStorage\SearchRankingStorageClient;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRanking\Business\SearchRankingFacade;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\QueryBucketClassifier;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunner;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RelevanceJudgmentGainMapper;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapper;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\ParameterVectorMapperRegistry;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuard;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\SearchRankingOptimizerFacade;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeBridge;
@@ -1134,19 +1140,55 @@ abstract class AbstractGroundTruthTest extends Unit
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
 
-        $forcedEnabledRankEvalRunner = new class (
+        // No longer an anonymous `RankEvalRunner` subclass overriding a protected method -- now that
+        // `RankEvalRunner` delegates specificity-enablement entirely to an injected
+        // `SpecificityWeightingApplier`, forcing it on is just a stub client passed to that collaborator,
+        // same technique {@see \SprykerCommunityTest\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplierTest}
+        // uses.
+        $specificityWeightingForcedEnabledClient = new class implements ClientSearchRankingOptimizerToSearchRankingClientInterface {
+            public function isSpecificityWeightingEnabled(): bool
+            {
+                return true;
+            }
+
+            /**
+             * @return array<string, string>
+             */
+            public function getSpecificityProbeFieldSearchAnalyzers(): array
+            {
+                return [
+                    'full-text' => 'fulltext_search_analyzer',
+                    'full-text-boosted' => 'fulltext_search_analyzer',
+                ];
+            }
+
+            public function createFunctionScoreBuilder(): FunctionScoreBuilder
+            {
+                return new FunctionScoreBuilder();
+            }
+
+            public function createQuerySpecificityCalculator(): QuerySpecificityCalculator
+            {
+                return new QuerySpecificityCalculator();
+            }
+
+            /**
+             * @return array<int, string>
+             */
+            public function getRegisteredRankingStrategyNames(): array
+            {
+                return ['adaptive_formula'];
+            }
+        };
+
+        $forcedEnabledRankEvalRunner = new RankEvalRunner(
             $elasticaClient,
             $indexNameResolver,
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            new QuerySpecificityCalculator(),
-        ) extends RankEvalRunner {
-            protected function isSpecificityWeightingEnabled(): bool
-            {
-                return true;
-            }
-        };
+            new SpecificityWeightingApplier($elasticaClient, new QuerySpecificityCalculator(), $specificityWeightingForcedEnabledClient),
+        );
 
         $searchRankingClientDouble = new class ($forcedEnabledRankEvalRunner) implements SearchRankingOptimizerToSearchRankingClientInterface {
             protected RankEvalRunnerInterface $rankEvalRunner;
@@ -1215,6 +1257,17 @@ abstract class AbstractGroundTruthTest extends Unit
             {
                 throw new LogicException('Not used by the optimization path this test double exists for.');
             }
+
+            /**
+             * The demoshop registers no ranking-strategy plugin, so `adaptive_formula` — the built-in
+             * default this optimizer tunes — is the only active strategy; the guard is a no-op.
+             *
+             * @return array<int, string>
+             */
+            public function getRegisteredRankingStrategyNames(): array
+            {
+                return ['adaptive_formula'];
+            }
         };
 
         $forcedEnabledFacade = new SpecificityForcedEnabledFacadeDecorator($this->getSearchRankingFacade());
@@ -1223,9 +1276,12 @@ abstract class AbstractGroundTruthTest extends Unit
             $this->getRepository(),
             $this->getEntityManager(),
             $forcedEnabledFacade,
-            new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper()),
+            new RankEvaluationRunner($this->getRepository(), $this->getEntityManager(), $searchRankingClientDouble, new RelevanceJudgmentGainMapper(), $forcedEnabledFacade, new QueryBucketClassifier()),
             new FormulaDeterminismChecker(),
             new AlgorithmFactory(),
+            new RankingStrategyGuard($searchRankingClientDouble, new ParameterVectorMapperRegistry([
+                RankingStrategyGuard::ADAPTIVE_FORMULA_STRATEGY_NAME => new ParameterVectorMapper([], [], 0.5, 1.0, 1.0, 0.0, 0.7, false),
+            ])),
         );
 
         $queuedRunTransfer = $this->getEntityManager()->createOptimizerRun(

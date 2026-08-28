@@ -35,6 +35,8 @@ class OptimizationRunner implements OptimizationRunnerInterface
 
     protected AlgorithmFactoryInterface $algorithmFactory;
 
+    protected RankingStrategyGuardInterface $rankingStrategyGuard;
+
     protected ?int $maxGenerations;
 
     /**
@@ -44,6 +46,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface $rankEvaluationRunner
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactoryInterface $algorithmFactory
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface $rankingStrategyGuard
      * @param int|null $maxGenerations Null uses SearchRankingOptimizerConfig::getOptimizationMaxGenerations() --
      *   overridable only to keep tests fast (a real run doesn't need hundreds of generations to verify this
      *   class's own orchestration logic), never exposed via SearchRankingOptimizerBusinessFactory.
@@ -55,6 +58,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         RankEvaluationRunnerInterface $rankEvaluationRunner,
         FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
         AlgorithmFactoryInterface $algorithmFactory,
+        RankingStrategyGuardInterface $rankingStrategyGuard,
         ?int $maxGenerations = null,
     ) {
         $this->repository = $repository;
@@ -63,6 +67,7 @@ class OptimizationRunner implements OptimizationRunnerInterface
         $this->rankEvaluationRunner = $rankEvaluationRunner;
         $this->formulaDeterminismChecker = $formulaDeterminismChecker;
         $this->algorithmFactory = $algorithmFactory;
+        $this->rankingStrategyGuard = $rankingStrategyGuard;
         $this->maxGenerations = $maxGenerations;
     }
 
@@ -89,10 +94,18 @@ class OptimizationRunner implements OptimizationRunnerInterface
     }
 
     /**
+     * The strategy guard runs FIRST, inside {@see runNext()}'s own try/catch, so a non-tunable active
+     * ranking strategy fails this run (status=failed, the guard's message as error_message) exactly like
+     * any other pre-flight problem — never a thrown exception escaping to the caller, never a half-scored
+     * run. Every candidate this method would otherwise score, and the baseline/best nDCG it would persist,
+     * describes formula parameters a non-`adaptive_formula` strategy never reads.
+     *
      * @param \Generated\Shared\Transfer\SearchRankingOptimizerRunTransfer $queuedRunTransfer
      */
     protected function process(SearchRankingOptimizerRunTransfer $queuedRunTransfer): void
     {
+        $this->rankingStrategyGuard->assertActiveStrategyIsTunable();
+
         $idOptimizerRun = $queuedRunTransfer->getIdSearchRankingOptimizerRunOrFail();
         $storeName = $queuedRunTransfer->getStoreNameOrFail();
         $localeName = $queuedRunTransfer->getLocaleNameOrFail();

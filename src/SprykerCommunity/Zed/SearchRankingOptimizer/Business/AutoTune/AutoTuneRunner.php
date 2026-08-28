@@ -19,6 +19,7 @@ use Generated\Shared\Transfer\SearchRankingAutoTuneResultTransfer;
 use Generated\Shared\Transfer\StoreTransfer;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface;
@@ -39,6 +40,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\AutoTune\AutoTuneNotificationRecipientResolverInterface $recipientResolver
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismCheckerInterface $formulaDeterminismChecker
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface $rankingStrategyGuard
      */
     public function __construct(
         protected SearchRankingOptimizerRepositoryInterface $repository,
@@ -47,6 +49,7 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
         protected AutoTuneNotificationRecipientResolverInterface $recipientResolver,
         protected SearchRankingOptimizerToSymfonyMailerFacadeInterface $symfonyMailerFacade,
         protected FormulaDeterminismCheckerInterface $formulaDeterminismChecker,
+        protected RankingStrategyGuardInterface $rankingStrategyGuard,
     ) {
     }
 
@@ -61,6 +64,11 @@ class AutoTuneRunner implements AutoTuneRunnerInterface
      */
     public function run(): SearchRankingAutoTuneResultTransfer
     {
+        // Before ANY store is touched: a metric-formula refit is only meaningful while `adaptive_formula`
+        // (or another strategy this package has a mapper for) is the live ranking strategy. Throws —
+        // caught loudly by the console — rather than degrading to a partial run.
+        $this->rankingStrategyGuard->assertActiveStrategyIsTunable();
+
         $resultTransfer = new SearchRankingAutoTuneResultTransfer();
         $metricResultsToNotify = [];
 
