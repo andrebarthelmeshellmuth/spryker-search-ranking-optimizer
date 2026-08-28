@@ -19,48 +19,21 @@ use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationResponseTransfer;
 use Generated\Shared\Transfer\SearchRankingQueryContextTransfer;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolverInterface;
-use SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface;
-use SprykerCommunity\Client\SearchRanking\Intent\BrandAnalyzer;
-use SprykerCommunity\Client\SearchRanking\Intent\CategoryAnalyzer;
-use SprykerCommunity\Client\SearchRanking\Intent\SkuIdentifierAnalyzer;
-use SprykerCommunity\Client\SearchRanking\Intent\SuggestIndexEntityLookup;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
-use SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface;
-use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
-use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
-use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException;
-use SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface;
-use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface;
-use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilderInterface;
-use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculatorInterface;
-use SprykerCommunity\Shared\SearchRanking\SearchRankingConfig;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfEvaluationQueryBuilderInterface;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use Throwable;
 
 /**
- * Specificity-aware relevance weighting (see `search-ranking`'s own README) is applied here too, not just
- * on the live storefront: `search-ranking`'s `SearchRankingFunctionScoreQueryExpanderPlugin` is the ONLY
- * place that mechanism runs live, and this class's `applyRankingFormula()` calls
- * `FunctionScoreBuilder::build()` directly, bypassing that plugin entirely -- so a candidate/live
- * configuration's own specificityBlendWeight/specificityCurveExponent/specificityWeightExponent/specificityWeightShiftMagnitude
- * were silently inert here despite always being present on `SearchRankingConfigurationStorageTransfer`.
- * `applySpecificityWeighting()` below closes that gap by reimplementing the same shift formula
- * {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator} uses -- reimplemented
- * rather than reusing that class (and its `QueryTermFrequencyFetcher` IO dependency) directly, since that
- * fetcher resolves its own index name via `Spryker\Shared\Kernel\Store::getInstance()`, unavailable in
- * this package's Zed/console execution context (the same reason this class already builds its own
- * raw-Elastica queries with an explicit index name instead of the higher-level Store-dependent Client
- * abstractions). `QuerySpecificityCalculator` itself (pure math, no Store dependency at all) IS reused
- * directly -- only the IO half needs reimplementing.
- *
- * `isSpecificityWeightingEnabled()`'s project-override resolution is NOT similarly reimplemented, though:
- * it asks {@see \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface::isSpecificityWeightingEnabled()}
- * (a thin bridge to search-ranking's own Client), which is the correctly Locator-resolved, genuinely
- * project-override-aware path -- unlike `Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()`
- * (a hardcoded `return false;` this class used to call directly), that Client method has no
- * Store-singleton/execution-context concern to route around. `getSpecificityProbeFieldSearchAnalyzers()`
- * is resolved the exact same way, for the exact same reason.
+ * Fires `_rank_eval` requests against a real search index to measure ranking quality for a candidate (or
+ * live) `search-ranking` configuration. This class stays deliberately thin -- it orchestrates the
+ * per-query pipeline (specificity weighting, Intent-Aware Alpha query context, navigational relevanceWeight
+ * shift, query-vector resolution, RRF vs. linear-blend query construction, the actual `_rank_eval` HTTP
+ * call) by delegating each of those concerns to its own single-purpose collaborator -- see
+ * {@see SpecificityWeightingApplierInterface}, {@see QueryContextResolverInterface},
+ * {@see QueryVectorResolverInterface}, and {@see RrfEvaluationQueryBuilderInterface} for the mechanisms
+ * themselves.
  */
 class RankEvalRunner implements RankEvalRunnerInterface
 {
@@ -73,35 +46,6 @@ class RankEvalRunner implements RankEvalRunnerInterface
     protected FunctionScoreBuilderInterface $functionScoreBuilder;
 
     protected SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient;
-
-    protected ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient;
-
-    /**
-     * @var int
-     */
-    protected const IDF_CACHE_TTL_SECONDS = 60;
-
-    /**
-     * Process-scoped cache of per-term idf values (`ln(N/df)`) per `"<indexName>:<searchTerm>"` —
-     * deliberately `static`, not an instance property: {@see \SprykerCommunity\Client\SearchRankingOptimizer\SearchRankingOptimizerFactory::createRankEvalRunner()}
-     * constructs a FRESH instance on every single call, but one automated optimization run fires this
-     * class's `evaluate()` potentially thousands of times within ONE continuous console-command process —
-     * and a search term's own idf values don't depend on anything the optimizer actually searches over
-     * (relevanceWeight/metric weights/specificity blend/exponent/shift), only on the term itself and the
-     * corpus, fetched once here regardless of what any single candidate proposes. Unlike the entropy-era
-     * probe cache this replaces, the key does NOT include `localeName`: `_termvectors`' corpus stats are
-     * already index-wide (this shop's `page` index is one-per-store-multiple-locales, see this package's
-     * README on that approximation) regardless of which locale's live query happens to be running.
-     *
-     * NOT actually console-only, though: {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller\TestCurrentEvaluationController::indexAction()}
-     * calls straight into `evaluate()` from a normal Zed HTTP request, which under PHP-FPM reuses worker
-     * processes across many unrelated requests — this `static` property does NOT reset between them.
-     * `IDF_CACHE_TTL_SECONDS` bounds the resulting staleness to a short window (still long enough for one
-     * optimization run's thousands of calls to benefit from a single fetch) instead of caching forever.
-     *
-     * @var array<string, array{0: array<string, float>, 1: float}>
-     */
-    protected static array $idfCache = [];
 
     /**
      * `_rank_eval` matches `ratings[]` entries to `hits[]` by the EXACT `(_index, _id)` pair — and a hit's
@@ -118,44 +62,18 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * evaluation that always reports "no improvement possible" regardless of how much real relevance data
      * exists. Resolving to the concrete index once per {@see evaluate()} call and using THAT for every
      * `ratings[]._index` in the request keeps both cases correct with no version constraint on the alias
-     * package needed. Same process-scoped/short-TTL caching rationale as `$idfCache` above: cheap to
-     * resolve once per run, wasteful to resolve on every one of potentially thousands of `evaluate()`
-     * calls within one optimization run.
+     * package needed. Cheap to resolve once per run, wasteful to resolve on every one of potentially
+     * thousands of `evaluate()` calls within one optimization run -- process-scoped/short-TTL cached below
+     * for exactly that reason.
      *
      * @var array<string, array{0: string, 1: float}>
      */
     protected static array $concreteIndexNameCache = [];
 
     /**
-     * Process-scoped cache of one {@see SkuIdentifierAnalyzer} per store name — same rationale as
-     * {@see $idfCache}/{@see $concreteIndexNameCache}: a fresh `RankEvalRunner` is built on every single
-     * `SearchRankingOptimizerFactory::createRankEvalRunner()` call, but the
-     * {@see \SprykerCommunity\Client\SearchRanking\Intent\SuggestIndexEntityLookup} each analyzer wraps
-     * fires a real OpenSearch request on every `exists()`/`suggest()` call, otherwise re-fired on every
-     * single query term of every single evaluate() call, within one run that can fire thousands of them.
-     * Store name is the only part of the entity-lookup index name that varies within one run (see
-     * {@see resolveQueryContextTransfer()}), so it's the cache key here too. Same `IDF_CACHE_TTL_SECONDS`
-     * staleness bound as the other two static caches, for the same PHP-FPM-worker-reuse reason.
-     *
-     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\SkuIdentifierAnalyzer, 1: float}>
+     * @var int
      */
-    protected static array $skuIdentifierAnalyzerCache = [];
-
-    /**
-     * Process-scoped cache of one {@see BrandAnalyzer} per store name — same rationale/TTL as
-     * {@see $skuIdentifierAnalyzerCache}.
-     *
-     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\BrandAnalyzer, 1: float}>
-     */
-    protected static array $brandAnalyzerCache = [];
-
-    /**
-     * Process-scoped cache of one {@see CategoryAnalyzer} per store name — same rationale/TTL as
-     * {@see $skuIdentifierAnalyzerCache}.
-     *
-     * @var array<string, array{0: \SprykerCommunity\Client\SearchRanking\Intent\CategoryAnalyzer, 1: float}>
-     */
-    protected static array $categoryAnalyzerCache = [];
+    protected const CONCRETE_INDEX_NAME_CACHE_TTL_SECONDS = 60;
 
     /**
      * @param \Elastica\Client $elasticaClient
@@ -163,24 +81,19 @@ class RankEvalRunner implements RankEvalRunnerInterface
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder
      * @param \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface $functionScoreBuilder
      * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient
-     * @param \SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface $querySpecificityCalculator
-     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface|null $searchRankingClient
-     * @param \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface|null $embeddingClient
-     * @param \SprykerCommunity\Client\SearchRanking\Semantic\SemanticQueryEmbeddingCacheInterface|null $semanticQueryEmbeddingCache
-     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculatorInterface|null $rrfScoreCalculator
-     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilderInterface|null $rrfCandidateQueryBuilder
-     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface|null $storageClient Backs the
-     *   Intent-Aware Alpha SKU/brand/category lookups (see {@see resolveQueryContextTransfer()}) — omitted
-     *   (the default) degrades to no identifier/brand/category detection at all, i.e. today's behavior:
-     *   `alpha` is never force-overridden to `1.0`, and `detectedBrand`/`detectedCategory` are never set,
-     *   for any query.
-     * @param \SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface|null $navigationalRelevanceWeightShiftCalculator
-     *   Backs Intent-Aware Alpha Pass 3's navigational relevanceWeight shift (see
-     *   {@see applyNavigationalShift()}) — omitted (the default) degrades to no shift applied at all, i.e.
-     *   today's behavior before this wiring existed. Stateless/pure math (no IO), so unlike
-     *   `$querySpecificityCalculator` it is NOT reused directly from a shared factory method that also
-     *   needs an IO-bound reimplementation — it's simply optional here the same way every other
-     *   Intent-Aware-Alpha-adjacent dependency in this class already is.
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplierInterface $specificityWeightingApplier
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryVectorResolverInterface|null $queryVectorResolver
+     *   Omitted (the default) degrades to pure lexical evaluation -- no query vector is ever resolved, same
+     *   as omitting an embedding client/cache in that resolver's own constructor.
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryContextResolverInterface|null $queryContextResolver
+     *   Backs the Intent-Aware Alpha SKU/brand/category lookups (see {@see resolveQueryContextTransfer()})
+     *   — omitted (the default) degrades to no identifier/brand/category detection at all, i.e. today's
+     *   behavior: `alpha` is never force-overridden to `1.0`, and `detectedBrand`/`detectedCategory` are
+     *   never set, for any query.
+     * @param \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfEvaluationQueryBuilderInterface|null $rrfEvaluationQueryBuilder
+     *   Backs `--fusion=rrf` evaluation mode (see {@see buildRrfWrappedQuery()}) — omitted (the default)
+     *   degrades to the plain unwrapped lexical query whenever RRF mode is requested, same as that builder's
+     *   own no-op fallback.
      */
     public function __construct(
         Client $elasticaClient,
@@ -188,21 +101,16 @@ class RankEvalRunner implements RankEvalRunnerInterface
         LiveCatalogSearchQueryBuilderInterface $liveCatalogSearchQueryBuilder,
         FunctionScoreBuilderInterface $functionScoreBuilder,
         SearchRankingOptimizerToSearchRankingStorageClientInterface $searchRankingStorageClient,
-        protected QuerySpecificityCalculatorInterface $querySpecificityCalculator,
-        ?SearchRankingOptimizerToSearchRankingClientInterface $searchRankingClient = null,
-        protected ?EmbeddingClientInterface $embeddingClient = null,
-        protected ?SemanticQueryEmbeddingCacheInterface $semanticQueryEmbeddingCache = null,
-        protected ?RrfScoreCalculatorInterface $rrfScoreCalculator = null,
-        protected ?RrfCandidateQueryBuilderInterface $rrfCandidateQueryBuilder = null,
-        protected ?SearchRankingToStorageClientInterface $storageClient = null,
-        protected ?NavigationalRelevanceWeightShiftCalculatorInterface $navigationalRelevanceWeightShiftCalculator = null,
+        protected SpecificityWeightingApplierInterface $specificityWeightingApplier,
+        protected ?QueryVectorResolverInterface $queryVectorResolver = null,
+        protected ?QueryContextResolverInterface $queryContextResolver = null,
+        protected ?RrfEvaluationQueryBuilderInterface $rrfEvaluationQueryBuilder = null,
     ) {
         $this->elasticaClient = $elasticaClient;
         $this->indexNameResolver = $indexNameResolver;
         $this->liveCatalogSearchQueryBuilder = $liveCatalogSearchQueryBuilder;
         $this->functionScoreBuilder = $functionScoreBuilder;
         $this->searchRankingStorageClient = $searchRankingStorageClient;
-        $this->searchRankingClient = $searchRankingClient;
     }
 
     /**
@@ -289,7 +197,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
             }
 
             $searchTerm = $queryTransfer->getSearchTermOrFail();
-            $perQueryConfigurationTransfer = $this->applySpecificityWeighting($indexName, $searchTerm, $configurationTransfer);
+            $perQueryConfigurationTransfer = $this->specificityWeightingApplier->apply($indexName, $searchTerm, $configurationTransfer);
             $queryContextTransfer = $this->resolveQueryContextTransfer($searchTerm, $storeName, $localeName);
             $perQueryConfigurationTransfer = $this->applyNavigationalShift($perQueryConfigurationTransfer, $queryContextTransfer);
 
@@ -326,35 +234,11 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * RRF (Reciprocal Rank Fusion) evaluation path -- an ALTERNATIVE to the linear-blend hybrid formula
-     * `FunctionScoreBuilder` applies (`relevanceWeight * saturatedBM25 + ... alpha * saturatedBM25 +
-     * (1-alpha) * cosineSimilarity ...`), selected via `SearchRankingEvaluationRequestTransfer::getFusionMode()
-     * === SearchRankingOptimizerConfig::FUSION_MODE_RRF`. Linear blending combines two RAW SCORES (BM25
-     * unbounded, cosine bounded to `[-1;1]`) with no single alpha that calibrates well across queries — RRF
-     * instead fuses two independently-retrieved RANK-POSITION lists (lexical, semantic/kNN), a
-     * better-evidenced standard alternative.
-     *
-     * This cluster's OpenSearch 1.3.4 has no native RRF/hybrid-query support (a 2.10+ feature), so the
-     * fusion is computed here in PHP: fire the lexical candidate query and a separate kNN-only candidate
-     * query independently (each capped at {@see SearchRankingOptimizerConfig::getRrfCandidateDepth()}),
-     * compute the fused rank order via {@see RrfScoreCalculatorInterface::fuse()}, then build a NEW query
-     * via {@see RrfCandidateQueryBuilderInterface::build()} whose natural ES result order already reflects
-     * that fused order — entirely without touching `FunctionScoreBuilder` or doing any Painless
-     * doc-value/map lookup (this shop's `search-result-data.*` fields are `index:false`, and doc-value
-     * availability for a Painless map-lookup-by-product-id is uncertain — using ES's always-queryable
-     * native `_id` field instead avoids that risk entirely; see `RrfCandidateQueryBuilder`'s own docblock).
-     * That RRF-ordered query is then handed to the SAME, UNCHANGED `applyRankingFormula()`/
-     * `FunctionScoreBuilder::build()` call the linear path already makes — `FunctionScoreBuilder` needs
-     * ZERO changes, it happily saturates whatever `_score` this query produces, exactly like it already
-     * saturates BM25's `_score` today.
-     *
-     * Gracefully degrades — never throws, never aborts the whole evaluation run — in every failure mode:
-     * no `RrfScoreCalculator`/`RrfCandidateQueryBuilder` wired in at all falls back to the plain unwrapped
-     * lexical query; a failed/unavailable query vector (embedding service down) falls back to an empty
-     * semantic candidate list, which {@see RrfScoreCalculatorInterface::fuse()} itself degrades to exactly
-     * the lexical list's own order (see that interface's own docblock for why that's mathematically the
-     * lexical-only order, not an error state); a failed lexical or semantic candidate retrieval itself
-     * (transient ES error) degrades to an empty candidate list on that side only.
+     * @see \SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfEvaluationQueryBuilderInterface for
+     * the full RRF mechanism and degradation contract. Falls back to the plain unwrapped lexical query
+     * (never throws) whenever no builder was wired in at all -- the same "no RRF collaborators available"
+     * fallback that builder's own default implementation applies internally, kept here too so this method
+     * behaves identically whether the builder itself is missing or merely degrading internally.
      *
      * @param string $searchTerm
      * @param string $storeName
@@ -370,111 +254,13 @@ class RankEvalRunner implements RankEvalRunnerInterface
         string $indexName,
         ?array $queryVector,
     ): AbstractQuery {
-        if ($this->rrfScoreCalculator === null || $this->rrfCandidateQueryBuilder === null) {
+        if ($this->rrfEvaluationQueryBuilder === null) {
             $fallbackQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName)->getQuery();
 
             return $fallbackQuery instanceof AbstractQuery ? $fallbackQuery : new MatchAll();
         }
 
-        $candidateDepth = SearchRankingOptimizerConfig::getRrfCandidateDepth();
-
-        $lexicalRankedDocIds = $this->fetchLexicalCandidateDocIds($searchTerm, $storeName, $localeName, $indexName, $candidateDepth);
-        $semanticRankedDocIds = $queryVector !== null
-            ? $this->fetchSemanticCandidateDocIds($queryVector, $indexName, $candidateDepth)
-            : [];
-
-        $fusedRankedDocIds = $this->rrfScoreCalculator->fuse(
-            $lexicalRankedDocIds,
-            $semanticRankedDocIds,
-            SearchRankingOptimizerConfig::getRrfK(),
-        );
-
-        return $this->rrfCandidateQueryBuilder->build($fusedRankedDocIds);
-    }
-
-    /**
-     * Fires the plain (unwrapped) live catalog query capped at $candidateDepth hits and returns just the
-     * ordered `_id` list -- the lexical half of RRF's two independent candidate retrievals. A failure here
-     * (transient ES error) degrades to an empty list rather than aborting the whole evaluation run, same
-     * discipline as {@see fetchIdfByTerm()}.
-     *
-     * @param string $searchTerm
-     * @param string $storeName
-     * @param string $localeName
-     * @param string $indexName
-     * @param int $candidateDepth
-     *
-     * @return array<int, string>
-     */
-    protected function fetchLexicalCandidateDocIds(
-        string $searchTerm,
-        string $storeName,
-        string $localeName,
-        string $indexName,
-        int $candidateDepth,
-    ): array {
-        try {
-            $elasticaQuery = $this->liveCatalogSearchQueryBuilder->build($searchTerm, $storeName, $localeName, $candidateDepth);
-            $resultSet = $this->elasticaClient->getIndex($indexName)->search($elasticaQuery);
-        } catch (Throwable) {
-            return [];
-        }
-
-        return array_map(
-            static fn ($result): string => $result->getId(),
-            $resultSet->getResults(),
-        );
-    }
-
-    /**
-     * Fires a pure kNN-only candidate query (no lexical component at all -- OpenSearch 1.3.4's own `knn`
-     * query type, raw request body, same raw-Elastica-request pattern already used elsewhere in this class
-     * for `_rank_eval`/`_termvectors`) and returns just the ordered `_id` list -- the semantic half of
-     * RRF's two independent candidate retrievals. A failure here (embedding index missing, transient ES
-     * error) degrades to an empty list rather than aborting the whole evaluation run.
-     *
-     * @param array<int, float> $queryVector
-     * @param string $indexName
-     * @param int $candidateDepth
-     *
-     * @return array<int, string>
-     */
-    protected function fetchSemanticCandidateDocIds(array $queryVector, string $indexName, int $candidateDepth): array
-    {
-        try {
-            $responseData = $this->elasticaClient->request(
-                sprintf('%s/_search', $indexName),
-                Request::POST,
-                [
-                    'size' => $candidateDepth,
-                    '_source' => false,
-                    'query' => [
-                        'knn' => [
-                            'embedding' => [
-                                'vector' => array_values($queryVector),
-                                'k' => $candidateDepth,
-                            ],
-                        ],
-                    ],
-                ],
-            )->getData();
-        } catch (Throwable) {
-            return [];
-        }
-
-        $hits = is_array($responseData['hits']['hits'] ?? null) ? $responseData['hits']['hits'] : [];
-
-        $docIds = [];
-
-        foreach ($hits as $hit) {
-            if (!is_array($hit) || !isset($hit['_id']) || !is_string($hit['_id'])) {
-                continue;
-            }
-
-            $docIds[] = $hit['_id'];
-        }
-
-        return $docIds;
+        return $this->rrfEvaluationQueryBuilder->build($searchTerm, $storeName, $localeName, $indexName, $queryVector);
     }
 
     /**
@@ -506,26 +292,9 @@ class RankEvalRunner implements RankEvalRunnerInterface
     }
 
     /**
-     * Runs {@see SkuIdentifierAnalyzer}, {@see BrandAnalyzer}, and {@see CategoryAnalyzer} against
-     * `$searchTerm` so this evaluation harness honors Intent-Aware Alpha's identifier-match override AND
-     * Pass 3's navigational relevanceWeight shift exactly like real storefront traffic does — without this,
-     * an identifier/SKU query's measured hybrid-search quality would reflect whatever `alpha` the candidate
-     * configuration happens to specify globally, even though `FunctionScoreBuilder` itself would never
-     * actually apply that alpha to this exact query live (see {@see \SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder::buildTextComponent()}),
-     * and a brand/category query's `brandMatchRelevanceWeightShift`/`categoryMatchRelevanceWeightShift`
-     * (see {@see applyNavigationalShift()}) would have nothing to act on at all.
-     *
-     * Brand/CategoryAnalyzer are now wired here (unlike when this docblock originally shipped alongside
-     * Pass 2, when both were still detection-only everywhere): Pass 3 made `detectedBrand`/`detectedCategory`
-     * a real scoring input (via {@see \SprykerCommunity\Client\SearchRanking\Search\NavigationalRelevanceWeightShiftCalculatorInterface},
-     * applied by `SearchRankingFunctionScoreQueryExpanderPlugin` on the live storefront) — running them here
-     * too is no longer pure overhead, it's required for this harness to measure that mechanism at all.
-     *
-     * Returns `null` (never throws) whenever NONE of the three analyzers can run at all: no storage client
-     * wired in (the default — omitting the constructor param degrades to exactly today's behavior, no
-     * override/shift for any query) — each analyzer's own `analyze()` already degrades every internal
-     * failure (KV read error, malformed cached shape regex) to "no match" without throwing, so nothing
-     * further needs catching here.
+     * @see \SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryContextResolverInterface for the
+     * full contract. Delegates to the injected resolver, degrading to `null` (never throws) whenever none
+     * was wired in.
      *
      * @param string $searchTerm
      * @param string $storeName
@@ -533,29 +302,14 @@ class RankEvalRunner implements RankEvalRunnerInterface
      */
     protected function resolveQueryContextTransfer(string $searchTerm, string $storeName, string $localeName): ?SearchRankingQueryContextTransfer
     {
-        $storageClient = $this->storageClient;
-
-        if ($storageClient === null) {
-            return null;
-        }
-
-        $queryContextTransfer = (new SearchRankingQueryContextTransfer())
-            ->setSearchString($searchTerm)
-            ->setStoreName($storeName)
-            ->setLocaleName($localeName);
-
-        $queryContextTransfer = $this->getSkuIdentifierAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
-        $queryContextTransfer = $this->getBrandAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
-
-        return $this->getCategoryAnalyzer($storeName, $storageClient)->analyze($queryContextTransfer);
+        return $this->queryContextResolver?->resolve($searchTerm, $storeName, $localeName);
     }
 
     /**
-     * Composes {@see NavigationalRelevanceWeightShiftCalculatorInterface} on top of whatever
-     * `relevanceWeight` {@see applySpecificityWeighting()} already produced — mirrors
-     * `SearchRankingFunctionScoreQueryExpanderPlugin::applyNavigationalShift()`'s own composition order on
-     * the live storefront. A no-op (the same instance, unchanged) whenever there's no configuration, no
-     * query context (e.g. no storage client wired in), or no calculator wired in at all.
+     * @see \SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryContextResolverInterface::applyNavigationalShift()
+     * for the full contract -- bundled onto that resolver rather than injected here as its own separate
+     * collaborator, see that method's own docblock for why. A no-op (the same instance, unchanged, never
+     * throws) whenever no resolver was wired in at all.
      *
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
      * @param \Generated\Shared\Transfer\SearchRankingQueryContextTransfer|null $queryContextTransfer
@@ -564,135 +318,22 @@ class RankEvalRunner implements RankEvalRunnerInterface
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
         ?SearchRankingQueryContextTransfer $queryContextTransfer,
     ): ?SearchRankingConfigurationStorageTransfer {
-        if ($configurationTransfer === null || $queryContextTransfer === null || $this->navigationalRelevanceWeightShiftCalculator === null) {
+        if ($this->queryContextResolver === null) {
             return $configurationTransfer;
         }
 
-        $effectiveRelevanceWeight = $this->navigationalRelevanceWeightShiftCalculator->calculateEffectiveRelevanceWeight(
-            (float)$configurationTransfer->getRelevanceWeight(),
-            $configurationTransfer,
-            $queryContextTransfer,
-        );
-
-        return (clone $configurationTransfer)->setRelevanceWeight($effectiveRelevanceWeight);
+        return $this->queryContextResolver->applyNavigationalShift($configurationTransfer, $queryContextTransfer);
     }
 
     /**
-     * @see $skuIdentifierAnalyzerCache for the process-scoped caching rationale.
-     *
-     * @param string $storeName
-     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
-     */
-    protected function getSkuIdentifierAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): SkuIdentifierAnalyzer
-    {
-        $cached = static::$skuIdentifierAnalyzerCache[$storeName] ?? null;
-
-        if ($cached !== null && $cached[1] > microtime(true)) {
-            return $cached[0];
-        }
-
-        $skuEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_SKU);
-        $skuIdentifierAnalyzer = new SkuIdentifierAnalyzer($skuEntityLookup);
-
-        static::$skuIdentifierAnalyzerCache[$storeName] = [$skuIdentifierAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
-
-        return $skuIdentifierAnalyzer;
-    }
-
-    /**
-     * @see $brandAnalyzerCache for the process-scoped caching rationale. Same
-     * `{prefix}_{storeName}_entity-lookup` index-name scheme `search-ranking`'s own
-     * `SearchRankingFactory::createSuggestIndexEntityLookup()` uses (ES is the only entity-lookup backend
-     * now — see that package's README/install checker).
-     *
-     * @param string $storeName
-     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
-     */
-    protected function getBrandAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): BrandAnalyzer
-    {
-        $cached = static::$brandAnalyzerCache[$storeName] ?? null;
-
-        if ($cached !== null && $cached[1] > microtime(true)) {
-            return $cached[0];
-        }
-
-        $brandEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_BRAND);
-        // `search-ranking`'s own BrandAnalyzer takes a second, category-scoped lookup for brand/category
-        // disambiguation (a term matching both, e.g. "office", defers to category -- see BrandAnalyzer's own
-        // docblock) -- mirror that here with a fresh SuggestIndexEntityLookup instance over the same entity
-        // type {@see getCategoryAnalyzer()} uses, so this harness's brandMatchRelevanceWeightShift measurement
-        // reflects the same disambiguation real storefront traffic gets.
-        $categoryEntityLookupForBrandDisambiguation = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_CATEGORY);
-        $brandAnalyzer = new BrandAnalyzer($brandEntityLookup, $categoryEntityLookupForBrandDisambiguation);
-
-        static::$brandAnalyzerCache[$storeName] = [$brandAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
-
-        return $brandAnalyzer;
-    }
-
-    /**
-     * @see $categoryAnalyzerCache for the process-scoped caching rationale. Same index-name scheme as
-     * {@see getBrandAnalyzer()}.
-     *
-     * @param string $storeName
-     * @param \SprykerCommunity\Client\SearchRanking\Dependency\Client\SearchRankingToStorageClientInterface $storageClient
-     */
-    protected function getCategoryAnalyzer(string $storeName, SearchRankingToStorageClientInterface $storageClient): CategoryAnalyzer
-    {
-        $cached = static::$categoryAnalyzerCache[$storeName] ?? null;
-
-        if ($cached !== null && $cached[1] > microtime(true)) {
-            return $cached[0];
-        }
-
-        $categoryEntityLookup = $this->createSuggestIndexEntityLookup($storeName, SearchRankingConfig::ENTITY_LOOKUP_TYPE_CATEGORY);
-        $categoryAnalyzer = new CategoryAnalyzer($categoryEntityLookup);
-
-        static::$categoryAnalyzerCache[$storeName] = [$categoryAnalyzer, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
-
-        return $categoryAnalyzer;
-    }
-
-    /**
-     * Builds a {@see SuggestIndexEntityLookup} for `$entityType`, scoped to `$storeName` — same
-     * `{prefix}_{storeName}_entity-lookup` index-name scheme `search-ranking`'s own
-     * `SearchRankingFactory::createSuggestIndexEntityLookup()` uses, resolved here via
-     * `$indexNameResolver` (already available on this class for the exact same Store-singleton-avoidance
-     * reason documented on this class itself) instead of that factory's own
-     * `getStoreClient()->getCurrentStore()`-based resolution, which is unavailable in this package's
-     * Zed/console execution context.
-     *
-     * @param string $storeName
-     * @param string $entityType
-     */
-    protected function createSuggestIndexEntityLookup(string $storeName, string $entityType): SuggestIndexEntityLookup
-    {
-        $indexName = $this->indexNameResolver->resolve(SearchRankingConfig::ENTITY_LOOKUP_SUGGEST_INDEX_SOURCE_IDENTIFIER, $storeName);
-
-        return new SuggestIndexEntityLookup($this->elasticaClient, $indexName, $entityType);
-    }
-
-    /**
-     * Resolves `$searchTerm`'s semantic embedding for the hybrid-search blend -- mirrors
-     * {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin::resolveQueryVector()}'s
-     * exact contract (same cache-first-then-embed-with-graceful-degradation shape, same `alpha == 1.0`
-     * short-circuit), reimplemented here rather than reused directly for the same Store/Locator-context
-     * reason the rest of this class already reimplements the specificity-probe IO instead of reusing
-     * `QueryTermFrequencyFetcher` (see this class's own docblock): that plugin only runs inside a real
-     * Yves/Client request, unreachable from this package's Zed/console execution context.
-     *
-     * Returns `null` (never throws) whenever no vector can usefully be used: no configuration at all,
-     * no embedding client/cache wired in (both constructor params are optional -- a caller that omits
-     * them gets pure lexical evaluation, same as omitting `$searchRankingClient`), `alpha == null` or
-     * `alpha >= 1.0` (100% lexical, no point paying for an embedding that would never be blended in), or
-     * a cache miss followed by any {@see \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException}
-     * (embedding service down/timed out/misconfigured/not yet booted -- see this package's own README on
-     * the P4 rollout state). `FunctionScoreBuilder::build()` degrades to exactly the lexical-only formula
-     * whenever this returns `null` -- an embedding failure must never abort the whole evaluation run,
-     * exactly like the live plugin never lets it abort a real search request.
+     * @see \SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryVectorResolverInterface for the full
+     * contract. Delegates to the injected resolver, degrading to `null` (never throws) whenever none was
+     * wired in -- the same "pure lexical evaluation" degradation that resolver's own missing-embedding-
+     * client branch already applies.
      *
      * @param string $searchTerm
      * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
+     * @param bool $ignoreAlphaGate
      *
      * @return array<int, float>|null
      */
@@ -701,258 +342,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
         ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
         bool $ignoreAlphaGate = false,
     ): ?array {
-        if ($this->embeddingClient === null || $this->semanticQueryEmbeddingCache === null) {
-            return null;
-        }
-
-        // RRF mode (see buildRrfWrappedQuery()) always needs a real vector to run its own kNN candidate
-        // query, regardless of what `alpha` is set to -- RRF is a fundamentally different fusion mode that
-        // doesn't gate semantic retrieval on alpha at all (that knob only governs the LINEAR blend). Every
-        // other caller keeps the original alpha-gated contract unchanged.
-        if (!$ignoreAlphaGate) {
-            if ($configurationTransfer === null) {
-                return null;
-            }
-
-            $alpha = $configurationTransfer->getAlpha();
-
-            // A null alpha (no explicit setAlpha() call) is treated the same as the documented default of
-            // 1.0 -- see FunctionScoreBuilder::buildTextComponent()'s own matching guard.
-            if ($alpha === null || $alpha >= 1.0) {
-                return null;
-            }
-        }
-
-        $modelId = SearchRankingOptimizerConfig::getEmbeddingModelId();
-        $cachedVector = $this->semanticQueryEmbeddingCache->get($searchTerm, $modelId);
-
-        if ($cachedVector !== null) {
-            return $cachedVector;
-        }
-
-        $queryText = SearchRankingOptimizerConfig::getEmbeddingQueryInstructionPrefix() . $searchTerm;
-
-        try {
-            $vector = $this->embeddingClient->embed($queryText);
-        } catch (EmbeddingUnavailableException) {
-            return null;
-        }
-
-        $this->semanticQueryEmbeddingCache->set($searchTerm, $modelId, $vector);
-
-        return $vector;
-    }
-
-    /**
-     * Returns a clone of $configurationTransfer with `relevanceWeight` replaced by the specificity-adjusted
-     * value for THIS search term — a no-op (the same instance, unchanged) when there's no configuration at
-     * all, {@see \SprykerCommunity\Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()}
-     * is off (the same project-level gate {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin}
-     * itself checks before ever firing the live probe — evaluation must never apply an effect live traffic
-     * never applies, regardless of what a candidate configuration's own specificity fields say), or no
-     * query term carries any real corpus evidence at all.
-     *
-     * @param string $indexName
-     * @param string $searchTerm
-     * @param \Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer|null $configurationTransfer
-     */
-    protected function applySpecificityWeighting(
-        string $indexName,
-        string $searchTerm,
-        ?SearchRankingConfigurationStorageTransfer $configurationTransfer,
-    ): ?SearchRankingConfigurationStorageTransfer {
-        if ($configurationTransfer === null || !$this->isSpecificityWeightingEnabled()) {
-            return $configurationTransfer;
-        }
-
-        $idfByTerm = $this->fetchIdfByTerm($indexName, $searchTerm);
-
-        if ($idfByTerm === []) {
-            return $configurationTransfer;
-        }
-
-        $rawSpecificity = $this->querySpecificityCalculator->calculateRawSpecificity(
-            $idfByTerm,
-            (float)$configurationTransfer->getSpecificityBlendWeight(),
-        );
-        $normalizedSpecificity = $this->querySpecificityCalculator->normalize(
-            $rawSpecificity,
-            (float)$configurationTransfer->getSpecificitySaturationPoint(),
-            $configurationTransfer->getSpecificityCurveExponent() ?? 1.0,
-        );
-
-        $shift = $this->calculateSpecificityShift(
-            $normalizedSpecificity,
-            (float)$configurationTransfer->getSpecificityWeightExponent(),
-            (float)$configurationTransfer->getSpecificityWeightShiftMagnitude(),
-        );
-        $adjustedRelevanceWeight = max(0.0, min(1.0, (float)$configurationTransfer->getRelevanceWeight() + $shift));
-
-        $perQueryConfigurationTransfer = clone $configurationTransfer;
-        $perQueryConfigurationTransfer->setRelevanceWeight($adjustedRelevanceWeight);
-
-        return $perQueryConfigurationTransfer;
-    }
-
-    /**
-     * Fetches (and process-caches, see {@see $idfCache}) per-term idf values for `$searchTerm` via ONE
-     * `_termvectors` probe against an artificial document — no real catalog query at all, unlike the
-     * entropy-era probe this replaces. A failing probe, or a corpus with zero documents, must never break
-     * the evaluation it was fired alongside, so any Throwable here is treated as "no usable signal" (falls
-     * back to the unadjusted configured relevanceWeight via the empty array this returns). A term with
-     * zero real corpus evidence is skipped, same reasoning as {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator}.
-     * Same store-only-index tradeoff as {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher}'s
-     * own docblock (dictionary lookup, corpus-wide, blended across locales sharing one store) — see there
-     * for why, and for the aggregation-based alternative if that blending ever needs fixing for real.
-     *
-     * @param string $indexName
-     * @param string $searchTerm
-     *
-     * @return array<string, float>
-     */
-    protected function fetchIdfByTerm(string $indexName, string $searchTerm): array
-    {
-        $cacheKey = $indexName . ':' . $searchTerm;
-
-        if (isset(static::$idfCache[$cacheKey]) && static::$idfCache[$cacheKey][1] > microtime(true)) {
-            return static::$idfCache[$cacheKey][0];
-        }
-
-        $fieldToSearchAnalyzer = $this->searchRankingClient !== null
-            ? $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers()
-            : [];
-
-        $idfByTerm = [];
-
-        if ($searchTerm !== '' && $fieldToSearchAnalyzer !== []) {
-            try {
-                $responseData = $this->elasticaClient->request(
-                    sprintf('%s/_termvectors', $indexName),
-                    Request::POST,
-                    [
-                        'doc' => array_fill_keys(array_keys($fieldToSearchAnalyzer), $searchTerm),
-                        'fields' => array_keys($fieldToSearchAnalyzer),
-                        'per_field_analyzer' => $fieldToSearchAnalyzer,
-                        'term_statistics' => true,
-                        'field_statistics' => true,
-                    ],
-                )->getData();
-
-                $idfByTerm = $this->calculateIdfByTermFromResponse($responseData);
-            } catch (Throwable) {
-                $idfByTerm = [];
-            }
-        }
-
-        static::$idfCache[$cacheKey] = [$idfByTerm, microtime(true) + static::IDF_CACHE_TTL_SECONDS];
-
-        return $idfByTerm;
-    }
-
-    /**
-     * Mirrors {@see \SprykerCommunity\Client\SearchRanking\Search\QueryTermFrequencyFetcher}'s own
-     * `_termvectors` response parsing (`doc_freq` `max()`-combined across fields, `doc_count` `max()`-ed
-     * across fields, a missing key treated as a real `0`) plus
-     * {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator}'s own idf derivation
-     * (`ln(N/df)`, skipping any term with zero real corpus evidence) in one pass, since this class needs
-     * only the final per-term idf map, not the intermediate doc-frequency result object.
-     *
-     * @param array<string, mixed> $responseData
-     *
-     * @return array<string, float>
-     */
-    protected function calculateIdfByTermFromResponse(array $responseData): array
-    {
-        [$docCount, $termDocumentFrequencies] = $this->extractDocCountAndTermFrequencies($responseData);
-
-        if ($docCount <= 0) {
-            return [];
-        }
-
-        $idfByTerm = [];
-
-        foreach ($termDocumentFrequencies as $term => $documentFrequency) {
-            if ($documentFrequency <= 0) {
-                continue;
-            }
-
-            $idfByTerm[$term] = max(0.0, log($docCount / $documentFrequency));
-        }
-
-        return $idfByTerm;
-    }
-
-    /**
-     * The `doc_count`/`doc_freq` extraction half of {@see calculateIdfByTermFromResponse()}, split out
-     * purely to keep that method's own cyclomatic/NPath complexity down — no behavioral change.
-     *
-     * @param array<string, mixed> $responseData
-     *
-     * @return array{0: int, 1: array<string, int>}
-     */
-    protected function extractDocCountAndTermFrequencies(array $responseData): array
-    {
-        $termVectorsByField = is_array($responseData['term_vectors'] ?? null) ? $responseData['term_vectors'] : [];
-
-        $docCount = 0;
-        $termDocumentFrequencies = [];
-
-        foreach ($termVectorsByField as $fieldTermVector) {
-            if (!is_array($fieldTermVector)) {
-                continue;
-            }
-
-            $fieldStatistics = is_array($fieldTermVector['field_statistics'] ?? null) ? $fieldTermVector['field_statistics'] : [];
-            $docCount = max($docCount, (int)($fieldStatistics['doc_count'] ?? 0));
-
-            $terms = is_array($fieldTermVector['terms'] ?? null) ? $fieldTermVector['terms'] : [];
-
-            foreach ($terms as $term => $termStatistics) {
-                $documentFrequency = (int)($termStatistics['doc_freq'] ?? 0);
-                $termDocumentFrequencies[$term] = max($termDocumentFrequencies[$term] ?? 0, $documentFrequency);
-            }
-        }
-
-        return [$docCount, $termDocumentFrequencies];
-    }
-
-    /**
-     * Ported from `search-ranking`'s own {@see \SprykerCommunity\Client\SearchRanking\Search\SpecificityWeightCalculator::calculateShift()}
-     * — see this class's own docblock for why it's reimplemented rather than reused directly. `2 *
-     * normalizedSpecificity - 1` maps specificity's `[0;1[` range onto a signed `[-1;1]` deviation from the
-     * neutral point (normalized specificity exactly 0.5 → deviation 0): positive when the query is MORE
-     * specific than typical (shift toward text relevance), negative when it's LESS specific than typical
-     * (shift toward business signals). The exponent is applied to the deviation's MAGNITUDE only, sign
-     * preserved separately.
-     *
-     * @param float $normalizedSpecificity
-     * @param float $exponent
-     * @param float $shiftMagnitude
-     */
-    protected function calculateSpecificityShift(float $normalizedSpecificity, float $exponent, float $shiftMagnitude): float
-    {
-        $signedDeviation = (2 * $normalizedSpecificity) - 1;
-        $shapedDeviation = ($signedDeviation <=> 0) * (abs($signedDeviation) ** $exponent);
-
-        return $shiftMagnitude * $shapedDeviation;
-    }
-
-    /**
-     * Delegates to search-ranking's own Client (via the injected bridge) whenever one was provided — the
-     * correctly Locator-resolved, genuinely project-override-aware answer, matching exactly what
-     * `SearchRankingFunctionScoreQueryExpanderPlugin` itself checks before firing the live probe. Falls
-     * back to `Shared\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` — a hardcoded
-     * `return false;` with no project-override path of its own — only when no bridge was given at all.
-     * The bridge parameter is optional, so this method never hard-fails when it's omitted; it just can't
-     * honor a project override without it.
-     */
-    protected function isSpecificityWeightingEnabled(): bool
-    {
-        if ($this->searchRankingClient !== null) {
-            return $this->searchRankingClient->isSpecificityWeightingEnabled();
-        }
-
-        return SearchRankingConfig::isSpecificityWeightingEnabled();
+        return $this->queryVectorResolver?->resolve($searchTerm, $configurationTransfer, $ignoreAlphaGate);
     }
 
     /**
@@ -993,7 +383,7 @@ class RankEvalRunner implements RankEvalRunnerInterface
     {
         $cached = static::$concreteIndexNameCache[$indexName] ?? null;
 
-        if ($cached !== null && $cached[1] > microtime(true) - static::IDF_CACHE_TTL_SECONDS) {
+        if ($cached !== null && $cached[1] > microtime(true) - static::CONCRETE_INDEX_NAME_CACHE_TTL_SECONDS) {
             return $cached[0];
         }
 

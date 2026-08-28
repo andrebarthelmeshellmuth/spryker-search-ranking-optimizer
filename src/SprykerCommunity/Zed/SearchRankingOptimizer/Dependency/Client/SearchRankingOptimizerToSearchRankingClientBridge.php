@@ -68,4 +68,12 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
     {
         return $this->searchRankingOptimizerClient->productMatchesSearch($searchTerm, $storeName, $localeName, $idProductAbstract);
     }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array
+    {
+        return $this->searchRankingOptimizerClient->getRegisteredRankingStrategyNames();
+    }
 }

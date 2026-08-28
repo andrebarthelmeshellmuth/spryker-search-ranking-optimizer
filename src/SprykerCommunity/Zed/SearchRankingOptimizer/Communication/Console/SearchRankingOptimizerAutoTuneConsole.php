@@ -12,6 +12,7 @@ namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Console;
 use Generated\Shared\Transfer\SearchRankingAutoTuneMetricResultTransfer;
 use Spryker\Zed\Kernel\Communication\Console\Console;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\UnsupportedRankingStrategyException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -48,7 +49,13 @@ class SearchRankingOptimizerAutoTuneConsole extends Console
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
-        $autoTuneResultTransfer = $this->getFacade()->runAutoTune();
+        try {
+            $autoTuneResultTransfer = $this->getFacade()->runAutoTune();
+        } catch (UnsupportedRankingStrategyException $unsupportedRankingStrategyException) {
+            $output->writeln(sprintf('<error>%s</error>', $unsupportedRankingStrategyException->getMessage()));
+
+            return static::CODE_ERROR;
+        }
 
         if ($autoTuneResultTransfer->getMetricResults()->count() === 0) {
             $output->writeln('No metric has an auto-tune threshold set (or none had a digest to check yet).');

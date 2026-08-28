@@ -40,6 +40,14 @@ class SearchRankingOptimizerToSearchRankingClientBridge implements SearchRanking
         return $this->searchRankingClient->getSpecificityProbeFieldSearchAnalyzers();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array
+    {
+        return $this->searchRankingClient->getRegisteredRankingStrategyNames();
+    }
+
     public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
     {
         return $this->searchRankingClient->createFunctionScoreBuilder();

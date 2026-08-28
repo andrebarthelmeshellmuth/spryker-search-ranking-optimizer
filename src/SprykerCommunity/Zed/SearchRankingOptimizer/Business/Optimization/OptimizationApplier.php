@@ -28,22 +28,27 @@ class OptimizationApplier implements OptimizationApplierInterface
 
     protected SearchRankingOptimizerEntityManagerInterface $entityManager;
 
+    protected RankingStrategyGuardInterface $rankingStrategyGuard;
+
     /**
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface $repository
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Checkpoint\WeightCheckpointRecorderInterface $recorder
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface $entityManager
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface $rankingStrategyGuard
      */
     public function __construct(
         SearchRankingOptimizerRepositoryInterface $repository,
         SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade,
         WeightCheckpointRecorderInterface $recorder,
         SearchRankingOptimizerEntityManagerInterface $entityManager,
+        RankingStrategyGuardInterface $rankingStrategyGuard,
     ) {
         $this->repository = $repository;
         $this->searchRankingFacade = $searchRankingFacade;
         $this->recorder = $recorder;
         $this->entityManager = $entityManager;
+        $this->rankingStrategyGuard = $rankingStrategyGuard;
     }
 
     /**
@@ -53,6 +58,12 @@ class OptimizationApplier implements OptimizationApplierInterface
      */
     public function apply(int $idSearchRankingOptimizerRun): ?SearchRankingOptimizerRunTransfer
     {
+        // Deliberately OUTSIDE the try/catch below and before any read: a non-tunable active ranking
+        // strategy is an operator-configuration error, not a per-run data condition, so it must surface
+        // loudly to the caller (console: red error + non-zero exit; Zed apply controller: error flash),
+        // never be swallowed into a silent `return null` the way a since-deleted metric is.
+        $this->rankingStrategyGuard->assertActiveStrategyIsTunable();
+
         $optimizerRunTransfer = $this->repository->findOptimizerRunById($idSearchRankingOptimizerRun);
 
         if ($optimizerRunTransfer === null || $optimizerRunTransfer->getStatus() !== SearchRankingOptimizerConfig::OPTIMIZATION_RUN_STATUS_DONE) {

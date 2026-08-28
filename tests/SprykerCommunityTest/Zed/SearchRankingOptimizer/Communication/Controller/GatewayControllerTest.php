@@ -342,6 +342,14 @@ class GatewayControllerTest extends Unit
             {
                 return $this->verifier->matches($searchTerm, $storeName, $localeName, $idProductAbstract);
             }
+
+            /**
+             * @return array<int, string>
+             */
+            public function getRegisteredRankingStrategyNames(): array
+            {
+                return ['adaptive_formula'];
+            }
         };
 
         $this->tester->setDependency(SearchRankingOptimizerDependencyProvider::CLIENT_SEARCH_RANKING_OPTIMIZER, $client);

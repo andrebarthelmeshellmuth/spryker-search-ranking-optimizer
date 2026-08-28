@@ -31,12 +31,18 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQuery
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifier;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\ProductSearchMatchVerifierInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryContextResolver;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryContextResolverInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryVectorResolver;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryVectorResolverInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunnerInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractor;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RawRelevanceScoreExtractorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfCandidateQueryBuilderInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfEvaluationQueryBuilder;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfEvaluationQueryBuilderInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculator;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Rrf\RrfScoreCalculatorInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibrationSearcher;
@@ -44,6 +50,8 @@ use SprykerCommunity\Client\SearchRankingOptimizer\Search\SaturationPointCalibra
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Semantic\InMemorySemanticQueryEmbeddingCache;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcher;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificitySearcherInterface;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplier;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplierInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStub;
 use SprykerCommunity\Client\SearchRankingOptimizer\Zed\ProductRelevanceJudgmentStubInterface;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
@@ -102,14 +110,52 @@ class SearchRankingOptimizerFactory extends AbstractFactory
             $this->createLiveCatalogSearchQueryBuilder(),
             $this->createFunctionScoreBuilder(),
             $this->getSearchRankingStorageClient(),
+            $this->createSpecificityWeightingApplier(),
+            $this->createQueryVectorResolver(),
+            $this->createQueryContextResolver(),
+            $this->createRrfEvaluationQueryBuilder(),
+        );
+    }
+
+    /**
+     * Bundles the IDF probe + specificity math + `isSpecificityWeightingEnabled()` project-override gating
+     * into one collaborator -- see {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplier}'s
+     * own docblock.
+     */
+    public function createSpecificityWeightingApplier(): SpecificityWeightingApplierInterface
+    {
+        return new SpecificityWeightingApplier(
+            $this->getElasticaClient(),
             $this->createQuerySpecificityCalculator(),
             $this->getSearchRankingClient(),
+        );
+    }
+
+    public function createQueryVectorResolver(): QueryVectorResolverInterface
+    {
+        return new QueryVectorResolver(
             $this->createEmbeddingClient(),
             $this->createSemanticQueryEmbeddingCache(),
-            $this->createRrfScoreCalculator(),
-            $this->createRrfCandidateQueryBuilder(),
+        );
+    }
+
+    public function createQueryContextResolver(): QueryContextResolverInterface
+    {
+        return new QueryContextResolver(
+            $this->getElasticaClient(),
+            $this->createIndexNameResolver(),
             $this->getStorageClient(),
             $this->createNavigationalRelevanceWeightShiftCalculator(),
+        );
+    }
+
+    public function createRrfEvaluationQueryBuilder(): RrfEvaluationQueryBuilderInterface
+    {
+        return new RrfEvaluationQueryBuilder(
+            $this->getElasticaClient(),
+            $this->createLiveCatalogSearchQueryBuilder(),
+            $this->createRrfScoreCalculator(),
+            $this->createRrfCandidateQueryBuilder(),
         );
     }
 

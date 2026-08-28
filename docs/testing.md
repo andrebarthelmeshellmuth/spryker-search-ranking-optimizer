@@ -185,8 +185,20 @@ vendor/bin/codecept build -c packages/spryker-community/search-ranking-optimizer
 vendor/bin/codecept run   -c packages/spryker-community/search-ranking-optimizer/tests/SprykerCommunityTest/GroundTruth/SearchRankingOptimizer
 ```
 
+**Approximate runtime: budget ~2 hours for the whole suite** (measured on a re-exported OpenSearch 3.5
+index; it fires several million `_rank_eval` sub-queries end to end and is almost entirely ES-I/O-bound).
+Each test is a `median`/`best`-of-N wrapper (`METRIC_WEIGHT_REPEAT_COUNT` = 3, `RELEVANCE_WEIGHT_REPEAT_COUNT`
+= 7 × 2 scenarios, `RESTART_ON_PLATEAU_SAMPLE_SIZE` = 10) around a real population × generations
+optimization, so the four test methods are ~40 full optimizer runs between them. Run a single method
+(append `SearchRankingOptimizer <TestClass>:<methodName>` to the `run` command) rather than the whole
+suite unless you specifically need all four. Expect the
+occasional legitimate `SKIPPED` (a scenario self-skips when the live catalog has too few marginal
+text-relevance pairs to build a ground truth) and, on the step-function scenarios, the occasional
+median-still-missed failure described next — re-run before treating either as a regression.
+
 Why this isn't a CI gate: each test runs a REAL population × generations optimization (tens of seconds to
-a few minutes), and — the more fundamental reason — a single rated pair per query gives `rank_eval`'s nDCG
+a few minutes each, ~2 h for the suite), and — the more fundamental reason — a single rated pair per query
+gives `rank_eval`'s nDCG
 an almost step-function landscape (flat everywhere except right at the exact parameter value where the 2
 rated products' relative order flips), which a population-based search can occasionally fail to climb from
 an unlucky random initialization even on an easy, unambiguous ground truth. Confirmed empirically: the same

@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Controller;
 
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\UnsupportedRankingStrategyException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Communication\Form\AutomatedWeightOptimizationApplyForm;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -39,7 +40,14 @@ class AutomatedWeightOptimizationApplyController extends AbstractController
         }
 
         $idSearchRankingOptimizerRun = (int)$applyForm->getData()[AutomatedWeightOptimizationApplyForm::FIELD_ID_SEARCH_RANKING_OPTIMIZER_RUN];
-        $optimizerRunTransfer = $this->getFacade()->applyOptimizationRun($idSearchRankingOptimizerRun);
+
+        try {
+            $optimizerRunTransfer = $this->getFacade()->applyOptimizationRun($idSearchRankingOptimizerRun);
+        } catch (UnsupportedRankingStrategyException $unsupportedRankingStrategyException) {
+            $this->addErrorMessage($unsupportedRankingStrategyException->getMessage());
+
+            return $this->redirectResponse(static::URL_OPTIMIZATION);
+        }
 
         if ($optimizerRunTransfer === null) {
             $this->addErrorMessage(sprintf(

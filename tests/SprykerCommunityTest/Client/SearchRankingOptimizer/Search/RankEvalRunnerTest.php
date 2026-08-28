@@ -14,27 +14,23 @@ use Generated\Shared\Transfer\SearchRankingConfigurationStorageTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationProductGainTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationQueryTransfer;
 use Generated\Shared\Transfer\SearchRankingEvaluationRequestTransfer;
-use ReflectionMethod;
-use ReflectionProperty;
 use Spryker\Client\SearchElasticsearch\Index\IndexNameResolver\IndexNameResolver;
 use Spryker\Client\SearchElasticsearch\SearchElasticsearchConfig;
 use Spryker\Shared\SearchElasticsearch\ElasticaClient\ElasticaClientFactory;
 use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilder;
-use SprykerCommunity\Client\SearchRanking\Query\FunctionScoreBuilderInterface;
 use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculator;
-use SprykerCommunity\Client\SearchRanking\Search\QuerySpecificityCalculatorInterface;
 use SprykerCommunity\Client\SearchRanking\SearchRankingClient;
 use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingClientInterface;
 use SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientBridge;
-use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingClientInterface;
 use SprykerCommunity\Client\SearchRankingOptimizer\Dependency\Client\SearchRankingOptimizerToSearchRankingStorageClientBridge;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\LiveCatalogSearchQueryBuilder;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\NeverInvokedStoreClient;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\QueryVectorResolver;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner;
 use SprykerCommunity\Client\SearchRankingOptimizer\Search\Semantic\InMemorySemanticQueryEmbeddingCache;
+use SprykerCommunity\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplier;
 use SprykerCommunity\Client\SearchRankingStorage\SearchRankingStorageClient;
-use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 
 /**
  * INTEGRATION TEST — talks to a real Elasticsearch/OpenSearch, against this shop's own real product page
@@ -161,178 +157,11 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
-     * Proves the specificity-weighting reimplementation directly at the source: before it existed,
-     * `specificityBlendWeight`/`specificitySaturationPoint`/`specificityWeightExponent`/
-     * `specificityWeightShiftMagnitude` were carried on every `SearchRankingConfigurationStorageTransfer`
-     * but never actually read anywhere in this evaluation path. Deliberately invokes the protected
-     * `applySpecificityWeighting()` directly (via reflection) against this shop's real "chair" search term
-     * and real catalog data, rather than asserting on the downstream `rank_eval` nDCG score -- same
-     * reasoning `testEvaluateAppliesAnExplicitRankingConfigurationOverrideInsteadOfTheLiveOne()`'s docblock
-     * gives for why a direct assertion on the adjusted value is the non-flaky way to prove a shift is real.
-     * A saturation point far below "chair"'s own real specificity (see this package's README) guarantees
-     * normalized specificity lands well above the neutral 0.5 point, so a non-zero
-     * `specificityWeightShiftMagnitude` must produce a `relevanceWeight` different from the configured one.
+     * Specificity-weighting shift/curve-exponent/caching/no-op coverage now lives directly on
+     * {@see \SprykerCommunityTest\Client\SearchRankingOptimizer\Search\SpecificityWeightingApplierTest} —
+     * that class's own `apply()` is public, so those tests no longer need reflection into a protected
+     * `RankEvalRunner` method, following this class's split into single-purpose collaborators.
      */
-    public function testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm(): void
-    {
-        // Arrange -- specificity weighting itself has no runtime override mechanism to flip on for a test
-        // (see createRankEvalRunnerWithSpecificityWeightingForcedEnabled()'s own docblock), so this
-        // deliberately uses the forced-enabled subclass rather than createRankEvalRunner().
-        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
-
-        $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight(0.5)
-            ->setRelevanceSaturationPoint(12.0)
-            ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setSpecificityBlendWeight(0.7)
-            ->setSpecificitySaturationPoint(1.0)
-            ->setSpecificityWeightExponent(1.0)
-            ->setSpecificityWeightShiftMagnitude(0.4);
-
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
-        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
-
-        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
-
-        // Act
-        $adjustedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $configurationTransfer);
-
-        // Assert
-        $this->assertNotSame(
-            $configurationTransfer->getRelevanceWeight(),
-            $adjustedConfigurationTransfer->getRelevanceWeight(),
-            'A real query term must produce a non-zero specificity shift -- if it doesn\'t, specificity-aware weighting is still inert.',
-        );
-        $this->assertGreaterThanOrEqual(0.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
-        $this->assertLessThanOrEqual(1.0, $adjustedConfigurationTransfer->getRelevanceWeightOrFail());
-    }
-
-    /**
-     * Proves `specificityCurveExponent` actually reaches this reimplementation's own shift math, not just
-     * the `?? 1.0` fallback -- a forgotten parameter here has already once made a knob silently inert
-     * during optimizer evaluation (see this class's own sibling
-     * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s docblock). Every other
-     * test in this class either omits `specificityCurveExponent` entirely (falling back to the
-     * pivot-neutral 1.0) or never varies it, so none of them would notice if this parameter were dropped
-     * on the floor again. Uses a deliberately small `specificityWeightShiftMagnitude` (0.05, vs the other
-     * tests' 0.4) so the final, clamped `relevanceWeight` has room to move in either direction regardless
-     * of which exponent produces the larger shift -- with a bigger magnitude, both exponents could clamp
-     * to the same boundary value and give a false pass that looks identical to the real bug.
-     */
-    public function testApplySpecificityWeightingRespectsTheConfiguredCurveExponent(): void
-    {
-        // Arrange
-        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
-
-        $buildConfigurationTransfer = fn (float $curveExponent): SearchRankingConfigurationStorageTransfer => (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight(0.5)
-            ->setRelevanceSaturationPoint(12.0)
-            ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setSpecificityBlendWeight(0.7)
-            ->setSpecificitySaturationPoint(1.0)
-            ->setSpecificityCurveExponent($curveExponent)
-            ->setSpecificityWeightExponent(1.0)
-            ->setSpecificityWeightShiftMagnitude(0.05);
-
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
-        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
-
-        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
-
-        // Act
-        $pivotNeutralConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $buildConfigurationTransfer(1.0));
-        $sharpenedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $buildConfigurationTransfer(4.0));
-
-        // Assert
-        $this->assertNotSame(
-            $pivotNeutralConfigurationTransfer->getRelevanceWeight(),
-            $sharpenedConfigurationTransfer->getRelevanceWeight(),
-            'Two different specificityCurveExponent values must produce two different adjusted relevanceWeight results for the same real query term -- if they don\'t, specificityCurveExponent is silently inert in this reimplementation.',
-        );
-    }
-
-    public function testFetchIdfByTermCachesTheResultAcrossRepeatedCalls(): void
-    {
-        // Arrange
-        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
-
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
-        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
-
-        $fetchIdfByTerm = new ReflectionMethod($runner, 'fetchIdfByTerm');
-
-        // Act
-        $fetchIdfByTerm->invoke($runner, $indexName, 'chair');
-
-        $cacheProperty = new ReflectionProperty(RankEvalRunner::class, 'idfCache');
-        $cache = $cacheProperty->getValue();
-
-        // Assert
-        $this->assertArrayHasKey($indexName . ':chair', $cache);
-    }
-
-    public function testApplySpecificityWeightingIsANoOpWhenNoQueryTermCarriesRealCorpusEvidence(): void
-    {
-        // Arrange -- a search term that matches nothing in the corpus at all has no idf to compute.
-        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedEnabled();
-
-        $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight(0.5)
-            ->setRelevanceSaturationPoint(12.0)
-            ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setSpecificityBlendWeight(0.7)
-            ->setSpecificitySaturationPoint(1.0)
-            ->setSpecificityWeightExponent(1.0)
-            ->setSpecificityWeightShiftMagnitude(0.4);
-
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
-        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
-
-        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
-
-        // Act
-        $unchangedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'nonexistenttermforthistest', $configurationTransfer);
-
-        // Assert
-        $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
-    }
-
-    /**
-     * Proves evaluation must never apply an effect live traffic never applies, regardless of what a
-     * candidate configuration's own specificity fields say. Deliberately uses an EXPLICIT forced-disabled
-     * stub rather than the real, ambient `createRankEvalRunner()` -- now that
-     * `isSpecificityWeightingEnabled()` genuinely resolves through a project override (see
-     * {@see \SprykerCommunity\Client\SearchRankingOptimizer\Search\RankEvalRunner}'s own docblock for the
-     * fix), `createRankEvalRunner()`'s result legitimately depends on whatever THIS shop's own project
-     * config says, which this test must not depend on to stay deterministic.
-     */
-    public function testApplySpecificityWeightingIsANoOpWhenSpecificityWeightingIsDisabled(): void
-    {
-        // Arrange -- a fully-populated specificity configuration that WOULD produce a real shift if
-        // specificity weighting were enabled (see testApplySpecificityWeightingShiftsRelevanceWeightForARealQueryTerm).
-        $runner = $this->createRankEvalRunnerWithSpecificityWeightingForcedDisabled();
-
-        $configurationTransfer = (new SearchRankingConfigurationStorageTransfer())
-            ->setRelevanceWeight(0.5)
-            ->setRelevanceSaturationPoint(12.0)
-            ->setMetricWeights(['pdp_impressions' => 1.0])
-            ->setSpecificityBlendWeight(0.7)
-            ->setSpecificitySaturationPoint(1.0)
-            ->setSpecificityWeightExponent(1.0)
-            ->setSpecificityWeightShiftMagnitude(0.4);
-
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), new SearchElasticsearchConfig());
-        $indexName = $indexNameResolver->resolve(SearchRankingOptimizerConfig::PAGE_SOURCE_IDENTIFIER, 'DE');
-
-        $applySpecificityWeighting = new ReflectionMethod($runner, 'applySpecificityWeighting');
-
-        // Act
-        $unchangedConfigurationTransfer = $applySpecificityWeighting->invoke($runner, $indexName, 'chair', $configurationTransfer);
-
-        // Assert
-        $this->assertSame($configurationTransfer, $unchangedConfigurationTransfer);
-    }
-
     public function testEvaluateSkipsAQueryWithNoRatedProductsRatherThanSendingAnEmptyRatingsArray(): void
     {
         // Arrange — rank_eval itself rejects a request with an empty `ratings` array, so a query with no
@@ -431,54 +260,6 @@ class RankEvalRunnerTest extends Unit
     }
 
     /**
-     * The unit-level counterpart to {@see testEvaluateDegradesToLexicalOnlyWhenTheEmbeddingClientIsUnavailable()}:
-     * proves `embed()` is never even attempted once `alpha >= 1.0` — the exact short-circuit
-     * {@see \SprykerCommunity\Client\SearchRanking\Plugin\Catalog\SearchRankingFunctionScoreQueryExpanderPlugin::resolveQueryVector()}
-     * itself applies. Uses a spying stub rather than the real `evaluate()` path so a bug that fires an
-     * unnecessary embedding call (wasted latency/cost against a real embedding service, once one exists)
-     * is caught even though it wouldn't currently change any score.
-     *
-     * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
-     */
-    public function testResolveQueryVectorNeverCallsEmbedWhenAlphaIsAtOrAboveOne(): void
-    {
-        // Arrange
-        $spyingEmbeddingClient = new class implements EmbeddingClientInterface {
-            public int $embedCallCount = 0;
-
-            // phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter -- signature is fixed by the
-            //   interface this test double implements; never actually reached by this test.
-            /**
-             * @param string $text
-             *
-             * @throws \SprykerCommunity\Client\SearchRanking\Semantic\EmbeddingUnavailableException
-             */
-            public function embed(string $text): array
-            {
-                // phpcs:enable SlevomatCodingStandard.Functions.UnusedParameter
-                $this->embedCallCount++;
-
-                throw new EmbeddingUnavailableException('Should never be called for alpha >= 1.0.');
-            }
-        };
-
-        $runner = $this->createRankEvalRunnerWithEmbeddingClient($spyingEmbeddingClient);
-        $resolveQueryVector = new ReflectionMethod($runner, 'resolveQueryVector');
-
-        $lexicalConfigurationTransfer = (new SearchRankingConfigurationStorageTransfer())->setAlpha(1.0);
-        $unsetAlphaConfigurationTransfer = new SearchRankingConfigurationStorageTransfer();
-
-        // Act
-        $resultForAlphaOne = $resolveQueryVector->invoke($runner, 'chair', $lexicalConfigurationTransfer);
-        $resultForUnsetAlpha = $resolveQueryVector->invoke($runner, 'chair', $unsetAlphaConfigurationTransfer);
-
-        // Assert
-        $this->assertNull($resultForAlphaOne);
-        $this->assertNull($resultForUnsetAlpha);
-        $this->assertSame(0, $spyingEmbeddingClient->embedCallCount, 'embed() must never be called when alpha >= 1.0 or unset -- there is no vector to blend in either case.');
-    }
-
-    /**
      * Same composition `SearchRankingOptimizerFactory::createRankEvalRunner()` uses in production —
      * including the real `SearchRankingOptimizerToSearchRankingClientBridge`, so this exercises the actual
      * project-override-aware `isSpecificityWeightingEnabled()` resolution (off by default, since nothing in
@@ -489,6 +270,7 @@ class RankEvalRunnerTest extends Unit
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
+        $searchRankingClient = new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient());
 
         return new RankEvalRunner(
             $elasticaClient,
@@ -496,8 +278,7 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            new QuerySpecificityCalculator(),
-            new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
+            new SpecificityWeightingApplier($elasticaClient, new QuerySpecificityCalculator(), $searchRankingClient),
         );
     }
 
@@ -538,6 +319,7 @@ class RankEvalRunnerTest extends Unit
         $searchElasticsearchConfig = new SearchElasticsearchConfig();
         $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
         $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
+        $searchRankingClient = new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient());
 
         return new RankEvalRunner(
             $elasticaClient,
@@ -545,113 +327,8 @@ class RankEvalRunnerTest extends Unit
             new LiveCatalogSearchQueryBuilder(),
             new FunctionScoreBuilder(),
             new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            new QuerySpecificityCalculator(),
-            new SearchRankingOptimizerToSearchRankingClientBridge(new SearchRankingClient()),
-            $embeddingClient,
-            new InMemorySemanticQueryEmbeddingCache(),
-        );
-    }
-
-    /**
-     * A real `SearchRankingOptimizerToSearchRankingClientInterface` stub forcing `true` — no longer an
-     * anonymous `RankEvalRunner` subclass overriding a protected method, now that the specificity-enabled
-     * flag genuinely IS dependency-injectable via the bridge {@see createRankEvalRunner()} also uses.
-     * `getSpecificityProbeFieldSearchAnalyzers()` mirrors this shop's own real project override
-     * (`Pyz\Client\SearchRanking\SearchRankingConfig`), since the field/analyzer names must match this
-     * shop's real `page.json` schema for a live `_termvectors` probe to find anything at all.
-     */
-    protected function createRankEvalRunnerWithSpecificityWeightingForcedEnabled(): RankEvalRunner
-    {
-        $searchElasticsearchConfig = new SearchElasticsearchConfig();
-        $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
-
-        $specificityWeightingForcedEnabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
-            public function isSpecificityWeightingEnabled(): bool
-            {
-                return true;
-            }
-
-            /**
-             * @return array<string, string>
-             */
-            public function getSpecificityProbeFieldSearchAnalyzers(): array
-            {
-                return [
-                    'full-text' => 'fulltext_search_analyzer',
-                    'full-text-boosted' => 'fulltext_search_analyzer',
-                ];
-            }
-
-            public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
-            {
-                return new FunctionScoreBuilder();
-            }
-
-            public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
-            {
-                return new QuerySpecificityCalculator();
-            }
-        };
-
-        return new RankEvalRunner(
-            $elasticaClient,
-            $indexNameResolver,
-            new LiveCatalogSearchQueryBuilder(),
-            new FunctionScoreBuilder(),
-            new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            new QuerySpecificityCalculator(),
-            $specificityWeightingForcedEnabledClient,
-        );
-    }
-
-    /**
-     * The counterpart to {@see createRankEvalRunnerWithSpecificityWeightingForcedEnabled()} —
-     * deterministically OFF regardless of what this shop's own project config says, for tests that
-     * specifically need to prove the disabled path rather than depend on ambient environment state.
-     */
-    protected function createRankEvalRunnerWithSpecificityWeightingForcedDisabled(): RankEvalRunner
-    {
-        $searchElasticsearchConfig = new SearchElasticsearchConfig();
-        $elasticaClient = (new ElasticaClientFactory())->createClient($searchElasticsearchConfig->getClientConfig());
-        $indexNameResolver = new IndexNameResolver(new NeverInvokedStoreClient(), $searchElasticsearchConfig);
-
-        $specificityWeightingForcedDisabledClient = new class implements SearchRankingOptimizerToSearchRankingClientInterface {
-            public function isSpecificityWeightingEnabled(): bool
-            {
-                return false;
-            }
-
-            /**
-             * @return array<string, string>
-             */
-            public function getSpecificityProbeFieldSearchAnalyzers(): array
-            {
-                return [
-                    'full-text' => 'fulltext_search_analyzer',
-                    'full-text-boosted' => 'fulltext_search_analyzer',
-                ];
-            }
-
-            public function createFunctionScoreBuilder(): FunctionScoreBuilderInterface
-            {
-                return new FunctionScoreBuilder();
-            }
-
-            public function createQuerySpecificityCalculator(): QuerySpecificityCalculatorInterface
-            {
-                return new QuerySpecificityCalculator();
-            }
-        };
-
-        return new RankEvalRunner(
-            $elasticaClient,
-            $indexNameResolver,
-            new LiveCatalogSearchQueryBuilder(),
-            new FunctionScoreBuilder(),
-            new SearchRankingOptimizerToSearchRankingStorageClientBridge(new SearchRankingStorageClient()),
-            new QuerySpecificityCalculator(),
-            $specificityWeightingForcedDisabledClient,
+            new SpecificityWeightingApplier($elasticaClient, new QuerySpecificityCalculator(), $searchRankingClient),
+            new QueryVectorResolver($embeddingClient, new InMemorySemanticQueryEmbeddingCache()),
         );
     }
 }

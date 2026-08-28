@@ -17,9 +17,11 @@ use Generated\Shared\Transfer\SearchRankingWeightCheckpointMetricWeightTransfer;
 use RuntimeException;
 use SprykerCommunity\Shared\SearchRankingOptimizer\SearchRankingOptimizerConfig;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Exception\UnsupportedRankingStrategyException;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Metric\FormulaDeterminismChecker;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\AlgorithmFactory;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\OptimizationRunner;
+use SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface;
 use SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerRepositoryInterface;
@@ -67,6 +69,37 @@ class OptimizationRunnerTest extends Unit
         $entityManagerMock->expects($this->never())->method('startOptimizerRun');
 
         $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock);
+
+        // Act
+        $runner->runNext();
+    }
+
+    /**
+     * A ranking strategy the optimizer has no parameter-space mapper for is live: the run must fail
+     * (status=failed, the guard's message) BEFORE any baseline/candidate is scored, so no misleading
+     * nDCG for parameters the active strategy never reads is ever persisted. The console surfaces the
+     * failed run as a red error + non-zero exit via its existing status=failed branch.
+     */
+    public function testRunNextFailsTheRunWhenTheActiveRankingStrategyIsNotTunable(): void
+    {
+        // Arrange
+        $repositoryMock = $this->createMock(SearchRankingOptimizerRepositoryInterface::class);
+        $repositoryMock->method('findOldestQueuedOptimizerRun')->willReturn($this->createQueuedRunTransfer());
+        $repositoryMock->method('findOptimizerRunById')->willReturn($this->createDoneRunTransfer());
+
+        $searchRankingFacadeMock = $this->createBasicSearchRankingFacadeMock();
+
+        $rankingStrategyGuardMock = $this->createMock(RankingStrategyGuardInterface::class);
+        $rankingStrategyGuardMock->method('assertActiveStrategyIsTunable')
+            ->willThrowException(new UnsupportedRankingStrategyException('Refusing to optimize: "hybrid" has no mapper.'));
+
+        $entityManagerMock = $this->createMock(SearchRankingOptimizerEntityManagerInterface::class);
+        $entityManagerMock->expects($this->once())
+            ->method('failOptimizerRun')
+            ->with(1, $this->stringContains('hybrid'));
+        $entityManagerMock->expects($this->never())->method('startOptimizerRun');
+
+        $runner = $this->createRunner($repositoryMock, $entityManagerMock, $searchRankingFacadeMock, null, $rankingStrategyGuardMock);
 
         // Act
         $runner->runNext();
@@ -724,12 +757,14 @@ class OptimizationRunnerTest extends Unit
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Persistence\SearchRankingOptimizerEntityManagerInterface|null $entityManager
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Dependency\Facade\SearchRankingOptimizerToSearchRankingFacadeInterface|null $searchRankingFacade
      * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Evaluation\RankEvaluationRunnerInterface|null $rankEvaluationRunner
+     * @param \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface|null $rankingStrategyGuard
      */
     protected function createRunner(
         SearchRankingOptimizerRepositoryInterface $repository,
         ?SearchRankingOptimizerEntityManagerInterface $entityManager = null,
         ?SearchRankingOptimizerToSearchRankingFacadeInterface $searchRankingFacade = null,
         ?RankEvaluationRunnerInterface $rankEvaluationRunner = null,
+        ?RankingStrategyGuardInterface $rankingStrategyGuard = null,
     ): OptimizationRunner {
         if ($rankEvaluationRunner === null) {
             $rankEvaluationRunner = $this->createMock(RankEvaluationRunnerInterface::class);
@@ -743,6 +778,7 @@ class OptimizationRunnerTest extends Unit
             $rankEvaluationRunner,
             new FormulaDeterminismChecker(),
             new AlgorithmFactory(),
+            $rankingStrategyGuard ?? $this->createMock(RankingStrategyGuardInterface::class),
             // Deliberately tiny -- these tests verify orchestration, not optimization quality (already
             // covered by CmaEsAlgorithmTest's own benchmark-function tests).
             maxGenerations: 2,

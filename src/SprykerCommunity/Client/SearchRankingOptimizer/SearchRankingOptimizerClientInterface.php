@@ -124,4 +124,20 @@ interface SearchRankingOptimizerClientInterface
      * @param int $idProductAbstract
      */
     public function productMatchesSearch(string $searchTerm, string $storeName, string $localeName, int $idProductAbstract): bool;
+
+    /**
+     * Specification:
+     * - Passes through spryker-community/search-ranking's own
+     *   {@see \SprykerCommunity\Client\SearchRanking\SearchRankingClientInterface::getRegisteredRankingStrategyNames()}:
+     *   the identity of every ranking strategy active in the project (`adaptive_formula` plus any
+     *   project-registered strategy plugin).
+     * - This package's formula-parameter optimization only knows how to tune `adaptive_formula`; its
+     *   {@see \SprykerCommunity\Zed\SearchRankingOptimizer\Business\Optimization\RankingStrategyGuardInterface}
+     *   reads this to refuse a write whenever a strategy it has no parameter-space mapper for is live.
+     *
+     * @api
+     *
+     * @return array<int, string>
+     */
+    public function getRegisteredRankingStrategyNames(): array;
 }
