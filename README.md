@@ -581,8 +581,9 @@ verification](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#
 Verified end-to-end on **OpenSearch 3.5.0** (Lucene 10.3.2): a demoshop upgraded from 1.3.4, full
 re-export/reindex, calibration and evaluation re-run against the live 3.5 cluster. **No package code
 change was needed** — the migration friction is all core Spryker (the search-schema packages, ticket
-SC-25160) and project/deployment level. It is written up in `search-ranking`'s [Migrating to OpenSearch
-3.x](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/docs/opensearch-3.x-migration.md).
+SC-25160) and project/deployment level. See [Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md)
+for what it means specifically for this package (`_rank_eval` + `function_score` are version-stable; only
+`evaluate-hybrid`'s raw-`knn` path touches k-NN).
 
 ## Installation
 
@@ -1099,6 +1100,7 @@ the package and getting it installed:
 | [Architecture](docs/architecture.md) | How this package sits on top of search-ranking, and how one tuned store/locale fans out to the rest. |
 | [Terminology](docs/terminology.md) | The vocabulary this package uses and how each term maps to the code. |
 | [Calling Client\Catalog / Client\Search from Zed](docs/zed-search-access.md) | Why those clients fail outside an HTTP context, and the two supported ways around it. |
+| [Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md) | Why `_rank_eval` and the reconstructed `function_score` carry across unchanged, the `evaluate-hybrid` k-NN touchpoint, and the 1.3.x → 3.5 capability delta. |
 | [Testing and CI](docs/testing.md) | How this package is tested, which suites need a host shop, and what CI runs. |
 
 ## License
