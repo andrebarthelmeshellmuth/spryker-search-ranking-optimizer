@@ -16,7 +16,7 @@
         "andrebarthelmeshellmuth/blackbox-optimizer": "^5.0.0",
         "propel/propel": "^2.0.0",
         "ruflin/elastica": "^7.3.0",
-        "spryker-community/search-ranking": "^2.2.0",
+        "spryker-community/search-ranking": "dev-wip/hybrid-search-p0-p4 as 2.4.0",
         "spryker/acl": "^3.27.0",
         "spryker/api-platform": "^1.22.0",
         "spryker/catalog": "^5.7.0",
@@ -105,6 +105,11 @@
         }
     },
     "minimum-stability": "stable",
+    "extra": {
+        "dependency-pins": {
+            "symfony/security-guard": "Resolution pin only — no src/ usage, do NOT drop in a phantom-dependency audit. Holds symfony/security-core on a PHP-8.3-compatible line; without it composer walks the spryker/api-platform -> api-platform/symfony -> symfony/security-core ^6.4||^7.0||^8.0 branch whose only self-consistent set needs security-core 8.x (php >= 8.4) and CI runs php 8.3, so 'composer install' fails outright."
+        }
+    },
     "homepage": "https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer",
     "authors": [
         {
