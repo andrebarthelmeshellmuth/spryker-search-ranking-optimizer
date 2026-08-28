@@ -29,6 +29,7 @@ installs and runs completely standalone without it (see [Relationship to search-
 - [Before you start: this needs real relevance ratings](#before-you-start-this-needs-real-relevance-ratings)
 - [What it does today](#what-it-does-today)
 - [Requirements](#requirements)
+- [Search engine compatibility](#search-engine-compatibility)
 - [Installation](#installation)
 - [Modules](#modules)
 - [Limitations](#limitations)
@@ -565,6 +566,25 @@ The workflow, from the **Search Ranking Optimizer → Automated Weight Optimizat
   email still resolves to nobody. `search-ranking-optimizer:check-installation`
   ([step 8](#8-verify-the-installation)) warns about both cases once any metric has notification enabled.
 
+## Search engine compatibility
+
+This package builds no ranking query of its own — it reaches the engine through two long-stable surfaces,
+and both are exercised by `search-ranking`'s own [engine-compatibility
+verification](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking#search-engine-compatibility):
+
+- **`_rank_eval`** — the objective score behind Rank evaluation, Auto-tune and Automated weight
+  optimization. Present and behaviour-stable on OpenSearch 1.3.4 → 3.5 and Elasticsearch 8.x.
+- **`function_score` / `script_score` (painless)** — reconstructed identically to what `search-ranking`
+  applies live, so Saturation Point Calibration and every evaluation run measure the real formula.
+  Byte-identical `_score` across the same engine range.
+
+Verified end-to-end on **OpenSearch 3.5.0** (Lucene 10.3.2): a demoshop upgraded from 1.3.4, full
+re-export/reindex, calibration and evaluation re-run against the live 3.5 cluster. **No package code
+change was needed** — the migration friction is all core Spryker (the search-schema packages, ticket
+SC-25160) and project/deployment level. See [Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md)
+for what it means specifically for this package (`_rank_eval` + `function_score` are version-stable; only
+`evaluate-hybrid`'s raw-`knn` path touches k-NN).
+
 ## Installation
 
 If `search-ranking` is already installed in your project, steps 2 and 5 are already done — this package
@@ -1080,6 +1100,7 @@ the package and getting it installed:
 | [Architecture](docs/architecture.md) | How this package sits on top of search-ranking, and how one tuned store/locale fans out to the rest. |
 | [Terminology](docs/terminology.md) | The vocabulary this package uses and how each term maps to the code. |
 | [Calling Client\Catalog / Client\Search from Zed](docs/zed-search-access.md) | Why those clients fail outside an HTTP context, and the two supported ways around it. |
+| [Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md) | Why `_rank_eval` and the reconstructed `function_score` carry across unchanged, the `evaluate-hybrid` k-NN touchpoint, and the 1.3.x → 3.5 capability delta. |
 | [Testing and CI](docs/testing.md) | How this package is tested, which suites need a host shop, and what CI runs. |
 
 ## License
